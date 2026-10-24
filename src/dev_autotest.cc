@@ -15,6 +15,7 @@
 
 #include "actions.h"
 #include "animation.h"
+#include "app_update.h"
 #include "art.h"
 #include "character_editor.h"
 #include "combat.h"
@@ -447,6 +448,10 @@ enum DevAutotestAction {
     DEV_AUTOTEST_ACTION_LOG_PREFERENCES,
     // Logs the saves (count, quick ones); FAIL when there aren't [a] of them.
     DEV_AUTOTEST_ACTION_LOG_SAVES,
+    // Offline update UI: state [a], tag [widget]. No network or APK install.
+    DEV_AUTOTEST_ACTION_UPDATE_STATE,
+    // Number of installer requests; closing an update window revokes intent.
+    DEV_AUTOTEST_ACTION_CHECK_UPDATE_INSTALLS,
 };
 
 struct DevAutotestStep {
@@ -1525,9 +1530,76 @@ static const DevAutotestStep kDevAutotestAboutSteps[] = {
     { DEV_AUTOTEST_ACTION_BACK, 0, 0, 0, 40, "a01_menu" },
     { DEV_AUTOTEST_ACTION_MUI_TAP, 0, 0, 0, 30, "a02_settings", "menu.settings" },
     { DEV_AUTOTEST_ACTION_MUI_TAP, 0, 0, 0, 30, "a03_about", "prefs.sections.5" },
-    { DEV_AUTOTEST_ACTION_CHECK_WIDGET, 1, 0, 0, 1, "a04_source_button", "prefs.about.source" },
     { DEV_AUTOTEST_ACTION_MUI_DRAG_BY, 0, -0.5f, 0, 40, "a05_scrolled", "prefs.about" },
     { DEV_AUTOTEST_ACTION_MUI_DRAG_BY, 0, -0.5f, 0, 40, "a06_scrolled", "prefs.about" },
+    { DEV_AUTOTEST_ACTION_CHECK_WIDGET, 1, 0, 0, 1, "a07_source_button", "prefs.about.source" },
+    { DEV_AUTOTEST_ACTION_MUI_TAP, 0, 0, 0, 30, "a08_licenses", "prefs.about.licenses" },
+    { DEV_AUTOTEST_ACTION_CHECK_WIDGET, 1, 0, 0, 1, "a09_licenses_open", "licenses.back" },
+    { DEV_AUTOTEST_ACTION_MUI_DRAG_BY, 0, -0.5f, 0, 30, "a10_licenses_scrolled", "licenses.text" },
+    { DEV_AUTOTEST_ACTION_BACK, 0, 0, 0, 30, "a11_licenses_closed" },
+};
+
+// A single update action, progress, closing while downloading, restored
+// readiness, deleting the file, automatic install only in the active dialog,
+// cancellation of the system installer, permission and retry states.
+static const DevAutotestStep kDevAutotestUpdateSteps[] = {
+    { DEV_AUTOTEST_ACTION_NONE, 0, 0, 0, 30, "up00_title" },
+    { DEV_AUTOTEST_ACTION_UPDATE_STATE, 0, 0, 0, 3, "up01_idle" },
+    { DEV_AUTOTEST_ACTION_CHECK_WIDGET, 0, 0, 0, 1, "up02_no_banner", "mainmenu.update" },
+    { DEV_AUTOTEST_ACTION_UPDATE_STATE, 3, 0, 0, 3, "up03_available", "v1.3.0-mobile.99" },
+    { DEV_AUTOTEST_ACTION_CHECK_WIDGET, 1, 0, 0, 1, "up04_banner", "mainmenu.update" },
+    { DEV_AUTOTEST_ACTION_MUI_TAP, 0, 0, 0, 30, "up05_notes", "mainmenu.update" },
+    { DEV_AUTOTEST_ACTION_CHECK_WIDGET, 1, 0, 0, 1, "up06_action", "update.download" },
+    { DEV_AUTOTEST_ACTION_MUI_TAP, 0, 0, 0, 8, "up07_downloading", "update.download" },
+    { DEV_AUTOTEST_ACTION_CHECK_WIDGET, 1, 0, 0, 1, "up08_progress", "update.progress" },
+    { DEV_AUTOTEST_ACTION_MUI_TAP, 0, 0, 0, 30, "up09_closed", "update.back" },
+    { DEV_AUTOTEST_ACTION_UPDATE_STATE, 5, 0, 0, 3, "up10_ready", "v1.3.0-mobile.99" },
+    { DEV_AUTOTEST_ACTION_CHECK_UPDATE_INSTALLS, 0, 0, 0, 1, "up11_no_surprise_install" },
+    { DEV_AUTOTEST_ACTION_MUI_TAP, 0, 0, 0, 30, "up12_ready_dialog", "mainmenu.update" },
+    { DEV_AUTOTEST_ACTION_CHECK_WIDGET, 1, 0, 0, 1, "up13_install_button", "update.install" },
+    { DEV_AUTOTEST_ACTION_CHECK_WIDGET, 0, 0, 0, 1, "up13b_no_delete_in_dialog", "update.delete" },
+    { DEV_AUTOTEST_ACTION_MUI_TAP, 0, 0, 0, 30, "up13c_dialog_closed", "update.back" },
+    { DEV_AUTOTEST_ACTION_MUI_TAP, 0, 0, 0, 30, "up13d_settings", "mainmenu.settings" },
+    { DEV_AUTOTEST_ACTION_MUI_TAP, 0, 0, 0, 30, "up13e_ready_about", "prefs.sections.5" },
+    { DEV_AUTOTEST_ACTION_CHECK_WIDGET, 1, 0, 0, 1, "up13f_update_dot", "prefs.about.update.notice" },
+    { DEV_AUTOTEST_ACTION_MUI_TAP, 0, 0, 0, 8, "up14_deleted", "prefs.about.update.delete" },
+    { DEV_AUTOTEST_ACTION_CHECK_WIDGET, 0, 0, 0, 1, "up14b_no_cached_file", "prefs.about.update.delete" },
+    { DEV_AUTOTEST_ACTION_CHECK_WIDGET, 0, 0, 0, 1, "up14c_no_apply", "prefs.apply" },
+    { DEV_AUTOTEST_ACTION_MUI_TAP, 0, 0, 0, 30, "up14d_main_menu", "prefs.back" },
+    { DEV_AUTOTEST_ACTION_MUI_TAP, 0, 0, 0, 30, "up14e_update_dialog", "mainmenu.update" },
+    { DEV_AUTOTEST_ACTION_CHECK_WIDGET, 0, 0, 0, 1, "up15_no_install", "update.install" },
+    { DEV_AUTOTEST_ACTION_MUI_TAP, 0, 0, 0, 8, "up16_download_again", "update.download" },
+    { DEV_AUTOTEST_ACTION_UPDATE_STATE, 5, 0, 0, 8, "up17_installing", "v1.3.0-mobile.99" },
+    { DEV_AUTOTEST_ACTION_CHECK_UPDATE_INSTALLS, 1, 0, 0, 1, "up18_one_install" },
+    { DEV_AUTOTEST_ACTION_UPDATE_STATE, 5, 0, 0, 8, "up19_installer_cancelled", "v1.3.0-mobile.99" },
+    { DEV_AUTOTEST_ACTION_CHECK_UPDATE_INSTALLS, 1, 0, 0, 1, "up20_not_reopened" },
+    { DEV_AUTOTEST_ACTION_UPDATE_STATE, 8, 0, 0, 8, "up21_permission", "v1.3.0-mobile.99" },
+    { DEV_AUTOTEST_ACTION_UPDATE_STATE, 7, 0, 0, 8, "up22_error", "v1.3.0-mobile.99" },
+    { DEV_AUTOTEST_ACTION_MUI_TAP, 0, 0, 0, 8, "up22b_retry_download", "update.download" },
+    { DEV_AUTOTEST_ACTION_MUI_TAP, 0, 0, 0, 8, "up22c_cancel_download", "update.cancel" },
+    { DEV_AUTOTEST_ACTION_UPDATE_STATE, 7, 1, 0, 8, "up22d_check_error", "v1.3.0-mobile.99" },
+    { DEV_AUTOTEST_ACTION_MUI_TAP, 0, 0, 0, 8, "up22e_retry_check", "update.download" },
+    { DEV_AUTOTEST_ACTION_CHECK_WIDGET, 0, 0, 0, 1, "up22f_check_does_not_download", "update.progress" },
+    { DEV_AUTOTEST_ACTION_BACK, 0, 0, 0, 30, "up23_back" },
+    { DEV_AUTOTEST_ACTION_MUI_TAP, 0, 0, 0, 30, "up24_settings", "mainmenu.settings" },
+    { DEV_AUTOTEST_ACTION_MUI_TAP, 0, 0, 0, 30, "up25_about", "prefs.sections.5" },
+    { DEV_AUTOTEST_ACTION_CHECK_WIDGET, 1, 0, 0, 1, "up26_notice", "prefs.about.notice" },
+    { DEV_AUTOTEST_ACTION_CHECK_WIDGET, 1, 0, 0, 1, "up26b_update_dot", "prefs.about.update.notice" },
+    { DEV_AUTOTEST_ACTION_CHECK_WIDGET, 0, 0, 0, 1, "up27_no_apply", "prefs.apply" },
+};
+
+static const DevAutotestStep kDevAutotestUpdateInGameSteps[] = {
+    { DEV_AUTOTEST_ACTION_NONE, 0, 0, 0, 30, "ug00_game" },
+    { DEV_AUTOTEST_ACTION_UPDATE_STATE, 5, 0, 0, 3, "ug01_ready", "v1.3.0-mobile.99" },
+    { DEV_AUTOTEST_ACTION_BACK, 0, 0, 0, 30, "ug02_menu" },
+    { DEV_AUTOTEST_ACTION_MUI_TAP, 0, 0, 0, 30, "ug03_settings", "menu.settings" },
+    { DEV_AUTOTEST_ACTION_MUI_TAP, 0, 0, 0, 30, "ug04_about", "prefs.sections.5" },
+    { DEV_AUTOTEST_ACTION_CHECK_WIDGET, 1, 0, 0, 1, "ug05_main_menu_hint", "prefs.about.update.ingame" },
+    { DEV_AUTOTEST_ACTION_MUI_TAP, 0, 0, 0, 8, "ug06_manual_check", "prefs.about.update" },
+    { DEV_AUTOTEST_ACTION_CHECK_WIDGET, 0, 0, 0, 1, "ug07_no_install", "update.install" },
+    { DEV_AUTOTEST_ACTION_CHECK_WIDGET, 0, 0, 0, 1, "ug08_no_download", "update.download" },
+    { DEV_AUTOTEST_ACTION_CHECK_WIDGET, 0, 0, 0, 1, "ug08b_no_delete", "prefs.about.update.delete" },
+    { DEV_AUTOTEST_ACTION_CHECK_UPDATE_INSTALLS, 0, 0, 0, 1, "ug09_no_installer" },
 };
 
 // Own SAVEGAME with a copy of the test save in slot 1: cancel once, then delete it.
@@ -2761,6 +2833,12 @@ void devAutotestSetScenario(const char* name)
     } else if (strcmp(name, "elevator") == 0) {
         gDevAutotestSteps = kDevAutotestElevatorSteps;
         gDevAutotestStepCount = sizeof(kDevAutotestElevatorSteps) / sizeof(kDevAutotestElevatorSteps[0]);
+    } else if (strcmp(name, "update") == 0) {
+        gDevAutotestSteps = kDevAutotestUpdateSteps;
+        gDevAutotestStepCount = sizeof(kDevAutotestUpdateSteps) / sizeof(kDevAutotestUpdateSteps[0]);
+    } else if (strcmp(name, "updateingame") == 0) {
+        gDevAutotestSteps = kDevAutotestUpdateInGameSteps;
+        gDevAutotestStepCount = sizeof(kDevAutotestUpdateInGameSteps) / sizeof(kDevAutotestUpdateInGameSteps[0]);
     } else if (strcmp(name, "mainmenu") == 0) {
         gDevAutotestSteps = kDevAutotestMainMenuSteps;
         gDevAutotestStepCount = sizeof(kDevAutotestMainMenuSteps) / sizeof(kDevAutotestMainMenuSteps[0]);
@@ -3659,6 +3737,16 @@ void devAutotestTick()
             if (!ok) {
                 exit(EXIT_FAILURE);
             }
+            break;
+        }
+        case DEV_AUTOTEST_ACTION_UPDATE_STATE:
+            appUpdateTestState(static_cast<AppUpdateState>(static_cast<int>(step->a)), step->widget, step->b != 0 ? static_cast<AppUpdateError>(static_cast<int>(step->b)) : AppUpdateError::Download);
+            devAutotestLog("  update state %d tag %s\n", static_cast<int>(step->a), step->widget != nullptr ? step->widget : "");
+            break;
+        case DEV_AUTOTEST_ACTION_CHECK_UPDATE_INSTALLS: {
+            bool ok = appUpdateTestInstalls() == static_cast<int>(step->a);
+            devAutotestLog("  update installs %d expected %d: %s\n", appUpdateTestInstalls(), static_cast<int>(step->a), ok ? "PASS" : "FAIL");
+            if (!ok) exit(EXIT_FAILURE);
             break;
         }
         case DEV_AUTOTEST_ACTION_CHECK_WIDGET: {

@@ -9,6 +9,7 @@
 #include <string>
 #include <vector>
 
+#include "app_update.h"
 #include "db.h"
 #include "dbox.h"
 #include "debug.h"
@@ -20,6 +21,8 @@
 #include "kb.h"
 #include "loadsave.h"
 #include "message.h"
+#include "mui_notify.h"
+#include "mui_update.h"
 #include "platform/git_version.h"
 #include "platform_compat.h"
 #include "preferences.h"
@@ -132,30 +135,10 @@ namespace {
     constexpr int kTextSectionAbout = 367;
     constexpr int kTextAboutVersion = 368;
     constexpr int kTextAboutNotice = 369;
-    constexpr int kTextAboutSource = 370;
-    constexpr int kTextAboutOpen = 371;
     constexpr int kTextAboutLicenses = 372;
 
     // Where the port's source is (the about section, README).
     constexpr const char* kSourceUrl = "https://github.com/imbaner/fallout2-ce-mobile";
-
-    // The engine's and its components' licenses (ce.dat), shown in full: the
-    // engine's license asks every copy to come with it.
-    struct LicenseFile {
-        const char* title;
-        const char* path;
-    };
-    const LicenseFile kLicenseFiles[] = {
-        { "Fallout 2 Community Edition - Sustainable Use License 1.0", "licenses\\fallout2-ce.txt" },
-        { "SDL 2 - zlib License", "licenses\\sdl2.txt" },
-        { "zlib - zlib License", "licenses\\zlib.txt" },
-        { "libarchive - BSD License", "licenses\\libarchive.txt" },
-        { "XZ Utils (liblzma) - BSD Zero Clause License", "licenses\\xz.txt" },
-        { "LodePNG - zlib License", "licenses\\lodepng.txt" },
-        { "stb_truetype, stb_vorbis - MIT / Public Domain", "licenses\\stb.txt" },
-        { "fpattern", "licenses\\fpattern.txt" },
-        { "PT Mono - SIL Open Font License 1.1", "fonts\\OFL.txt" },
-    };
 
 #ifndef FALLOUT_APP_VERSION
 #define FALLOUT_APP_VERSION "1.3.0"
@@ -164,10 +147,6 @@ namespace {
     // The port's number of quick saves (one page, the phone's config); CE's
     // own default is none.
     constexpr int kDefaultQuickSaves = 10;
-
-    const MuiColor kDanger = muiRgb(0xFF8E72);
-    const MuiColor kDangerFill = muiRgb(0x1B100E);
-    const MuiColor kDangerPressed = muiRgb(0x47211D);
 
     // Texts in OPTIONS.MSG (the game's window: values).
     constexpr int kMessageOn = 201;
@@ -657,14 +636,10 @@ namespace {
         bool inGame;
         Section section = Section::Game;
         bool resetScroll = true;
-        // The about section's lines, wrapped for [aboutWidth].
-        struct AboutLine {
-            std::u32string text;
-            float size;
-            bool heading;
-        };
-        std::vector<AboutLine> aboutLines;
-        float aboutWidth = -1.0f;
+        bool pendingLicenses = false;
+        bool pendingUpdate = false;
+        bool pendingDeleteUpdate = false;
+        bool waitingUpdate = false;
 
         MessageList optionsMessages;
         bool optionsLoaded = false;
@@ -827,6 +802,13 @@ namespace {
                 marked[static_cast<size_t>(row.section)] = true;
             }
         }
+        // The same quiet marker as changed settings, with separate state:
+        // an update never makes settings dirty or asks to apply changes.
+        if (appUpdateHasRelease()) {
+            size_t index = std::find(shown.begin(), shown.end(), Section::About) - shown.begin();
+            marked[index] = true;
+            ui.mark("prefs.about.notice", list);
+        }
 
         muiFillRoundRect(list, ui.dp(7.0f), kPanel);
         int current = static_cast<int>(std::find(shown.begin(), shown.end(), section) - shown.begin());
@@ -878,89 +860,114 @@ namespace {
     void PreferencesScreen::buildAbout(MuiContext& ui, const MuiRect& rect)
     {
         const MuiTheme& theme = muiTheme();
-
-        float buttonHeight = ui.dp(40.0f);
-        MuiRect button = { rect.x, rect.bottom() - buttonHeight, rect.w, buttonHeight };
-        MuiRect text = { rect.x, rect.y, rect.w, button.y - ui.dp(8.0f) - rect.y };
-        float textWidth = text.w - ui.dp(8.0f);
-
-        if (aboutWidth != textWidth) {
-            aboutWidth = textWidth;
-            aboutLines.clear();
-            auto add = [&](const std::u32string& value, float size, bool heading) {
-                for (const std::u32string& line : muiWrapText(value, textWidth, size)) {
-                    aboutLines.push_back({ line, size, heading });
-                }
-            };
-            auto gap = [&]() { aboutLines.push_back({ U"", ui.dp(6.0f), false }); };
-
-            char version[160];
-            snprintf(version, sizeof(version), muiText(kTextAboutVersion, "Version %s, build %s"), FALLOUT_APP_VERSION, _BUILD_HASH);
-            add(U"Fallout 2 CE", ui.dp(16.0f), true);
-            add(muiDecodeGameText(version), ui.dp(11.0f), false);
-            gap();
-            add(muiDecodeGameText(muiText(kTextAboutNotice, "An unofficial mobile version of Fallout 2 Community Edition: CE's engine changed for touch screens. Not affiliated with Bethesda Softworks, ZeniMax or Interplay. Needs your own copy of Fallout 2.")), ui.dp(12.0f), false);
-            gap();
-            add(muiDecodeGameText(muiText(kTextAboutSource, "Source and changes:")) + U" " + muiDecodeUtf8(kSourceUrl), ui.dp(12.0f), false);
-            gap();
-            add(muiDecodeGameText(muiText(kTextAboutLicenses, "Licenses")), ui.dp(14.0f), true);
-
-            // As written (their lines are short), long ones wrapped.
-            for (const LicenseFile& license : kLicenseFiles) {
-                gap();
-                add(muiDecodeUtf8(license.title), ui.dp(12.0f), true);
-                File* stream = fileOpen(license.path, "rb");
-                if (stream == nullptr) {
-                    continue;
-                }
-                std::string contents(std::max(fileGetSize(stream), 0), '\0');
-                contents.resize(fileRead(&contents[0], 1, contents.size(), stream));
-                fileClose(stream);
-
-                size_t start = 0;
-                while (start <= contents.size()) {
-                    size_t end = contents.find('\n', start);
-                    if (end == std::string::npos) {
-                        end = contents.size();
-                    }
-                    std::string line = contents.substr(start, end - start);
-                    if (!line.empty() && line.back() == '\r') {
-                        line.pop_back();
-                    }
-                    if (line.empty()) {
-                        aboutLines.push_back({ U"", ui.dp(10.0f), false });
-                    } else {
-                        add(muiDecodeUtf8(line.c_str()), ui.dp(10.0f), false);
-                    }
-                    start = end + 1;
-                }
-            }
-        }
-
-        float height = 0.0f;
-        for (const AboutLine& line : aboutLines) {
-            height += line.size * 1.35f;
-        }
-
+        auto label = [](int id, const char* fallback) { return muiDecodeGameText(muiText(id, fallback)); };
+        float gap = ui.dp(10.0f);
+        float size = ui.dp(12.0f);
+        float line = muiLineHeight(size);
+        float rowHeight = ui.dp(48.0f);
+        bool updates = appUpdateState() != AppUpdateState::Unsupported;
+        bool deleting = updates && !inGame && appUpdateReady() && appUpdateState() != AppUpdateState::Checking && appUpdateState() != AppUpdateState::Installing;
+        auto notice = muiWrapText(label(kTextAboutNotice, "An unofficial mobile version of Fallout 2 Community Edition: CE's engine changed for touch screens. Not affiliated with Bethesda Softworks, ZeniMax or Interplay. Needs your own copy of Fallout 2."), rect.w - ui.dp(8.0f), size);
+        float titleHeight = ui.dp(24.0f);
+        float noticeHeight = notice.size() * line;
+        float updateNote = updates && inGame && appUpdateHasRelease() ? line * 2.0f : 0.0f;
+        float height = titleHeight + line + gap + noticeHeight + gap
+            + (updates ? rowHeight * (deleting ? 3.0f : 2.0f) + line + updateNote + gap : 0.0f) + rowHeight * 2.0f;
         if (resetScroll) {
             ui.setScroll("prefs.about", 0.0f);
             resetScroll = false;
         }
-        float offset = ui.scroll("prefs.about", text, height);
-        muiPushClip(text);
-        float y = text.y - offset;
-        for (const AboutLine& line : aboutLines) {
-            float lineHeight = line.size * 1.35f;
-            if (y + lineHeight >= text.y && y <= text.bottom() && !line.text.empty()) {
-                muiDrawTextAligned(line.text, { text.x + ui.dp(4.0f), y, textWidth, lineHeight }, line.size, line.heading ? theme.text : theme.textDim, MuiAlign::Start, MuiAlign::Center);
-            }
-            y += lineHeight;
+        float offset = ui.scroll("prefs.about", rect, height);
+        muiPushClip(rect);
+        float y = rect.y - offset;
+        muiDrawTextAligned(U"Fallout 2 CE Mobile", { rect.x + ui.dp(4.0f), y, rect.w, titleHeight }, ui.dp(16.0f), theme.text, MuiAlign::Start, MuiAlign::Center);
+        y += titleHeight;
+        char version[160];
+        snprintf(version, sizeof(version), muiText(kTextAboutVersion, "Version %s, build %s"), FALLOUT_APP_VERSION, _BUILD_HASH);
+        muiDrawTextAligned(muiDecodeGameText(version), { rect.x + ui.dp(4.0f), y, rect.w, line }, size, theme.textDim, MuiAlign::Start, MuiAlign::Center);
+        y += line + gap;
+        for (const auto& value : notice) {
+            muiDrawTextAligned(value, { rect.x + ui.dp(4.0f), y, rect.w - ui.dp(8.0f), line }, size, theme.textDim, MuiAlign::Start, MuiAlign::Center);
+            y += line;
         }
-        muiPopClip();
+        y += gap;
 
-        if (ui.button("prefs.about.source", button, muiDecodeGameText(muiText(kTextAboutOpen, "Open the source page")))) {
-            SDL_OpenURL(kSourceUrl);
+        auto visible = [&](const MuiRect& row) { return row.bottom() > rect.y && row.y < rect.bottom(); };
+        auto separator = [&]() {
+            muiFillRect({ rect.x, y - ui.dp(1.0f), rect.w, ui.dp(1.0f) }, kRowLine);
+        };
+        auto actionRow = [&](const char* id, const std::u32string& title, const std::u32string& verb, MuiButtonStyle style = MuiButtonStyle::Normal, bool marked = false) {
+            MuiRect row = { rect.x, y, rect.w, rowHeight };
+            y += rowHeight;
+            if (!visible(row)) return false;
+            float buttonWidth = std::min(ui.dp(150.0f), row.w * 0.42f);
+            MuiRect button = { row.right() - buttonWidth, row.y + ui.dp(7.0f), buttonWidth, row.h - ui.dp(14.0f) };
+            MuiRect name = { row.x + ui.dp(4.0f), row.y, button.x - row.x - ui.dp(12.0f), row.h };
+            if (marked) {
+                float dot = ui.dp(4.0f);
+                muiFillCircle(name.x + dot, name.centerY(), dot, kChanged);
+                ui.mark("prefs.about.update.notice", { name.x, name.centerY() - dot, dot * 2.0f, dot * 2.0f });
+                float inset = dot * 2.0f + ui.dp(8.0f);
+                name.x += inset;
+                name.w -= inset;
+            }
+            auto lines = muiWrapText(title, name.w, size);
+            float top = name.centerY() - std::min(lines.size(), static_cast<size_t>(2)) * line / 2.0f;
+            for (size_t index = 0; index < std::min(lines.size(), static_cast<size_t>(2)); index++) {
+                muiDrawTextAligned(lines[index], { name.x, top + index * line, name.w, line }, size, theme.text, MuiAlign::Start, MuiAlign::Center);
+            }
+            return ui.button(id, button, verb, style);
+        };
+
+        if (updates) {
+            bool available = appUpdateHasRelease();
+            bool busy = appUpdateState() == AppUpdateState::Checking || appUpdateState() == AppUpdateState::Installing;
+            std::u32string verb = !inGame && available ? (appUpdateReady() ? label(408, "Install") : label(407, "Update")) : label(411, "Check");
+            if (actionRow("prefs.about.update", muiUpdateStatus(), verb, available && !inGame ? MuiButtonStyle::Primary : MuiButtonStyle::Normal, available) && !busy) pendingUpdate = true;
+            if (deleting && actionRow("prefs.about.update.delete", label(426, "Delete downloaded update"), label(kTextDeleteButton, "Delete"), MuiButtonStyle::Danger)) pendingDeleteUpdate = true;
+            if (updateNote > 0.0f) {
+                MuiRect hint = { rect.x + ui.dp(4.0f), y, rect.w - ui.dp(8.0f), updateNote };
+                auto lines = muiWrapText(label(428, "Download and install updates from the main menu."), hint.w, size);
+                for (const auto& value : lines) {
+                    muiDrawTextAligned(value, { hint.x, y, hint.w, line }, size, theme.textDim, MuiAlign::Start, MuiAlign::Center);
+                    y += line;
+                }
+                y = hint.bottom();
+                ui.mark("prefs.about.update.ingame", hint);
+            }
+            separator();
+
+            MuiRect toggle = { rect.x, y, rect.w, rowHeight };
+            y += rowHeight;
+            if (visible(toggle)) {
+                MuiRect control = { toggle.right() - ui.dp(52.0f), toggle.y + ui.dp(10.0f), ui.dp(52.0f), toggle.h - ui.dp(20.0f) };
+                auto name = label(424, "Check for updates");
+                float badgeWidth = ui.dp(38.0f);
+                MuiRect nameRect = { toggle.x + ui.dp(4.0f), toggle.y, control.x - toggle.x - badgeWidth - ui.dp(16.0f), toggle.h };
+                float nameSize = muiFitTextSize(name, nameRect.w, ui.dp(14.0f), ui.dp(10.0f));
+                muiDrawTextAligned(name, nameRect, nameSize, theme.text, MuiAlign::Start, MuiAlign::Center);
+                MuiRect badge = { nameRect.x + muiTextWidth(name, nameSize) + ui.dp(6.0f), toggle.centerY() - ui.dp(9.0f), badgeWidth, ui.dp(18.0f) };
+                muiStrokeRoundRect(badge, ui.dp(4.0f), ui.dp(1.0f), kPortBadge);
+                muiDrawTextAligned(label(kTextPortBadge, "port"), badge, ui.dp(10.0f), kPortBadge, MuiAlign::Center, MuiAlign::Center);
+                bool enabled = settings.touch.update_check;
+                if (ui.toggle("prefs.about.update.auto", control, &enabled)) {
+                    bool previous = settings.touch.update_check;
+                    settings.touch.update_check = enabled;
+                    if (!settingsSave()) {
+                        settings.touch.update_check = previous;
+                        muiNotify(muiText(433, "Could not save this setting."), MuiNoticeKind::Warning);
+                    }
+                }
+            }
+            muiDrawTextAligned(label(425, "At startup, at most once an hour"), { rect.x + ui.dp(4.0f), y, rect.w, line }, size, theme.textDim, MuiAlign::Start, MuiAlign::Center);
+            y += line + gap;
+            separator();
         }
+        if (actionRow("prefs.about.source", label(437, "Source code"), label(438, "Open"))) SDL_OpenURL(kSourceUrl);
+        separator();
+        if (actionRow("prefs.about.licenses", label(kTextAboutLicenses, "Licenses"), label(435, "View"))) pendingLicenses = true;
+        separator();
+        muiPopClip();
     }
 
     void PreferencesScreen::buildFiles(MuiContext& ui, const MuiRect& rect)
@@ -1026,16 +1033,7 @@ namespace {
             muiDrawTextAligned(note, noteRect, muiFitTextSize(note, noteRect.w, ui.dp(11.0f), ui.dp(9.0f)), theme.textDim, MuiAlign::Start, MuiAlign::Center);
 
             std::u32string verb = muiDecodeGameText(muiText(action.buttonId, action.buttonFallback));
-            if (action.action == FilesAction::DeleteSaves) {
-                bool pressed = false;
-                if (ui.touchable(action.id, button, &pressed)) {
-                    pendingFiles = action.action;
-                }
-                // As the other buttons, in the danger colors.
-                muiFillRoundRect(button, ui.dp(theme.radius), pressed ? kDangerPressed : kDangerFill);
-                muiStrokeRoundRect(button, ui.dp(theme.radius), ui.dp(theme.borderWidth), kDanger);
-                muiDrawTextAligned(verb, button, muiFitTextSize(verb, button.w - ui.dp(theme.padding), ui.dp(theme.buttonTextSize), ui.dp(10.0f)), kDanger, MuiAlign::Center, MuiAlign::Center);
-            } else if (ui.button(action.id, button, verb)) {
+            if (ui.button(action.id, button, verb, action.action == FilesAction::DeleteSaves ? MuiButtonStyle::Danger : MuiButtonStyle::Normal)) {
                 pendingFiles = action.action;
             }
         }
@@ -1269,6 +1267,27 @@ namespace {
 
     void PreferencesScreen::runPending()
     {
+        if (pendingDeleteUpdate) {
+            pendingDeleteUpdate = false;
+            appUpdateDelete();
+        }
+        if (pendingLicenses) {
+            pendingLicenses = false;
+            muiLicensesShow();
+        }
+        if (pendingUpdate) {
+            pendingUpdate = false;
+            if (!inGame && appUpdateHasRelease()) {
+                muiUpdateShow();
+            } else {
+                appUpdateCheck(true);
+                waitingUpdate = true;
+            }
+        }
+        if (waitingUpdate && appUpdateState() != AppUpdateState::Checking) {
+            waitingUpdate = false;
+            if (!inGame && appUpdateHasRelease()) muiUpdateShow();
+        }
         if (pendingFiles != FilesAction::None) {
             FilesAction action = pendingFiles;
             pendingFiles = FilesAction::None;

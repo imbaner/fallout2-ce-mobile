@@ -391,9 +391,17 @@ bool MuiContext::button(const std::string& id, const MuiRect& rect, const std::u
     bool primary = style == MuiButtonStyle::Primary;
     MuiColor fill = pressed ? kTheme.buttonPressed : (primary ? kTheme.buttonPrimary : kTheme.button);
     MuiColor textColor = primary && !pressed ? kTheme.buttonPrimaryText : kTheme.buttonText;
+    MuiColor border = pressed || style == MuiButtonStyle::AccentBorder ? kTheme.accent : kTheme.buttonBorder;
+    if (style == MuiButtonStyle::AccentBorder) {
+        textColor = kTheme.accent;
+    }
+    if (style == MuiButtonStyle::Danger) {
+        fill = muiRgb(pressed ? 0x47211D : 0x1B100E);
+        textColor = border = muiRgb(0xFF8E72);
+    }
 
     muiFillRoundRect(rect, dp(kTheme.radius), fill);
-    muiStrokeRoundRect(rect, dp(kTheme.radius), dp(kTheme.borderWidth), pressed ? kTheme.accent : kTheme.buttonBorder);
+    muiStrokeRoundRect(rect, dp(kTheme.radius), dp(kTheme.borderWidth), border);
     // Long labels (other languages, narrow buttons) get smaller.
     float size = muiFitTextSize(label, rect.w - dp(kTheme.padding), dp(kTheme.buttonTextSize), dp(10.0f));
     muiDrawTextAligned(label, rect, size, textColor, MuiAlign::Center, MuiAlign::Center);

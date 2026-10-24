@@ -40,6 +40,15 @@
     <!-- <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" /> -->
     <!-- <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" /> -->
 
+    <!-- Optional GitHub update checks and user-confirmed APK updates. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- PackageInstaller uses our PendingIntent identity. Other applications
+         must not forge its results, including on Android 7-12L. -->
+    <permission android:name="${applicationId}.UPDATE_INSTALL"
+        android:protectionLevel="signature" />
+    <uses-permission android:name="${applicationId}.UPDATE_INSTALL" />
+
     <!-- Allow access to the vibrator -->
     <uses-permission android:name="android.permission.VIBRATE" />
 

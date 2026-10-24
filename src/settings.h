@@ -259,6 +259,8 @@ struct SoundSettings {
 };
 
 struct DebugSettings {
+    // Signed OTA test releases, debug APKs only (UpdateManager.java).
+    std::string update_repo;
     std::string mode = "environment";
     bool show_fps = false;
     // CE: Once a second appends frame timings to perf.log (see
@@ -330,6 +332,8 @@ struct WorldViewSettings {
 
 // CE: Touch-first controls on the map, see touch_controls.h.
 struct TouchSettings {
+    // Optional daily GitHub release check. Manual checks work when off.
+    bool update_check = true;
 #ifdef __ANDROID__
     bool controls = true;
     // Touch HUD instead of the original interface bar, see touch_hud.h.

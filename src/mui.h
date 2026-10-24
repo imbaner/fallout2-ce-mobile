@@ -68,6 +68,8 @@ const MuiTheme& muiTheme();
 enum class MuiButtonStyle {
     Normal,
     Primary,
+    AccentBorder,
+    Danger,
 };
 
 class MuiContext;

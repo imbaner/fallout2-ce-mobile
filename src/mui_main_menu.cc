@@ -6,11 +6,13 @@
 #include <algorithm>
 #include <string>
 
+#include "app_update.h"
 #include "art.h"
 #include "game.h"
 #include "loadsave.h"
 #include "mainmenu.h"
 #include "message.h"
+#include "mui_update.h"
 #include "platform_compat.h"
 #include "settings.h"
 #include "version.h"
@@ -52,6 +54,7 @@ namespace {
         void back() override { choice = MAIN_MENU_EXIT; }
 
         int choice = -1;
+        bool pendingUpdate = false;
 
     private:
         // The save Continue loads, -1 - none (or the button is off).
@@ -141,7 +144,17 @@ namespace {
         float smallHeight = ui.dp(38.0f);
         float footerHeight = ui.dp(30.0f);
 
-        float height = (continueSlot != -1 ? continueHeight + gap : 0.0f) + (buttonHeight + gap) * 3.0f + smallHeight;
+        // Center the actions that are actually visible, including the
+        // update row only once a release is available.
+        bool update = appUpdateHasRelease();
+        float height = (continueSlot != -1 ? continueHeight + gap : 0.0f) + (buttonHeight + gap) * 3.0f + smallHeight
+            + (update ? buttonHeight + gap : 0.0f);
+        float scale = std::min(1.0f, std::max(column.h - footerHeight, 0.0f) / height);
+        buttonHeight *= scale;
+        continueHeight *= scale;
+        smallHeight *= scale;
+        gap *= scale;
+        height *= scale;
         float y = column.y + std::max((column.h - footerHeight - height) / 2.0f, 0.0f);
 
         if (continueSlot != -1) {
@@ -177,6 +190,15 @@ namespace {
             if (ui.button(button.id, { column.x, y, column.w, buttonHeight }, muiDecodeGameText(muiText(button.textId, button.fallback)))) {
                 choice = button.choice;
             }
+            y += buttonHeight + gap;
+        }
+
+        if (update) {
+            std::u32string label = muiDecodeGameText(muiText(appUpdateReady() ? 406 : appUpdateState() == AppUpdateState::Downloading ? 409
+                                                                                                                                      : 405,
+                appUpdateReady() ? "Update ready" : appUpdateState() == AppUpdateState::Downloading ? "Downloading update…"
+                                                                                                    : "Update available"));
+            if (ui.button("mainmenu.update", { column.x, y, column.w, buttonHeight }, label, MuiButtonStyle::AccentBorder)) pendingUpdate = true;
             y += buttonHeight + gap;
         }
 
@@ -228,6 +250,7 @@ void muiMainMenuShow()
 
     gMainMenuScreen = new MainMenuScreen();
     muiPush(gMainMenuScreen);
+    if (settings.touch.update_check) appUpdateCheck(false);
 }
 
 void muiMainMenuReady()
@@ -252,6 +275,11 @@ int muiMainMenuTakeChoice()
 {
     if (gMainMenuScreen == nullptr) {
         return -1;
+    }
+
+    if (gMainMenuScreen->pendingUpdate) {
+        gMainMenuScreen->pendingUpdate = false;
+        muiUpdateShow();
     }
 
     int choice = gMainMenuScreen->choice;

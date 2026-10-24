@@ -1,6 +1,11 @@
 package com.alexbatalov.fallout2ce;
 
+import android.annotation.SuppressLint;
+import android.app.Activity;
+import android.content.BroadcastReceiver;
 import android.content.Intent;
+import android.content.Context;
+import android.content.IntentFilter;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.content.res.AssetManager;
@@ -22,6 +27,12 @@ import java.nio.charset.StandardCharsets;
 
 public class MainActivity extends SDLActivity {
     private boolean noExit = false;
+    private final BroadcastReceiver updateReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            UpdateManager.installResult(MainActivity.this, intent);
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -45,6 +56,8 @@ public class MainActivity extends SDLActivity {
         }
         installBundledFiles(externalFilesDir);
 
+        UpdateManager.initialize(this);
+        registerUpdateReceiver();
         super.onCreate(savedInstanceState);
 
         // Without the game's files (or copied in part): the import screen.
@@ -55,6 +68,14 @@ public class MainActivity extends SDLActivity {
             noExit = true;
             finish();
         }
+    }
+
+    @SuppressLint("UnspecifiedRegisterReceiverFlag") // Signature permission on all APIs, private flag on 33+.
+    private void registerUpdateReceiver() {
+        IntentFilter filter = new IntentFilter(UpdateManager.INSTALL_ACTION);
+        String permission = getPackageName() + ".UPDATE_INSTALL";
+        if (Build.VERSION.SDK_INT >= 33) registerReceiver(updateReceiver, filter, permission, null, RECEIVER_NOT_EXPORTED);
+        else registerReceiver(updateReceiver, filter, permission, null);
     }
 
     // The engine's own data (ce.dat, a folder in the app's assets, see
@@ -134,12 +155,45 @@ public class MainActivity extends SDLActivity {
 
     @Override
     protected void onDestroy() {
+        unregisterReceiver(updateReceiver);
         super.onDestroy();
 
         if (!noExit) {
             // Needed to make sure libc calls exit handlers, which releases
             // in-game resources.
             System.exit(0);
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        UpdateManager.resumed(true);
+    }
+
+    @Override
+    protected void onPause() {
+        UpdateManager.resumed(false);
+        super.onPause();
+    }
+
+    // The native updater's non-blocking bridge (app_update.cc).
+    public static void updateConfigure(String repository) { UpdateManager.configure(repository); }
+    public static void updateCheck(boolean manual) { UpdateManager.check(manual); }
+    public static int updateState() { return UpdateManager.state(); }
+    public static int updateError() { return UpdateManager.error(); }
+    public static String updateString(int field) { return UpdateManager.string(field); }
+    public static long[] updateProgress() { return UpdateManager.progress(); }
+    public static boolean updateReady() { return UpdateManager.ready(); }
+    public static void updateDownload() { UpdateManager.download(); }
+    public static void updateCancel() { UpdateManager.cancel(); }
+    public static void updateDelete() { UpdateManager.deleteDownload(); }
+    public static void updateSetActive(boolean active) { UpdateManager.setActive(active); }
+    public static void updateInstall() {
+        if (mSingleton != null) {
+            final Activity activity = mSingleton;
+            final long token = UpdateManager.activeToken();
+            activity.runOnUiThread(() -> UpdateManager.install(activity, token));
         }
     }
 

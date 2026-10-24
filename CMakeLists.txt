@@ -62,6 +62,8 @@ include("cmake/gitver.cmake")
 # Shared engine sources — used by both game and mapper targets.
 # Excludes main.cc/main.h (game-only entry logic).
 set(FALLOUT_ENGINE_SOURCES
+    "src/app_update.cc"
+    "src/app_update.h"
     "src/actions.cc"
     "src/actions.h"
     "src/animation_defs.h"
@@ -390,6 +392,9 @@ set(FALLOUT_PLATFORM_SOURCES
     "src/mui_character_selector.cc"
     "src/mui_elevator.cc"
     "src/mui_main_menu.cc"
+    "src/mui_update.cc"
+    "src/mui_update.h"
+    "src/mui_licenses.cc"
     "src/mui_options.cc"
     "src/mui_scenes.cc"
     "src/mui_worldmap.cc"
