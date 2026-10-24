@@ -1,5 +1,67 @@
 # Android touch adaptation — working notes
 
+## Updates
+
+Android's `UpdateManager` checks the latest stable GitHub release of
+`imbaner/fallout2-ce-mobile` in a worker on the first main-menu entry of a
+new process, at most once per hour (manual checks always work). The last
+request time is stored in SharedPreferences; there is no background timer.
+Resuming the activity or returning to the menu does not check again.
+`[touch] update_check=0` disables automatic requests.
+The installed package must be the public release package; debug packages
+are disabled unless `[debug] update_repo=owner/test-repo` explicitly selects
+a separate repository of APKs signed with that debug package's key. Never
+publish test APKs in the public release repository. Release assets must
+keep the `fallout2-ce-mobile-<version>-arm64.apk` naming convention.
+
+The main menu centers its visible actions and adds a quiet update row only
+when a release is available. The
+update dialog's single action downloads and opens Android's installer only
+while that dialog stays open and the game is foregrounded at the main
+menu. Closing it leaves the download running but revokes installation
+intent. Ready files and release metadata live in `cache/update/`; on a new
+process they are rechecked, never installed automatically. Interrupted
+downloads can be retried from the start. Cancel removes the partial file;
+Delete in About removes a complete download; a successful update clears old files
+at the next start. Saves and game files are not touched.
+
+The initial APK URL must point to this repository and tag under
+`github.com/.../releases/download/`. HTTPS redirects are followed at most
+five times and restricted to `api.github.com`, `github.com`,
+`release-assets.githubusercontent.com` and `objects.githubusercontent.com`.
+Size, GitHub's required SHA-256 digest, APK package, exact version name,
+strictly newer version code and all current signing certificates are checked
+after downloading, on cache restoration and before installation. A public
+release APK must not be debuggable. A changed digest invalidates a cached APK
+even when the tag, URL and size did not change. Key rotation is deliberately
+not accepted automatically; it needs an explicit migration.
+APK size is limited to 128 MiB, metadata to 1 MiB and notes to 32768 UTF-16
+code units. Metadata and APK transfers have overall read budgets of 30
+seconds and 10 minutes, in addition to 10-second socket timeouts. A conservative
+space check reserves room for both the APK and the installer's staged copy.
+Notes are displayed as plain text without remote images or executable links;
+their wrapped layout is cached rather than recomputed every frame.
+`PackageInstaller` sessions use a package-scoped mutable PendingIntent and
+a signature-permission-protected receiver on every supported Android version,
+with `RECEIVER_NOT_EXPORTED` on Android 13+. The per-process action and session
+ID reject unrelated results; a terminal result cancels its PendingIntent and
+invalidates the ID to reject replays. Mutability is necessary for the system's
+status extras, and a session needs both pending-user-action and terminal results.
+Unknown-source permission is requested through the system settings only
+after the player asks to update. Install cancellation retains the APK.
+
+About contains status/actions, the immediately saved auto-check switch,
+source and an offline license dialog. Its orange dot reflects update
+availability, independently of unsaved settings, and uses the same selected
+color as other section markers. The update action has its own orange dot.
+A ready APK can be deleted below that action using the shared danger button
+style, without a divider inside the update group. Update and license
+screens use the common Back rail (at the screen edge on phones, beside the
+window in windowed mode). During gameplay About allows
+checking only, with a note to install from the main menu. Release notes
+are UTF-8, unlike the game's localized texts. Desktop builds have no updater
+except the offline `update` / `updateingame` dev autotest scenarios.
+
 **2026-09-29, GPT-6 Astra:** исправлен вылет перед новым главным меню
 после изменения HR-фона в работе Claude Opus 5.5. Причина — именованный
 FRM передавался в загрузчик только для числовых FID; исправлены загрузка

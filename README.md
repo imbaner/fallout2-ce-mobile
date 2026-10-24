@@ -38,6 +38,24 @@ Plain Fallout 2 from GOG, Steam or Epic works too, with or without mods. The gam
 
 **Recommended setup: Fallout 2 + [Restoration Project (RPU)](https://github.com/BGforgeNet/Fallout2_Restoration_Project) 2.4.34.** The port is played and tested with it. RPU relies on sfall, which this engine reimplements: Fallout 2: Community Engine, the continuation of the original Fallout 2 Community Edition. Install RPU into the game folder on a computer, then copy the folder to the phone.
 
+## App updates
+
+Settings → About lets you check for updates and turn off automatic checks
+(on a full launch, at most once an hour by default). A new release appears
+quietly on the main menu.
+Update downloads its APK and opens Android's installation confirmation;
+installation is available only from the main menu. Closing the update
+window never launches an installer later. A completed download survives
+restarts and can be installed later or deleted from Settings → About.
+
+The app contacts GitHub (`api.github.com`, `github.com` and download servers
+under `*.githubusercontent.com`) to check for and download updates. Game
+files, saves and player actions are not sent. With automatic checks off,
+network requests happen only at your request. Before installation, the
+APK's SHA-256 is checked against GitHub's release metadata; its package,
+version and signing certificate are checked against the installed app.
+Full licenses are available separately, offline, in About.
+
 ## Known limitations
 
 - Landscape only; portrait is planned.
