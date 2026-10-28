@@ -276,7 +276,7 @@
 {366}{}{Could not rearrange the quick saves, their number stays.}
 {367}{}{About}
 {368}{}{Version %s, build %s}
-{369}{}{An unofficial mobile version of Fallout 2 Community Edition: CE's engine changed for touch screens. Not affiliated with Bethesda Softworks, ZeniMax or Interplay. Needs your own copy of Fallout 2.}
+{369}{}{An unofficial mobile version of Fallout 2 Community Edition: CE's engine changed for touch screens. Not affiliated with or endorsed by Microsoft, Bethesda Softworks, ZeniMax or Interplay. Needs your own copy of Fallout 2.}
 {370}{}{Source and changes:}
 {371}{}{Open the source page}
 {372}{}{Licenses}

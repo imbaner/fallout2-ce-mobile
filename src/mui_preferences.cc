@@ -864,8 +864,8 @@ namespace {
         float rowHeight = ui.dp(48.0f);
         bool updates = appUpdateState() != AppUpdateState::Unsupported;
         bool deleting = updates && !inGame && appUpdateReady() && appUpdateState() != AppUpdateState::Checking && appUpdateState() != AppUpdateState::Installing;
-        auto notice = muiWrapText(label(kTextAboutNotice, "An unofficial mobile version of Fallout 2 Community Edition: CE's engine changed for touch screens. Not affiliated with Bethesda Softworks, ZeniMax or Interplay. Needs your own copy of Fallout 2."), rect.w - ui.dp(8.0f), size);
-        auto thanksNote = muiWrapText(label(444, "The app, its updates and all of its features are free. You can thank the port's author separately if you like: it gives no access to builds or features, no priority for fixes and no commitment to development."), rect.w - ui.dp(8.0f), size);
+        auto notice = muiWrapText(label(kTextAboutNotice, "An unofficial mobile version of Fallout 2 Community Edition: CE's engine changed for touch screens. Not affiliated with or endorsed by Microsoft, Bethesda Softworks, ZeniMax or Interplay. Needs your own copy of Fallout 2."), rect.w - ui.dp(8.0f), size);
+        auto thanksNote = muiWrapText(label(444, "The app, its updates and all of its features are free. A thank-you goes to the port's author personally: it is not a payment for Fallout 2 or for the app, and it has nothing to do with Microsoft, Bethesda Softworks, ZeniMax, Interplay or any other owner of Fallout. It gives no access to builds or features, no priority for fixes and no commitment to development."), rect.w - ui.dp(8.0f), size);
         float titleHeight = ui.dp(24.0f);
         float noticeHeight = notice.size() * line;
         float updateNote = updates && inGame && appUpdateHasRelease() ? line * 2.0f : 0.0f;
