@@ -17,6 +17,8 @@
 #include "settings.h"
 #include "version.h"
 
+#include <SDL.h>
+
 namespace fallout {
 
 namespace {
@@ -64,6 +66,7 @@ namespace {
         void buildArt(MuiContext& ui, float buttonsRight);
         void buildButtons(MuiContext& ui, const MuiRect& column);
         void buildFooter(MuiContext& ui, const MuiRect& rect);
+        void buildLinks(MuiContext& ui, const MuiRect& safe);
     };
 
     MainMenuScreen::MainMenuScreen()
@@ -102,6 +105,7 @@ namespace {
         MuiRect column = { safe.x + margin, safe.y + margin, width, safe.h - margin * 2.0f };
         buildArt(ui, column.right() + margin);
         buildButtons(ui, column);
+        buildLinks(ui, safe);
     }
 
     void MainMenuScreen::buildArt(MuiContext& ui, float buttonsRight)
@@ -217,6 +221,36 @@ namespace {
         }
 
         buildFooter(ui, { column.x, column.bottom() - footerHeight, column.w * 2.0f, footerHeight });
+    }
+
+    // The port author's pages at the top right, over the picture: small, as
+    // HUD buttons are, and open in the browser.
+    void MainMenuScreen::buildLinks(MuiContext& ui, const MuiRect& safe)
+    {
+        const MuiTheme& theme = muiTheme();
+        struct Link {
+            const char* id;
+            MuiIcon icon;
+            const char* url;
+        };
+        const Link links[] = {
+            { "mainmenu.telegram", MuiIcon::Telegram, kPortTelegramUrl },
+            { "mainmenu.youtube", MuiIcon::YouTube, kPortYouTubeUrl },
+            { "mainmenu.github", MuiIcon::GitHub, kPortSourceUrl },
+        };
+        float size = ui.dp(38.0f);
+        float gap = ui.dp(8.0f);
+        float margin = ui.dp(16.0f);
+        float x = safe.right() - margin - size * 3.0f - gap * 2.0f;
+        for (const Link& link : links) {
+            MuiRect rect = { x, safe.y + margin, size, size };
+            bool pressed;
+            if (ui.touchable(link.id, rect, &pressed)) SDL_OpenURL(link.url);
+            muiFillRoundRect(rect, size / 2.0f, pressed ? theme.buttonPressed : theme.button);
+            muiStrokeRoundRect(rect, size / 2.0f, ui.dp(1.0f), pressed ? theme.accent : theme.buttonBorder);
+            muiDrawIcon(link.icon, rect.centerX(), rect.centerY(), size * 0.5f, ui.dp(1.8f), theme.accent);
+            x += size + gap;
+        }
     }
 
     // The game's copyright and version, as its menu shows them.

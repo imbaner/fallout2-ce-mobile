@@ -137,9 +137,6 @@ namespace {
     constexpr int kTextAboutNotice = 369;
     constexpr int kTextAboutLicenses = 372;
 
-    // Where the port's source is (the about section, README).
-    constexpr const char* kSourceUrl = "https://github.com/imbaner/fallout2-ce-mobile";
-
 #ifndef FALLOUT_APP_VERSION
 #define FALLOUT_APP_VERSION "1.3.0"
 #endif
@@ -868,11 +865,13 @@ namespace {
         bool updates = appUpdateState() != AppUpdateState::Unsupported;
         bool deleting = updates && !inGame && appUpdateReady() && appUpdateState() != AppUpdateState::Checking && appUpdateState() != AppUpdateState::Installing;
         auto notice = muiWrapText(label(kTextAboutNotice, "An unofficial mobile version of Fallout 2 Community Edition: CE's engine changed for touch screens. Not affiliated with Bethesda Softworks, ZeniMax or Interplay. Needs your own copy of Fallout 2."), rect.w - ui.dp(8.0f), size);
+        auto thanksNote = muiWrapText(label(444, "The app, its updates and all of its features are free. You can thank the port's author separately if you like: it gives no access to builds or features, no priority for fixes and no commitment to development."), rect.w - ui.dp(8.0f), size);
         float titleHeight = ui.dp(24.0f);
         float noticeHeight = notice.size() * line;
         float updateNote = updates && inGame && appUpdateHasRelease() ? line * 2.0f : 0.0f;
         float height = titleHeight + line + gap + noticeHeight + gap
-            + (updates ? rowHeight * (deleting ? 3.0f : 2.0f) + line + updateNote + gap : 0.0f) + rowHeight * 2.0f;
+            + (updates ? rowHeight * (deleting ? 3.0f : 2.0f) + line + updateNote + gap : 0.0f) + rowHeight * 6.0f
+            + thanksNote.size() * line + gap;
         if (resetScroll) {
             ui.setScroll("prefs.about", 0.0f);
             resetScroll = false;
@@ -963,7 +962,21 @@ namespace {
             y += line + gap;
             separator();
         }
-        if (actionRow("prefs.about.source", label(437, "Source code"), label(438, "Open"))) SDL_OpenURL(kSourceUrl);
+        // The author's pages, then the source; the thanks with what it is not.
+        if (actionRow("prefs.about.telegram", label(440, "Developer news on Telegram"), label(438, "Open"))) SDL_OpenURL(kPortTelegramUrl);
+        separator();
+        if (actionRow("prefs.about.youtube", label(441, "Videos and guides on YouTube"), label(438, "Open"))) SDL_OpenURL(kPortYouTubeUrl);
+        separator();
+        if (actionRow("prefs.about.issues", label(442, "Report a problem"), label(438, "Open"))) SDL_OpenURL(kPortIssuesUrl);
+        separator();
+        if (actionRow("prefs.about.source", label(437, "Source code"), label(438, "Open"))) SDL_OpenURL(kPortSourceUrl);
+        separator();
+        if (actionRow("prefs.about.thanks", label(443, "Thank the port's author"), U"Boosty")) SDL_OpenURL(kPortThanksUrl);
+        for (const auto& value : thanksNote) {
+            muiDrawTextAligned(value, { rect.x + ui.dp(4.0f), y, rect.w - ui.dp(8.0f), line }, size, theme.textDim, MuiAlign::Start, MuiAlign::Center);
+            y += line;
+        }
+        y += gap;
         separator();
         if (actionRow("prefs.about.licenses", label(kTextAboutLicenses, "Licenses"), label(435, "View"))) pendingLicenses = true;
         separator();

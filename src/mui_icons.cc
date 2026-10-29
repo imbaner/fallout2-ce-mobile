@@ -1,5 +1,8 @@
 #include "mui_icons.h"
 
+#include <ctype.h>
+#include <stdlib.h>
+
 #include <algorithm>
 #include <cmath>
 #include <map>
@@ -857,10 +860,368 @@ static void drawIconShapes(MuiIcon icon, float x, float y, float size, float thi
     case MuiIcon::Collapse:
         drawCorners(pen, false);
         break;
+    // Textures only (`rasterizeBrandMark`).
+    case MuiIcon::Telegram:
+    case MuiIcon::YouTube:
+    case MuiIcon::GitHub:
     case MuiIcon::Count:
         break;
     }
 }
+
+// MARK: Brand marks
+
+namespace {
+
+    // The port author's pages (the main menu): Simple Icons' marks (CC0,
+    // simpleicons.org) on their 24 unit square, filled, with their holes as
+    // paths of their own. Drawn from their outlines, not with the pen, as
+    // the next versions draw every icon.
+    struct BrandMark {
+        const char* fill;
+        const char* hole;
+    };
+
+    const BrandMark kBrandMarks[] = {
+        // Telegram
+        { "M12 0a12 12 0 0 1 0 24 12 12 0 0 1 0-24z",
+            "M16.906 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z" },
+        // YouTube
+        { "M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814z",
+            "M9.545 15.568V8.432L15.818 12z" },
+        // GitHub
+        { "M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12",
+            nullptr },
+    };
+
+    const BrandMark* brandMark(MuiIcon icon)
+    {
+        switch (icon) {
+        case MuiIcon::Telegram:
+            return &kBrandMarks[0];
+        case MuiIcon::YouTube:
+            return &kBrandMarks[1];
+        case MuiIcon::GitHub:
+            return &kBrandMarks[2];
+        default:
+            return nullptr;
+        }
+    }
+
+    bool readNumber(const char** cursor, float* value)
+    {
+        const char* p = *cursor;
+        while (*p == ' ' || *p == ',' || *p == '\t' || *p == '\n') {
+            p++;
+        }
+        char* end;
+        float result = strtof(p, &end);
+        if (end == p) {
+            return false;
+        }
+        *value = result;
+        *cursor = end;
+        return true;
+    }
+
+    // A flag of an arc: a single 0 or 1, maybe with no separator after it.
+    bool readFlag(const char** cursor, bool* value)
+    {
+        const char* p = *cursor;
+        while (*p == ' ' || *p == ',') {
+            p++;
+        }
+        if (*p != '0' && *p != '1') {
+            return false;
+        }
+        *value = *p == '1';
+        *cursor = p + 1;
+        return true;
+    }
+
+    void addCubic(std::vector<SDL_FPoint>& points, SDL_FPoint from, SDL_FPoint c1, SDL_FPoint c2, SDL_FPoint to)
+    {
+        constexpr int kSegments = 16;
+        for (int step = 1; step <= kSegments; step++) {
+            float t = static_cast<float>(step) / kSegments;
+            float u = 1.0f - t;
+            float a = u * u * u;
+            float b = 3.0f * u * u * t;
+            float c = 3.0f * u * t * t;
+            float d = t * t * t;
+            points.push_back({ a * from.x + b * c1.x + c * c2.x + d * to.x, a * from.y + b * c1.y + c * c2.y + d * to.y });
+        }
+    }
+
+    void addQuadratic(std::vector<SDL_FPoint>& points, SDL_FPoint from, SDL_FPoint control, SDL_FPoint to)
+    {
+        constexpr int kSegments = 12;
+        for (int step = 1; step <= kSegments; step++) {
+            float t = static_cast<float>(step) / kSegments;
+            float u = 1.0f - t;
+            points.push_back({ u * u * from.x + 2.0f * u * t * control.x + t * t * to.x, u * u * from.y + 2.0f * u * t * control.y + t * t * to.y });
+        }
+    }
+
+    // SVG's endpoint arc through its center form (SVG 1.1 F.6.5).
+    void addArc(std::vector<SDL_FPoint>& points, SDL_FPoint from, float rx, float ry, float rotation, bool large, bool sweep, SDL_FPoint to)
+    {
+        rx = std::fabs(rx);
+        ry = std::fabs(ry);
+        if (rx < 1e-4f || ry < 1e-4f) {
+            points.push_back(to);
+            return;
+        }
+
+        float phi = rotation * kPi / 180.0f;
+        float cosPhi = std::cos(phi);
+        float sinPhi = std::sin(phi);
+        float dx = (from.x - to.x) / 2.0f;
+        float dy = (from.y - to.y) / 2.0f;
+        float x1 = cosPhi * dx + sinPhi * dy;
+        float y1 = -sinPhi * dx + cosPhi * dy;
+
+        float lambda = (x1 * x1) / (rx * rx) + (y1 * y1) / (ry * ry);
+        if (lambda > 1.0f) {
+            rx *= std::sqrt(lambda);
+            ry *= std::sqrt(lambda);
+        }
+
+        float numerator = rx * rx * ry * ry - rx * rx * y1 * y1 - ry * ry * x1 * x1;
+        float denominator = rx * rx * y1 * y1 + ry * ry * x1 * x1;
+        float coefficient = denominator > 0.0f ? std::sqrt(std::max(numerator / denominator, 0.0f)) : 0.0f;
+        if (large == sweep) {
+            coefficient = -coefficient;
+        }
+        float cx1 = coefficient * rx * y1 / ry;
+        float cy1 = -coefficient * ry * x1 / rx;
+        float cx = cosPhi * cx1 - sinPhi * cy1 + (from.x + to.x) / 2.0f;
+        float cy = sinPhi * cx1 + cosPhi * cy1 + (from.y + to.y) / 2.0f;
+
+        auto angle = [](float ux, float uy, float vx, float vy) {
+            return std::atan2(ux * vy - uy * vx, ux * vx + uy * vy);
+        };
+        float start = angle(1.0f, 0.0f, (x1 - cx1) / rx, (y1 - cy1) / ry);
+        float delta = angle((x1 - cx1) / rx, (y1 - cy1) / ry, (-x1 - cx1) / rx, (-y1 - cy1) / ry);
+        if (!sweep && delta > 0.0f) {
+            delta -= 2.0f * kPi;
+        } else if (sweep && delta < 0.0f) {
+            delta += 2.0f * kPi;
+        }
+
+        int segments = std::max(static_cast<int>(std::ceil(std::fabs(delta) / (10.0f * kPi / 180.0f))), 2);
+        for (int step = 1; step <= segments; step++) {
+            float t = start + delta * step / segments;
+            float px = rx * std::cos(t);
+            float py = ry * std::sin(t);
+            points.push_back({ cosPhi * px - sinPhi * py + cx, sinPhi * px + cosPhi * py + cy });
+        }
+    }
+
+    float signedArea(const std::vector<SDL_FPoint>& points)
+    {
+        float area = 0.0f;
+        for (size_t index = 0; index < points.size(); index++) {
+            const SDL_FPoint& a = points[index];
+            const SDL_FPoint& b = points[(index + 1) % points.size()];
+            area += a.x * b.y - b.x * a.y;
+        }
+        return area;
+    }
+
+    // A finished subpath as a closed contour.
+    void addContour(std::vector<std::vector<SDL_FPoint>>* contours, std::vector<SDL_FPoint>& points)
+    {
+        if (points.size() >= 3) {
+            contours->push_back(points);
+        }
+        points.clear();
+    }
+
+    void parsePath(const char* data, std::vector<std::vector<SDL_FPoint>>* contours)
+    {
+        std::vector<SDL_FPoint> points;
+        SDL_FPoint current = { 0.0f, 0.0f };
+        SDL_FPoint start = { 0.0f, 0.0f };
+        // The last curve's second control point, for S and T.
+        SDL_FPoint control = { 0.0f, 0.0f };
+        char previous = 0;
+        char command = 0;
+        const char* p = data;
+        while (true) {
+            while (*p == ' ' || *p == ',' || *p == '\t' || *p == '\n') {
+                p++;
+            }
+            if (*p == '\0') {
+                break;
+            }
+            if (isalpha(static_cast<unsigned char>(*p))) {
+                command = *p++;
+            } else if (command == 0) {
+                break;
+            }
+
+            bool relative = islower(static_cast<unsigned char>(command)) != 0;
+            char upper = static_cast<char>(toupper(static_cast<unsigned char>(command)));
+            float ox = relative ? current.x : 0.0f;
+            float oy = relative ? current.y : 0.0f;
+            if (upper != 'M' && upper != 'Z' && points.empty()) {
+                points.push_back(current);
+            }
+
+            bool ok = true;
+            switch (upper) {
+            case 'M': {
+                float x;
+                float y;
+                ok = readNumber(&p, &x) && readNumber(&p, &y);
+                if (ok) {
+                    addContour(contours, points);
+                    current = { ox + x, oy + y };
+                    start = current;
+                    points.push_back(current);
+                    // Pairs after it are lines.
+                    command = relative ? 'l' : 'L';
+                }
+                break;
+            }
+            case 'L': {
+                float x;
+                float y;
+                ok = readNumber(&p, &x) && readNumber(&p, &y);
+                if (ok) {
+                    current = { ox + x, oy + y };
+                    points.push_back(current);
+                }
+                break;
+            }
+            case 'H': {
+                float x;
+                ok = readNumber(&p, &x);
+                if (ok) {
+                    current.x = ox + x;
+                    points.push_back(current);
+                }
+                break;
+            }
+            case 'V': {
+                float y;
+                ok = readNumber(&p, &y);
+                if (ok) {
+                    current.y = oy + y;
+                    points.push_back(current);
+                }
+                break;
+            }
+            case 'C':
+            case 'S': {
+                float v[6];
+                SDL_FPoint c1;
+                if (upper == 'C') {
+                    for (int index = 0; index < 6 && ok; index++) {
+                        ok = readNumber(&p, &v[index]);
+                    }
+                    c1 = { ox + v[0], oy + v[1] };
+                } else {
+                    for (int index = 2; index < 6 && ok; index++) {
+                        ok = readNumber(&p, &v[index]);
+                    }
+                    c1 = previous == 'C' || previous == 'S' ? SDL_FPoint { 2.0f * current.x - control.x, 2.0f * current.y - control.y } : current;
+                }
+                if (ok) {
+                    SDL_FPoint c2 = { ox + v[2], oy + v[3] };
+                    SDL_FPoint to = { ox + v[4], oy + v[5] };
+                    addCubic(points, current, c1, c2, to);
+                    control = c2;
+                    current = to;
+                }
+                break;
+            }
+            case 'Q':
+            case 'T': {
+                float v[4];
+                SDL_FPoint c;
+                if (upper == 'Q') {
+                    for (int index = 0; index < 4 && ok; index++) {
+                        ok = readNumber(&p, &v[index]);
+                    }
+                    c = { ox + v[0], oy + v[1] };
+                } else {
+                    for (int index = 2; index < 4 && ok; index++) {
+                        ok = readNumber(&p, &v[index]);
+                    }
+                    c = previous == 'Q' || previous == 'T' ? SDL_FPoint { 2.0f * current.x - control.x, 2.0f * current.y - control.y } : current;
+                }
+                if (ok) {
+                    SDL_FPoint to = { ox + v[2], oy + v[3] };
+                    addQuadratic(points, current, c, to);
+                    control = c;
+                    current = to;
+                }
+                break;
+            }
+            case 'A': {
+                float rx;
+                float ry;
+                float rotation;
+                bool large;
+                bool sweep;
+                float x;
+                float y;
+                ok = readNumber(&p, &rx) && readNumber(&p, &ry) && readNumber(&p, &rotation)
+                    && readFlag(&p, &large) && readFlag(&p, &sweep) && readNumber(&p, &x) && readNumber(&p, &y);
+                if (ok) {
+                    SDL_FPoint to = { ox + x, oy + y };
+                    addArc(points, current, rx, ry, rotation, large, sweep, to);
+                    current = to;
+                }
+                break;
+            }
+            case 'Z':
+                addContour(contours, points);
+                current = start;
+                break;
+            default:
+                ok = false;
+                break;
+            }
+
+            if (!ok) {
+                break;
+            }
+            previous = upper;
+        }
+        addContour(contours, points);
+    }
+
+    // [mark]'s coverage in an [extent] square: the 24 unit square scaled
+    // to [scale] px a unit, centered; the mark takes 3..21 of it.
+    std::vector<unsigned char> rasterizeBrandMark(const BrandMark& mark, int extent, float scale)
+    {
+        float origin = extent / 2.0f - 12.0f * scale;
+        std::vector<std::vector<SDL_FPoint>> contours;
+        auto add = [&](const char* data, bool hole) {
+            std::vector<std::vector<SDL_FPoint>> parsed;
+            parsePath(data, &parsed);
+            for (std::vector<SDL_FPoint>& points : parsed) {
+                for (SDL_FPoint& point : points) {
+                    point = { origin + (3.0f + point.x * 0.75f) * scale, origin + (3.0f + point.y * 0.75f) * scale };
+                }
+                // Fills all one way round, holes the other way.
+                if ((signedArea(points) < 0.0f) != hole) {
+                    std::reverse(points.begin(), points.end());
+                }
+                contours.push_back(std::move(points));
+            }
+        };
+        add(mark.fill, false);
+        if (mark.hole != nullptr) {
+            add(mark.hole, true);
+        }
+        return muiRasterizeContours(contours, extent, extent);
+    }
+
+} // namespace
 
 namespace {
 
@@ -892,6 +1253,26 @@ namespace {
         }
 
         IconTexture& entry = gIconTextures[key];
+
+        if (const BrandMark* mark = brandMark(icon)) {
+            // The pen's icons take 21.5 of the 24 units across [size].
+            float scale = size / 21.5f;
+            entry.extent = static_cast<int>(std::ceil(24.0f * scale)) + 4;
+            std::vector<unsigned char> coverage = rasterizeBrandMark(*mark, entry.extent, scale);
+            std::vector<Uint32> pixels(coverage.size());
+            for (size_t index = 0; index < coverage.size(); index++) {
+                Uint32 value = coverage[index];
+                pixels[index] = (value << 24) | (value << 16) | (value << 8) | value;
+            }
+            entry.texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STATIC, entry.extent, entry.extent);
+            if (entry.texture == nullptr) {
+                return nullptr;
+            }
+            SDL_UpdateTexture(entry.texture, nullptr, pixels.data(), entry.extent * static_cast<int>(sizeof(Uint32)));
+            SDL_SetTextureBlendMode(entry.texture, muiPremultipliedBlendMode());
+            SDL_SetTextureScaleMode(entry.texture, SDL_ScaleModeNearest);
+            return &entry;
+        }
 
         // Room for strokes and round joins sticking out of the icon square.
         entry.extent = static_cast<int>(std::ceil(size + thickness * 2.0f)) + 4;

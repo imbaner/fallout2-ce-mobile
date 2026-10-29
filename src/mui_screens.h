@@ -13,6 +13,13 @@
 
 namespace fallout {
 
+// The port's pages and its author's (the main menu, the about section).
+constexpr const char* kPortSourceUrl = "https://github.com/imbaner/fallout2-ce-mobile";
+constexpr const char* kPortIssuesUrl = "https://github.com/imbaner/fallout2-ce-mobile/issues";
+constexpr const char* kPortTelegramUrl = "https://t.me/imbaner";
+constexpr const char* kPortYouTubeUrl = "https://www.youtube.com/@imbaner_dev";
+constexpr const char* kPortThanksUrl = "https://boosty.to/imbaner";
+
 // Parts shared by the mobile UI game screens (talk, barter, later loot and
 // inventory).
 

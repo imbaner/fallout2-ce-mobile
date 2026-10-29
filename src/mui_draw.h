@@ -79,6 +79,11 @@ void muiFillConvex(const std::vector<SDL_FPoint>& points, MuiColor color);
 // Connected segments with round joins and ends.
 void muiDrawPolyline(const std::vector<SDL_FPoint>& points, float thickness, MuiColor color, bool closed = false);
 
+// Antialiased coverage (0-255) of [contours] in a [width] x [height] bitmap,
+// pixel coordinates: each contour is closed; the ones going round the same
+// way add up where they overlap, opposite ones cut holes.
+std::vector<unsigned char> muiRasterizeContours(const std::vector<std::vector<SDL_FPoint>>& contours, int width, int height);
+
 void muiPushClip(const MuiRect& rect);
 void muiPopClip();
 

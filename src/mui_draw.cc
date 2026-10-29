@@ -510,6 +510,36 @@ void muiDrawPolyline(const std::vector<SDL_FPoint>& points, float thickness, Mui
     }
 }
 
+std::vector<unsigned char> muiRasterizeContours(const std::vector<std::vector<SDL_FPoint>>& contours, int width, int height)
+{
+    std::vector<unsigned char> coverage(static_cast<size_t>(std::max(width, 0)) * std::max(height, 0), 0);
+    if (width <= 0 || height <= 0) {
+        return coverage;
+    }
+
+    // stb_truetype's glyph rasterizer: short coordinates, so in 1/16 px.
+    constexpr float kSubpixels = 16.0f;
+    std::vector<stbtt_vertex> vertices;
+    for (const std::vector<SDL_FPoint>& contour : contours) {
+        if (contour.size() < 3) {
+            continue;
+        }
+        for (size_t index = 0; index < contour.size(); index++) {
+            stbtt_vertex vertex = {};
+            vertex.type = index == 0 ? STBTT_vmove : STBTT_vline;
+            vertex.x = static_cast<stbtt_vertex_type>(std::lround(contour[index].x * kSubpixels));
+            vertex.y = static_cast<stbtt_vertex_type>(std::lround(contour[index].y * kSubpixels));
+            vertices.push_back(vertex);
+        }
+    }
+
+    if (!vertices.empty()) {
+        stbtt__bitmap bitmap = { width, height, width, coverage.data() };
+        stbtt_Rasterize(&bitmap, 0.35f, vertices.data(), static_cast<int>(vertices.size()), 1.0f / kSubpixels, 1.0f / kSubpixels, 0.0f, 0.0f, 0, 0, 0, nullptr);
+    }
+    return coverage;
+}
+
 void muiPushClip(const MuiRect& rect)
 {
     SDL_Rect clip = {

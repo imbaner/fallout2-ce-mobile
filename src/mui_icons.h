@@ -88,6 +88,11 @@ enum class MuiIcon {
     // Combat's tactical view: three tiles.
     TacticalView,
 
+    // The port author's pages (the main menu).
+    Telegram,
+    YouTube,
+    GitHub,
+
     Count,
 };
 
