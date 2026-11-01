@@ -609,6 +609,24 @@ static TouchAction touchControlsGetActionFor(Object* target, Object** targetPtr)
     }
 }
 
+// The tactical view picks a critter by the tile it stands on (the figures,
+// see-through, cover other tiles); else the object the game would act on
+// without it, [object] (items, ladders, doors, bodies: #3, nothing could be
+// picked up in combat), a standing critter's figure aside.
+static Object* touchControlsTacticalPick(int worldX, int worldY, Object* object)
+{
+    Object* critter = tacticalViewCritterAt(tileFromScreenXY(worldX, worldY));
+    if (critter != nullptr) {
+        return critter;
+    }
+
+    if (object != nullptr && FrmId(object).objectType() == OBJ_TYPE_CRITTER && !critterIsDead(object)) {
+        return nullptr;
+    }
+
+    return object;
+}
+
 static void touchControlsHandleTap(int x, int y)
 {
     int worldX;
@@ -623,9 +641,10 @@ static void touchControlsHandleTap(int x, int y)
     int mode = gameMouseGetMode();
     if (mode >= GAME_MOUSE_MODE_USE_CROSSHAIR) {
         touchControlsClearSelection();
-        Object* object = tactical
-            ? tacticalViewCritterAt(tileFromScreenXY(worldX, worldY))
-            : playerObjectAt(worldX, worldY, OBJ_TYPE_INVALID, true, gElevation);
+        Object* object = playerObjectAt(worldX, worldY, OBJ_TYPE_INVALID, true, gElevation);
+        if (tactical) {
+            object = touchControlsTacticalPick(worldX, worldY, object);
+        }
         mapHintsSetDestination(-1);
         mapHintsSetInteraction(object);
         if (mode == GAME_MOUSE_MODE_USE_CROSSHAIR) {
@@ -641,7 +660,7 @@ static void touchControlsHandleTap(int x, int y)
     TouchAction action;
     int tile = tileFromScreenXY(worldX, worldY);
     if (tactical) {
-        action = touchControlsGetActionFor(tacticalViewCritterAt(tile), &target);
+        action = touchControlsGetActionFor(touchControlsTacticalPick(worldX, worldY, playerPrimaryTargetAt(worldX, worldY, gElevation)), &target);
     } else {
         action = touchControlsGetActionAt(worldX, worldY, &target);
         touchControlsSnapTap(x, y, &tile, &action, &target);
@@ -940,11 +959,13 @@ static bool radialMenuOpen(int x, int y)
     int worldY;
     worldViewScreenToWorld(x, y, &worldX, &worldY);
 
-    // The tactical view: the menu of the critter standing on the tile.
+    // The tactical view: the menu of the critter standing on the tile (else
+    // of the object, as without it).
     bool tactical = tacticalViewIsShown();
-    Object* target = tactical
-        ? tacticalViewCritterAt(tileFromScreenXY(worldX, worldY))
-        : playerObjectAt(worldX, worldY, OBJ_TYPE_INVALID, true, gElevation);
+    Object* target = playerObjectAt(worldX, worldY, OBJ_TYPE_INVALID, true, gElevation);
+    if (tactical) {
+        target = touchControlsTacticalPick(worldX, worldY, target);
+    }
 
     // Item magnet (with highlight on), as for taps.
     if (!tactical && touchHudIsHighlightActive()) {

@@ -770,8 +770,9 @@ namespace {
         std::u32string perksLabel = creating
             ? ceText(kTextTraits, "Traits") + U" " + number(2 - characterEditorGetTraitsLeft()) + U"/2"
             : editorText(kEditorPerks);
-        // Owed perk: dot on the perks tab.
-        bool perkOwed = !creating && characterEditorGetPerkOwed() != 0;
+        // Owed perk: dot on the perks tab (as the notice there, only with a
+        // perk to choose).
+        bool perkOwed = !creating && characterEditorGetPerkOwed() != 0 && !characterEditorGetAvailablePerks().empty();
 
         std::vector<TabInfo> tabs = {
             { Tab::Stats, "character.tab.stats", ceText(kTextStats, "Stats") },
