@@ -424,9 +424,12 @@ final class UpdateManager {
         return Build.VERSION.SDK_INT >= 28 ? info.getLongVersionCode() : info.versionCode;
     }
 
+    // An archive's signingInfo can be missing on some Android versions (the
+    // update failed verification on a Pixel 4 with Android 13, #20): the
+    // archive's signatures are asked for too and used then.
     private static byte[][] signers(PackageInfo info) {
-        Signature[] values = Build.VERSION.SDK_INT >= 28
-            ? (info.signingInfo == null ? null : info.signingInfo.getApkContentsSigners()) : info.signatures;
+        Signature[] values = Build.VERSION.SDK_INT >= 28 && info.signingInfo != null
+            ? info.signingInfo.getApkContentsSigners() : info.signatures;
         if (values == null) return null;
         byte[][] bytes = new byte[values.length][];
         for (int index = 0; index < values.length; index++) bytes[index] = values[index].toByteArray();
@@ -437,22 +440,34 @@ final class UpdateManager {
         PackageManager pm = context.getPackageManager();
         int flags = Build.VERSION.SDK_INT >= 28 ? PackageManager.GET_SIGNING_CERTIFICATES : PackageManager.GET_SIGNATURES;
         PackageInfo installed = pm.getPackageInfo(context.getPackageName(), flags);
-        return verifyApk(pm, context.getPackageName(), installed, apk, selected);
+        String problem = apkProblem(pm, context.getPackageName(), installed, apk, selected);
+        // Which check failed, for reports from devices (the screen says only
+        // "damaged or signed with a different key").
+        if (problem != null) Log.w(TAG, "Update APK rejected: " + problem + " (Android " + Build.VERSION.SDK_INT + ")");
+        return problem == null;
     }
 
+    // The failed check of a downloaded APK, null if it may be installed.
     // Also exercised on a device with real signed, re-signed and corrupt APKs.
-    static boolean verifyApk(PackageManager pm, String packageName, PackageInfo installed, File apk, JSONObject selected) throws IOException {
+    @SuppressWarnings("deprecation")
+    static String apkProblem(PackageManager pm, String packageName, PackageInfo installed, File apk, JSONObject selected) throws IOException {
         long size = selected.optLong("size");
-        if (size <= 0 || size > UpdateRelease.MAX_APK_SIZE || apk.length() != size
-            || !UpdateRelease.matchesDigest(apk, selected.optString("digest"))) return false;
-        int flags = Build.VERSION.SDK_INT >= 28 ? PackageManager.GET_SIGNING_CERTIFICATES : PackageManager.GET_SIGNATURES;
+        if (size <= 0 || size > UpdateRelease.MAX_APK_SIZE || apk.length() != size) return "size " + apk.length() + " of " + size;
+        if (!UpdateRelease.matchesDigest(apk, selected.optString("digest"))) return "digest";
+        int flags = Build.VERSION.SDK_INT >= 28 ? PackageManager.GET_SIGNING_CERTIFICATES | PackageManager.GET_SIGNATURES : PackageManager.GET_SIGNATURES;
         PackageInfo candidate = pm.getPackageArchiveInfo(apk.getAbsolutePath(), flags);
-        return candidate != null && packageName.equals(candidate.packageName)
-            && (!UpdateRelease.RELEASE_PACKAGE.equals(packageName)
-                || (candidate.applicationInfo != null && (candidate.applicationInfo.flags & ApplicationInfo.FLAG_DEBUGGABLE) == 0))
-            && ("v" + candidate.versionName).equals(selected.optString("tag"))
-            && code(candidate) == selected.optLong("version") && code(candidate) > code(installed)
-            && UpdateRelease.sameSigners(signers(installed), signers(candidate));
+        if (candidate == null) return "not parsed";
+        if (!packageName.equals(candidate.packageName)) return "package " + candidate.packageName;
+        if (UpdateRelease.RELEASE_PACKAGE.equals(packageName)
+            && (candidate.applicationInfo == null || (candidate.applicationInfo.flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0)) return "debuggable";
+        if (!("v" + candidate.versionName).equals(selected.optString("tag"))) return "version name " + candidate.versionName;
+        if (code(candidate) != selected.optLong("version") || code(candidate) <= code(installed)) return "version code " + code(candidate) + " over " + code(installed);
+        byte[][] installedSigners = signers(installed);
+        byte[][] candidateSigners = signers(candidate);
+        if (!UpdateRelease.sameSigners(installedSigners, candidateSigners)) {
+            return "signers " + (installedSigners == null ? "none" : installedSigners.length) + " installed, " + (candidateSigners == null ? "none" : candidateSigners.length) + " in the APK";
+        }
+        return null;
     }
 
     private static File cache() {
