@@ -358,6 +358,8 @@ enum DevAutotestAction {
     // FAIL unless [a] perks are owed, chosen at level [b], with perks to
     // choose from.
     DEV_AUTOTEST_ACTION_CHECK_PERK_CHOICE,
+    // A perk every [a] levels (sfall's set_perk_freq).
+    DEV_AUTOTEST_ACTION_SET_PERK_FREQ,
     // In combat: the dude's Bonus Move free move points are [a].
     DEV_AUTOTEST_ACTION_SET_FREE_MOVE,
     // FAIL unless the dude's free move points are [a] (in combat).
@@ -969,7 +971,8 @@ static const DevAutotestStep kDevAutotestTacticalSteps[] = {
 
 // #3: in combat with the tactical view, an item on the ground is picked up
 // by a tap on it (selected) and a second one (it used to pick tiles only:
-// critters, nothing else).
+// critters, nothing else); with highlight on, by taps next to it too (the
+// item magnet, 25 px off).
 static const DevAutotestStep kDevAutotestTacticalPickupSteps[] = {
     { DEV_AUTOTEST_ACTION_NONE, 0, 0, 0, 30, "u00_map" },
     { DEV_AUTOTEST_ACTION_START_COMBAT, 0, 0, 0, 60, "u01_combat" },
@@ -980,6 +983,16 @@ static const DevAutotestStep kDevAutotestTacticalPickupSteps[] = {
     { DEV_AUTOTEST_ACTION_TOUCH_TAP_NEAR_ITEM, 0, 0, 1, 20, "u05_selected" },
     { DEV_AUTOTEST_ACTION_TOUCH_TAP_NEAR_ITEM, 0, 0, 1, 200, "u06_picked" },
     { DEV_AUTOTEST_ACTION_LOG_PLACED_ITEM, 1, 0, 0, 1, "u07_check" },
+    // The turn ends - and the combat with it (the critter is far): the next
+    // one, the view shown again.
+    { DEV_AUTOTEST_ACTION_HUD_TAP, HUD_ELEMENT(EndTurn), 0, 0, 120, "u08_end_turn" },
+    { DEV_AUTOTEST_ACTION_START_COMBAT, 0, 0, 0, 60, "u08b_next_combat" },
+    { DEV_AUTOTEST_ACTION_CHECK_TACTICAL, 1, 1, 0, 1, "u08c_shown" },
+    { DEV_AUTOTEST_ACTION_HUD_TAP, HUD_ELEMENT(Highlight), 0, 0, 20, "u09_highlight" },
+    { DEV_AUTOTEST_ACTION_PLACE_ITEM, 40, 2, ROTATION_W, 10, "u10_item" },
+    { DEV_AUTOTEST_ACTION_TOUCH_TAP_NEAR_ITEM, 18, 18, 0, 20, "u11_selected" },
+    { DEV_AUTOTEST_ACTION_TOUCH_TAP_NEAR_ITEM, 18, 18, 0, 200, "u12_picked" },
+    { DEV_AUTOTEST_ACTION_LOG_PLACED_ITEM, 1, 0, 0, 1, "u13_check" },
 };
 
 // Every icon at the UI's sizes: small (labels, weights), chips and buttons,
@@ -2447,8 +2460,8 @@ static const DevAutotestStep kDevAutotestCharacterSteps[] = {
 // Owed perks (#19): a perk owed for a level that offers none (the only
 // perks of level 3 without stat requirements taken, low stats) used to stay
 // owed for good - a dot on the perks tab, nothing to choose. It's chosen at
-// the current level, as in the original game; the next owed one at its own
-// level again, also after a save.
+// the next level that offers one (here the current); the next owed one at its
+// own level again, also after a save.
 static const DevAutotestStep kDevAutotestPerkOwedSteps[] = {
     { DEV_AUTOTEST_ACTION_NONE, 0, 0, 0, 30, "o00_start" },
     { DEV_AUTOTEST_ACTION_SET_STAT, STAT_STRENGTH, 5, 0, 1, "o01a_st" },
@@ -2473,6 +2486,33 @@ static const DevAutotestStep kDevAutotestPerkOwedSteps[] = {
     { DEV_AUTOTEST_ACTION_QUICK_SAVE, 0, 0, 0, 30, "o09_saved" },
     { DEV_AUTOTEST_ACTION_QUICK_LOAD, 0, 0, 0, 60, "o10_loaded" },
     { DEV_AUTOTEST_ACTION_CHECK_PERK_CHOICE, 1, 6, 0, 1, "o10b_choice" },
+};
+
+// A perk every level (sfall's set_perk_freq, used by repacks' scripts, #19):
+// no perk is available below level 3, the one owed for level 2 used to stay
+// owed for good, and every perk owed after it. It's chosen at level 3, the
+// next ones at their own levels.
+static const DevAutotestStep kDevAutotestPerkEveryLevelSteps[] = {
+    { DEV_AUTOTEST_ACTION_NONE, 0, 0, 0, 30, "e00_start" },
+    { DEV_AUTOTEST_ACTION_SET_PERK_FREQ, 1, 0, 0, 1, "e01_freq" },
+    { DEV_AUTOTEST_ACTION_ADD_EXPERIENCE, 1000, 0, 0, 30, "e02_level2" },
+    { DEV_AUTOTEST_ACTION_LOG_CHARACTER, 0, 0, 0, 1, "e02b_log" },
+    { DEV_AUTOTEST_ACTION_ADD_EXPERIENCE, 9000, 0, 0, 30, "e03_level5" },
+    { DEV_AUTOTEST_ACTION_LOG_CHARACTER, 0, 0, 0, 1, "e03b_log" },
+    { DEV_AUTOTEST_ACTION_CHECK_PERK_CHOICE, 4, 3, 0, 1, "e03c_choice" },
+    { DEV_AUTOTEST_ACTION_COMMAND, static_cast<int>(GameCommandType::Character), 0, 0, 60, "e04_character" },
+    { DEV_AUTOTEST_ACTION_MUI_TAP, 0, 0, 0, 20, "e05_pick", "character.perkpanel.list.0" },
+    { DEV_AUTOTEST_ACTION_MUI_TAP, 0, 0, 0, 40, "e06_taken", "character.perkpanel.take" },
+    { DEV_AUTOTEST_ACTION_CHECK_PERK_CHOICE, 3, 3, 0, 1, "e06b_choice" },
+    { DEV_AUTOTEST_ACTION_MUI_TAP, 0, 0, 0, 20, "e07_pick", "character.perkpanel.list.0" },
+    { DEV_AUTOTEST_ACTION_MUI_TAP, 0, 0, 0, 40, "e08_taken", "character.perkpanel.take" },
+    { DEV_AUTOTEST_ACTION_CHECK_PERK_CHOICE, 2, 4, 0, 1, "e08b_choice" },
+    { DEV_AUTOTEST_ACTION_MUI_TAP, 0, 0, 0, 20, "e09_pick", "character.perkpanel.list.0" },
+    { DEV_AUTOTEST_ACTION_MUI_TAP, 0, 0, 0, 40, "e10_taken", "character.perkpanel.take" },
+    { DEV_AUTOTEST_ACTION_CHECK_PERK_CHOICE, 1, 5, 0, 1, "e10b_choice" },
+    { DEV_AUTOTEST_ACTION_QUICK_SAVE, 0, 0, 0, 30, "e11_saved" },
+    { DEV_AUTOTEST_ACTION_QUICK_LOAD, 0, 0, 0, 60, "e12_loaded" },
+    { DEV_AUTOTEST_ACTION_CHECK_PERK_CHOICE, 1, 5, 0, 1, "e12b_choice" },
 };
 
 // Before the vault suit (a new game) there's no Pip-Boy, as in combat: the
@@ -3891,6 +3931,9 @@ void devAutotestSetScenario(const char* name)
     } else if (strcmp(name, "tacticalpickup") == 0) {
         gDevAutotestSteps = kDevAutotestTacticalPickupSteps;
         gDevAutotestStepCount = sizeof(kDevAutotestTacticalPickupSteps) / sizeof(kDevAutotestTacticalPickupSteps[0]);
+    } else if (strcmp(name, "perkeverylevel") == 0) {
+        gDevAutotestSteps = kDevAutotestPerkEveryLevelSteps;
+        gDevAutotestStepCount = sizeof(kDevAutotestPerkEveryLevelSteps) / sizeof(kDevAutotestPerkEveryLevelSteps[0]);
     } else if (strcmp(name, "perkowed") == 0) {
         gDevAutotestSteps = kDevAutotestPerkOwedSteps;
         gDevAutotestStepCount = sizeof(kDevAutotestPerkOwedSteps) / sizeof(kDevAutotestPerkOwedSteps[0]);
@@ -7447,6 +7490,9 @@ void devAutotestTick()
             }
             break;
         }
+        case DEV_AUTOTEST_ACTION_SET_PERK_FREQ:
+            characterEditorSetPerkFrequency(static_cast<int>(step->a));
+            break;
         case DEV_AUTOTEST_ACTION_CHECK_PERK_CHOICE: {
             int owed = characterEditorGetPerkOwed();
             int level = characterEditorGetPerkSelectionLevel();

@@ -5696,13 +5696,14 @@ int characterEditorGetPerkSelectionLevel()
 
     int level = std::min(characterEditorOwedPerkLevels.front(), currentLevel);
 
-    // CE: An owed level that offers no perk at all (its perks taken, stats
-    // too low) would keep the perk owed for good, the editor can't open the
-    // choice (#19 of the mobile port): it's chosen at the current level then,
-    // as the original game and sfall always do.
+    // CE: A level that offers no perk at all would keep the perk owed for
+    // good, and every perk owed after it. No perk is available below level 3,
+    // so it happens with a perk every level (sfall's `set_perk_freq`), also
+    // with perks taken or stats too low. Such a perk is chosen at the next
+    // level that offers one, up to the current level.
     Perk perks[PERK_COUNT];
-    if (level < currentLevel && perkGetAvailablePerks(gDude, level, perks) == 0) {
-        return currentLevel;
+    while (level < currentLevel && perkGetAvailablePerks(gDude, level, perks) == 0) {
+        level++;
     }
 
     return level;

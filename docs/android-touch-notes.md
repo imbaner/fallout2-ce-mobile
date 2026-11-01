@@ -202,8 +202,10 @@ goes through mouse emulation in touchscreen (absolute) mode.
     (`tacticalViewCritterAt`); without a critter there, the object the game
     would act on as without the view (items, ladders, doors, bodies), a
     standing critter's figure aside (`touchControlsTacticalPick`; until
-    2026-11-01 nothing else could be picked, #3). Autotests `tactical`,
-    `tacticalpickup`.
+    2026-11-01 nothing else could be picked, #3). With highlight on, the
+    item magnet as without the view (`touchControlsSnapToItem`); the
+    enemy's body and the tile magnets stay off (critters go by tiles).
+    Autotests `tactical`, `tacticalpickup`.
 - Combat outlines with touch controls (2026-10-09,
   `combatOutlinesFollowTurn`): the game outlines critters only while the
   cursor is a crosshair; touch controls have no cursor (a move selection
