@@ -1,5 +1,6 @@
 import {nativeText as n} from './import-native.js';
 import {installHint} from './install-hint.js';
+import {countEvent} from './visits.js';
 import {language, webText as t} from './strings.js';
 
 export function createFilesManager({root = document, mode = null, resources = null, buildId = null, onReturn = () => { location.href = './index.html'; }, download = null} = {}) {
@@ -222,12 +223,14 @@ export function createFilesManager({root = document, mode = null, resources = nu
         if (resources && data.code === 'no_saves' && pendingAction === 'export-saves') {
           show(labels.saves,n('saves_export_none')); complete(); return;
         }
+        if (data.code !== 'cancelled') countEvent('import-error-' + (errors[data.code] ? data.code : 'other'));
         plan = null; show(resources ? labels.saves : labels.title,errors[data.code] || t('operation_failed'));
         $('details').textContent = data.message; surface.classList.add('error');
         buttons([t('try_again'),welcome],active ? [labels.play,play] : null);
         return;
       }
       plan = data.plan;
+      if (data.action === 'install' || data.action === 'install-saves') countEvent(data.action === 'install' ? 'files-installed' : 'saves-imported');
       if (returning) { returning = false; play(); return; }
       if (['export-saves','export-before-replace'].includes(data.action)) { exported(data.exchange,data.action === 'export-before-replace' ? confirmReplace : null); return; }
       if (plan) { review(); return; }
@@ -255,7 +258,9 @@ export function createFilesManager({root = document, mode = null, resources = nu
     // Lock the UI before any permission-sensitive promise can yield.
     busy = true; buttons(null,null);
     try { await navigator.storage?.persist?.(); } catch {}
-    busy = false; inspect(pickMode,chosen);
+    busy = false;
+    if (pickMode === 'game') countEvent('archive-chosen');
+    inspect(pickMode,chosen);
   };
   $('back').onclick = returnToGame;
   const keydown = event => {

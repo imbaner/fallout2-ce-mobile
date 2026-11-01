@@ -159,7 +159,7 @@ body.playing #canvas { display: block; }
 .startup h1 { font-size: 30px; }
 .startup #play { margin-top: 20px; }
 #startup-tools { display:flex; justify-content:center; flex-wrap:wrap; gap:4px 10px; margin-top:12px; font-size:12px; flex-shrink:0; }
-#notice, #build-tag, #repair { color:var(--dim); }
+#notice, #build-tag, #repair, #privacy { color:var(--dim); }
 #repair { margin-top:12px; padding:8px; flex-shrink:0; }
 @media (max-height: 300px) {
   .startup #panel { padding: 12px; }

@@ -12,7 +12,7 @@ from import_ui import write_native_assets
 
 ROOT = Path(__file__).resolve().parents[2]
 SITE_FILES = ['index.html', 'app.css', 'app.js', 'filesystem.js', 'browser.js',
-              'app-cache.js', 'audio-worklet.js', 'install-hint.js', 'strings.js', 'resource-store.js', 'working-files.js', 'storage-common.js', 'user-report.js',
+              'app-cache.js', 'audio-worklet.js', 'install-hint.js', 'visits.js', 'privacy.html', 'privacy-page.js', 'strings.js', 'resource-store.js', 'working-files.js', 'storage-common.js', 'user-report.js',
               'zip-import.js', 'probe-worker.js', 'manifest.webmanifest',
               'game-config.js', 'files.html', 'files.css', 'files.js', 'files-view.js', 'files-page.js',
               'save-session.js', 'save-download.js',

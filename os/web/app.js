@@ -6,7 +6,8 @@ import {createFilesView} from './files-view.js';
 import {createSaveSession} from './save-session.js';
 import {createSaveDownloads} from './save-download.js';
 import {startAppCache} from './app-cache.js';
-import {installHint} from './install-hint.js';
+import {installHint, installedApp} from './install-hint.js';
+import {countVisit, countEvent} from './visits.js';
 import {language, webText as t} from './strings.js';
 
 const $ = id => document.getElementById(id);
@@ -32,6 +33,8 @@ $('retry').textContent = t('try_again');
 $('rotate').textContent = t('rotate');
 $('notice').textContent = t('unofficial');
 $('tagline').textContent = t('tagline');
+$('privacy').textContent = t('privacy');
+countVisit();
 let source = null;
 let starting = false;
 let running = false;
@@ -51,6 +54,7 @@ function rotatePrompt() {
 }
 function error(message, detail) {
   console.error(message, detail || '');
+  if (detail?.name !== 'StorageBusyError') countEvent('start-failed');
   textInput.end();
   audio.stop();
   audioTiming?.stop();
@@ -207,6 +211,7 @@ async function play() {
     $('canvas').focus();
     running = true;
     rotatePrompt();
+    countEvent(installedApp() ? 'start-app' : 'start-browser');
     module.callMain([]);
   } catch (exception) {
     engine?.webUserFiles?.close();

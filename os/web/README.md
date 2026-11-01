@@ -157,6 +157,18 @@ viewport uniformly. Browser chrome/orientation changes can add black bars;
 they must not stretch squares or shift the touch targets. A fresh launch in
 landscape/fullscreen chooses its logical resolution for that viewport.
 
+## Visit counter
+
+`visits.js` counts page openings of the launcher, file manager and privacy
+page on `play.f2touch.com` only, with GoatCounter (`imbaner.goatcounter.com`,
+statistics private): page path, outside referrer, link labels (`?ref=`,
+`utm_*`) and screen width, no cookies or game data. Named events, once per
+page load: `archive-chosen`, `files-installed`, `saves-imported`,
+`import-error-<code>`, `start-app` / `start-browser`, `start-failed`,
+`visits-off` (counted just before the opt-out takes effect) and `visits-on`.
+Other hosts, automated browsers, Do Not Track, Global Privacy Control and the
+opt-out on `privacy.html` send nothing.
+
 ## Checks and CI
 
 ```sh

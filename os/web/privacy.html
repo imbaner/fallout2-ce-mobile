@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=overlays-content">
+  <meta name="theme-color" content="#050A06">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+  <title>F2 Touch — privacy</title>
+  <link rel="stylesheet" href="./app.css">
+  <link rel="stylesheet" href="./import-native.css">
+  <link rel="stylesheet" href="./files.css">
+  <script type="module" src="./privacy-page.js"></script>
+</head>
+<body class="privacy">
+  <main id="launcher">
+    <section id="panel" aria-labelledby="title">
+      <h1 id="title">Privacy</h1>
+      <div id="content">
+        <p id="privacy-local"></p>
+        <p id="privacy-why"></p>
+        <p id="privacy-visits" class="dim"></p>
+        <p id="privacy-state" class="dim" role="status" aria-live="polite"></p>
+      </div>
+      <div id="actions"><button id="primary" type="button" hidden></button></div>
+    </section>
+  </main>
+  <a id="back" class="button" href="./" aria-label="Back"><img src="./icons/import-back.svg" width="28" height="28" alt=""></a>
+</body>
+</html>

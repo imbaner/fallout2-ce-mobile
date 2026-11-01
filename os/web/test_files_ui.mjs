@@ -26,6 +26,7 @@ async function page(mode,check,options = {}) {
     await copyFile(new URL('./files.js',import.meta.url),join(directory,'files.mjs'));
     await copyFile(new URL('./files.js',import.meta.url),join(directory,'files.js'));
     await copyFile(new URL('./install-hint.js',import.meta.url),join(directory,'install-hint.js'));
+    await copyFile(new URL('./visits.js',import.meta.url),join(directory,'visits.js'));
     await copyFile(new URL('./strings.js',import.meta.url),join(directory,'strings.js'));
     await copyFile(new URL('./save-session.js',import.meta.url),join(directory,'save-session.mjs'));
     await copyFile(new URL('./save-download.js',import.meta.url),join(directory,'save-download.mjs'));
