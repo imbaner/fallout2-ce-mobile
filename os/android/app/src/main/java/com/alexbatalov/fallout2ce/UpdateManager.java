@@ -257,7 +257,7 @@ final class UpdateManager {
                 }
                 if (cancelled) return;
                 if (part.length() != size) throw new InvalidApkException("size");
-                if (!verify(part, selected)) throw new InvalidApkException();
+                verify(part, selected);
                 File complete = new File(cache(), selected.getString("tag") + ".apk");
                 synchronized (UpdateManager.class) {
                     // Cancel and promotion to a ready APK are one decision,
@@ -329,7 +329,7 @@ final class UpdateManager {
             int id = -1;
             boolean committed = false;
             try {
-                if (!verify(apk, selected)) throw new InvalidApkException();
+                verify(apk, selected);
                 PackageInstaller.SessionParams params = new PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL);
                 params.setAppPackageName(context.getPackageName());
                 params.setSize(apk.length());
@@ -442,15 +442,26 @@ final class UpdateManager {
         return bytes;
     }
 
-    private static boolean verify(File apk, JSONObject selected) throws PackageManager.NameNotFoundException, IOException {
+    // Throws InvalidApkException naming the failed check: the game's problem
+    // report shows it (error_report.h), the log has it for adb.
+    private static void verify(File apk, JSONObject selected) throws PackageManager.NameNotFoundException, IOException {
         PackageManager pm = context.getPackageManager();
         int flags = Build.VERSION.SDK_INT >= 28 ? PackageManager.GET_SIGNING_CERTIFICATES : PackageManager.GET_SIGNATURES;
         PackageInfo installed = pm.getPackageInfo(context.getPackageName(), flags);
         String problem = apkProblem(pm, context.getPackageName(), installed, apk, selected);
-        // Which check failed, for reports from devices (the screen says only
-        // "damaged or signed with a different key").
-        if (problem != null) Log.w(TAG, "Update APK rejected: " + problem + " (Android " + Build.VERSION.SDK_INT + ")");
-        return problem == null;
+        if (problem != null) {
+            Log.w(TAG, "Update APK rejected: " + problem + " (Android " + Build.VERSION.SDK_INT + ")");
+            throw new InvalidApkException(problem);
+        }
+    }
+
+    private static boolean passes(File apk, JSONObject selected) throws PackageManager.NameNotFoundException, IOException {
+        try {
+            verify(apk, selected);
+            return true;
+        } catch (InvalidApkException e) {
+            return false;
+        }
     }
 
     // The failed check of a downloaded APK, null if it may be installed.
@@ -516,7 +527,7 @@ final class UpdateManager {
                     clearCache();
                 } else {
                     File complete = new File(cache(), saved.getString("tag") + ".apk");
-                    if (complete.isFile() && verify(complete, saved)) apk = complete;
+                    if (complete.isFile() && passes(complete, saved)) apk = complete;
                     else if (complete.exists() && !complete.delete()) Log.w(TAG, "Cannot remove invalid cached APK");
                     File part = new File(cache(), "download.part");
                     interrupted = part.exists();
@@ -608,9 +619,8 @@ final class UpdateManager {
     }
 
     private static final class ServiceException extends IOException { }
-    // [check]: which of the APK's checks failed, when known.
+    // [check]: which of the APK's checks failed (apkProblem).
     private static final class InvalidApkException extends IOException {
-        InvalidApkException() { }
         InvalidApkException(String check) { super(check); }
     }
 }
