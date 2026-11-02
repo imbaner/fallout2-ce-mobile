@@ -32,11 +32,27 @@ export function abortDetail(reason) {
     .replace(/[^\x20-\x7e…]/g, '').trim().slice(0, 80) || 'abort';
 }
 
+// Google Forms and GitHub refuse links longer than about 8 KB (a letter of
+// another alphabet takes 6 characters in a link): what doesn't fit goes from
+// the oldest events, then from the end (as the engine's links do).
+export const URL_LIMIT = 8000;
+
+export function fittedText(text, room) {
+  const lines = text.split('\n');
+  while (encodeURIComponent(lines.join('\n')).length > room && lines.length > 0) {
+    const event = lines.findIndex(line => line.startsWith('- '));
+    lines.splice(event >= 0 ? event : Math.max(lines.length - 2, 0), 1);
+  }
+  return lines.join('\n');
+}
+
 export function reportUrls(texts, title, report) {
   const encode = encodeURIComponent;
+  const fence = encode('```\n');
+  const github = `${texts.github}?title=${encode(title)}&body=${fence}`;
   return {
-    form: texts.form ? texts.form + encode(report) : '',
-    github: `${texts.github}?title=${encode(title)}&body=${encode('```\n' + report + '```\n')}`,
+    form: texts.form ? texts.form + encode(fittedText(report, URL_LIMIT - texts.form.length)) : '',
+    github: github + encode(fittedText(report, URL_LIMIT - github.length - fence.length)) + fence,
     telegram: texts.telegram + encode(report),
   };
 }

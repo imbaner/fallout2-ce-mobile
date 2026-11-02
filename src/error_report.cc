@@ -44,10 +44,10 @@ namespace fallout {
 
 namespace {
 
-    // The Google Form's prefill link up to its report field's value
-    // ("https://docs.google.com/forms/d/e/<id>/viewform?usp=pp_url&entry.<n>="):
-    // the form isn't made yet, its button shows once this is set.
-    constexpr const char* kFormPrefillUrl = "";
+    // The Google Form's prefill link up to its report field's value (the
+    // form's first question; the other two are the player's own, optional).
+    // Empty hides its button.
+    constexpr const char* kFormPrefillUrl = "https://docs.google.com/forms/d/e/1FAIpQLSfxwxftP2naSS9T5-maVG-jC9vti_2dnRACLccl2whZbW4IJw/viewform?usp=pp_url&entry.878318686=";
     // Telegram without the app (desktop, a browser without sharing).
     constexpr const char* kTelegramShareUrl = "https://t.me/share/url?url=https%3A%2F%2Ff2touch.com&text=";
 
@@ -633,14 +633,42 @@ namespace {
         return result;
     }
 
+    // Google Forms and GitHub refuse links longer than about 8 KB (a letter
+    // of another alphabet takes 6 characters in a link): what doesn't fit
+    // goes from the oldest events, then from the end.
+    constexpr size_t kUrlLimit = 8000;
+
+    std::string fittedText(std::string text, size_t room)
+    {
+        while (urlEncode(text).size() > room) {
+            // The oldest event's line, else the last line.
+            size_t start = text.find("\n- ");
+            if (start != std::string::npos) {
+                start += 1;
+            } else {
+                start = text.rfind('\n', text.size() - 2);
+                start = start != std::string::npos ? start + 1 : 0;
+            }
+            size_t end = text.find('\n', start);
+            text.erase(start, end != std::string::npos ? end + 1 - start : std::string::npos);
+        }
+        return text;
+    }
+
     std::string formUrl(const Report& report)
     {
-        return kFormPrefillUrl[0] != '\0' ? kFormPrefillUrl + urlEncode(report.text) : std::string();
+        if (kFormPrefillUrl[0] == '\0') {
+            return std::string();
+        }
+        std::string prefix = kFormPrefillUrl;
+        return prefix + urlEncode(fittedText(report.text, kUrlLimit - prefix.size()));
     }
 
     std::string githubUrl(const Report& report)
     {
-        return std::string(kPortIssuesUrl) + "/new?title=" + urlEncode(report.summary) + "&body=" + urlEncode("```\n" + report.text + "```\n");
+        std::string prefix = std::string(kPortIssuesUrl) + "/new?title=" + urlEncode(report.summary) + "&body=" + urlEncode("```\n");
+        std::string suffix = urlEncode("```\n");
+        return prefix + urlEncode(fittedText(report.text, kUrlLimit - prefix.size() - suffix.size())) + suffix;
     }
 
     void openUrl(const std::string& url)

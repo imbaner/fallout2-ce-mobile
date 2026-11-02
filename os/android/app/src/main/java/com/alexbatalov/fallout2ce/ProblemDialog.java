@@ -22,6 +22,9 @@ import org.json.JSONObject;
 
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 // The problem window the game can't draw itself (error_report.h): it
 // stopped showing frames. Its texts are the game's own (in the game's
@@ -75,9 +78,11 @@ final class ProblemDialog {
         channels.setOrientation(LinearLayout.HORIZONTAL);
         String form = texts.optString("form");
         if (!form.isEmpty()) {
-            addChannel(channels, texts.optString("formLabel"), texts.optString("noAccount"), () -> open(activity, form + encode(report)));
+            addChannel(channels, texts.optString("formLabel"), texts.optString("noAccount"), () -> open(activity, form + encode(fittedText(report, URL_LIMIT - form.length()))));
         }
-        String github = texts.optString("github") + "?title=" + encode(title) + "&body=" + encode("```\n" + report + "```\n");
+        String fence = encode("```\n");
+        String githubPrefix = texts.optString("github") + "?title=" + encode(title) + "&body=" + fence;
+        String github = githubPrefix + encode(fittedText(report, URL_LIMIT - githubPrefix.length() - fence.length())) + fence;
         addChannel(channels, "GitHub", texts.optString("account"), () -> open(activity, github));
         addChannel(channels, "Telegram", texts.optString("account"), () -> MainActivity.share(activity, report));
         layout.addView(channels);
@@ -124,6 +129,23 @@ final class ProblemDialog {
         } catch (ActivityNotFoundException e) {
             Log.w(TAG, "No browser", e);
         }
+    }
+
+    // Google Forms and GitHub refuse links longer than about 8 KB (a letter
+    // of another alphabet takes 6 characters in a link): what doesn't fit
+    // goes from the oldest events, then from the end (as the game's links do).
+    static final int URL_LIMIT = 8000;
+
+    static String fittedText(String text, int room) {
+        List<String> lines = new ArrayList<>(Arrays.asList(text.split("\n", -1)));
+        while (!lines.isEmpty() && encode(String.join("\n", lines)).length() > room) {
+            int event = -1;
+            for (int index = 0; index < lines.size() && event < 0; index++) {
+                event = lines.get(index).startsWith("- ") ? index : -1;
+            }
+            lines.remove(event >= 0 ? event : Math.max(lines.size() - 2, 0));
+        }
+        return String.join("\n", lines);
     }
 
     static String encode(String value) {

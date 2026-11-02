@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {abortDetail, abortKind, createHangWatch, HANG_MS, LOADING_HANG_MS, reportUrls} from './problem-view.js';
+import {abortDetail, abortKind, createHangWatch, fittedText, HANG_MS, LOADING_HANG_MS, reportUrls, URL_LIMIT} from './problem-view.js';
 
 test('the hang watchdog: 20 s without new frames, 60 s while loading, not before the first frame', () => {
   const watch = createHangWatch();
@@ -31,4 +31,13 @@ test('the channels get the report as it is shown; no form until its link is set'
   assert.equal(urls.github, 'https://github.com/imbaner/fallout2-ce-mobile/issues/new?title=%D0%98%D0%B3%D1%80%D0%B0%20%D0%BD%D0%B5%20%D0%BE%D1%82%D0%B2%D0%B5%D1%87%D0%B0%D0%B5%D1%82&body=%60%60%60%0Aline%201%0Aline%202%0A%60%60%60%0A');
   assert.equal(urls.telegram, 'https://t.me/share/url?url=x&text=line%201%0Aline%202%0A');
   assert.equal(reportUrls({...texts, form:'https://docs.google.com/forms/d/e/x/viewform?entry.1='}, 't', 'a b').form, 'https://docs.google.com/forms/d/e/x/viewform?entry.1=a%20b');
+});
+
+test('a long report fits the links: the oldest events go first, then the last lines', () => {
+  assert.equal(fittedText('code\nLast events:\n- one\n- two\n', 'code%0ALast%20events%3A%0A-%20two%0A'.length), 'code\nLast events:\n- two\n');
+  assert.equal(fittedText('one\ntwo\n', 'one%0A'.length), 'one\n');
+  const report = 'Код: ошибка\n' + 'Скрипт: длинная строка про ошибку\n'.repeat(20) + 'Last events:\n' + '- карта и что-то ещё\n'.repeat(30);
+  const urls = reportUrls({form:'https://docs.google.com/forms/d/e/x/viewform?usp=pp_url&entry.1=', github:'https://github.com/a/b/issues/new', telegram:''}, 't', report);
+  assert.ok(urls.form.length <= URL_LIMIT && urls.github.length <= URL_LIMIT);
+  assert.ok(decodeURIComponent(urls.form).includes('Код: ошибка\n'));
 });
