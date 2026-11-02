@@ -4,7 +4,6 @@ import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.ActivityManager;
 import android.app.ApplicationExitInfo;
-import android.content.ActivityNotFoundException;
 import android.content.BroadcastReceiver;
 import android.content.Intent;
 import android.content.Context;
@@ -295,24 +294,6 @@ public class MainActivity extends SDLActivity {
             Log.w(TAG, "No exit reasons", e);
         }
         return "";
-    }
-
-    // Called from native code (error_report.cc, a problem report's
-    // "Telegram"): the system's sharing of [text], in Telegram when it's
-    // there.
-    public void shareText(String text) {
-        runOnUiThread(() -> share(this, text));
-    }
-
-    static void share(Activity activity, String text) {
-        Intent intent = new Intent(Intent.ACTION_SEND);
-        intent.setType("text/plain");
-        intent.putExtra(Intent.EXTRA_TEXT, text);
-        try {
-            activity.startActivity(new Intent(intent).setPackage("org.telegram.messenger"));
-        } catch (ActivityNotFoundException e) {
-            activity.startActivity(Intent.createChooser(intent, "Telegram"));
-        }
     }
 
     // The native updater's non-blocking bridge (app_update.cc).

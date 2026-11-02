@@ -53,7 +53,7 @@ export function reportUrls(texts, title, report) {
   return {
     form: texts.form ? texts.form + encode(fittedText(report, URL_LIMIT - texts.form.length)) : '',
     github: github + encode(fittedText(report, URL_LIMIT - github.length - fence.length)) + fence,
-    telegram: texts.telegram + encode(report),
+    telegram: texts.telegram + encode(fittedText(report, URL_LIMIT - texts.telegram.length)),
   };
 }
 
@@ -85,16 +85,17 @@ export function showProblem(host, {texts, title, message, report, actions = []})
       channels.append(cell);
     };
     const open = url => window.open(url, '_blank', 'noopener');
+    let copy;
+    const copyReport = () => {
+      navigator.clipboard?.writeText(report).then(() => { copy.textContent = texts.copied; }).catch(() => {});
+    };
     if (urls.form) channel(texts.formLabel, texts.noAccount, () => open(urls.form));
     channel('GitHub', texts.account, () => open(urls.github));
-    channel('Telegram', texts.account, () => {
-      if (navigator.share) navigator.share({text:report}).catch(error => { if (error.name !== 'AbortError') open(urls.telegram); });
-      else open(urls.telegram);
-    });
+    // The channel's direct messages; Telegram may leave the draft out, so
+    // the report is copied first.
+    channel('Telegram', texts.account, () => { copyReport(); open(urls.telegram); });
     panel.append(channels);
-    const copy = button(texts.copy, () => {
-      navigator.clipboard?.writeText(report).then(() => { copy.textContent = texts.copied; }).catch(() => {});
-    });
+    copy = button(texts.copy, () => copyReport());
     actions = [{node:copy}, ...actions];
   }
   const row = element('div', 'problem-actions');

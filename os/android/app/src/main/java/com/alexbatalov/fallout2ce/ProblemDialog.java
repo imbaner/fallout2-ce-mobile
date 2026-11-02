@@ -84,16 +84,23 @@ final class ProblemDialog {
         String githubPrefix = texts.optString("github") + "?title=" + encode(title) + "&body=" + fence;
         String github = githubPrefix + encode(fittedText(report, URL_LIMIT - githubPrefix.length() - fence.length())) + fence;
         addChannel(channels, "GitHub", texts.optString("account"), () -> open(activity, github));
-        addChannel(channels, "Telegram", texts.optString("account"), () -> MainActivity.share(activity, report));
-        layout.addView(channels);
-
         Button copy = new Button(activity);
-        copy.setText(texts.optString("copy"));
-        copy.setOnClickListener(v -> {
+        Runnable copyReport = () -> {
             ClipboardManager clipboard = (ClipboardManager) activity.getSystemService(Context.CLIPBOARD_SERVICE);
             clipboard.setPrimaryClip(ClipData.newPlainText(title, report));
             copy.setText(texts.optString("copied"));
+        };
+        // The channel's direct messages; Telegram may leave the draft out,
+        // so the report is copied first (as the game's window does).
+        String telegram = texts.optString("telegram");
+        addChannel(channels, "Telegram", texts.optString("account"), () -> {
+            copyReport.run();
+            open(activity, telegram + encode(fittedText(report, URL_LIMIT - telegram.length())));
         });
+        layout.addView(channels);
+
+        copy.setText(texts.optString("copy"));
+        copy.setOnClickListener(v -> copyReport.run());
         layout.addView(copy);
 
         return new AlertDialog.Builder(activity, android.R.style.Theme_DeviceDefault_Dialog_Alert)

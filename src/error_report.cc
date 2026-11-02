@@ -50,8 +50,9 @@ namespace {
     // form's first question; the other two are the player's own, optional).
     // Empty hides its button.
     constexpr const char* kFormPrefillUrl = "https://docs.google.com/forms/d/e/1FAIpQLSfxwxftP2naSS9T5-maVG-jC9vti_2dnRACLccl2whZbW4IJw/viewform?usp=pp_url&entry.878318686=";
-    // Telegram without the app (desktop, a browser without sharing).
-    constexpr const char* kTelegramShareUrl = "https://t.me/share/url?url=https%3A%2F%2Ff2touch.com&text=";
+    // The channel's direct messages (kPortTelegramUrl), the report as the
+    // draft. Telegram may leave the draft out: the report is copied first.
+    constexpr const char* kTelegramDirectUrl = "https://t.me/imbaner?direct&text=";
 
     // In the game's folder: the run going on (its last events, for the next
     // start when it ends unexpectedly), and a problem the app's import
@@ -673,6 +674,12 @@ namespace {
         return prefix + urlEncode(fittedText(report.text, kUrlLimit - prefix.size() - suffix.size())) + suffix;
     }
 
+    std::string telegramUrl(const Report& report)
+    {
+        std::string prefix = kTelegramDirectUrl;
+        return prefix + urlEncode(fittedText(report.text, kUrlLimit - prefix.size()));
+    }
+
     void openUrl(const std::string& url)
     {
         if (devAutotestIsEnabled()) {
@@ -684,53 +691,11 @@ namespace {
 
 #ifdef __EMSCRIPTEN__
     // clang-format off
-    EM_JS(void, webShareTextJs, (const char* text, const char* fallback), {
-        const value = UTF8ToString(text);
-        const url = UTF8ToString(fallback);
-        const open = () => window.open(url, '_blank', 'noopener');
-        if (navigator.share) navigator.share({ text: value }).catch(error => { if (error.name !== 'AbortError') open(); });
-        else open();
-    });
-
     EM_JS(void, webCopyTextJs, (const char* text), {
         navigator.clipboard?.writeText(UTF8ToString(text)).catch(error => console.warn('Copy failed', error));
     });
     // clang-format on
 #endif
-
-    // The system's sharing (Telegram first on Android), else Telegram's own
-    // page.
-    void shareText(const std::string& text)
-    {
-        std::string fallback = kTelegramShareUrl + urlEncode(text);
-        if (devAutotestIsEnabled()) {
-            devAutotestNote("report: share %zu bytes\n", text.size());
-            return;
-        }
-#if defined(__ANDROID__)
-        JNIEnv* env = static_cast<JNIEnv*>(SDL_AndroidGetJNIEnv());
-        jobject activity = static_cast<jobject>(SDL_AndroidGetActivity());
-        if (env == nullptr || activity == nullptr) {
-            return;
-        }
-        jclass activityClass = env->GetObjectClass(activity);
-        jmethodID method = env->GetMethodID(activityClass, "shareText", "(Ljava/lang/String;)V");
-        if (method != nullptr) {
-            jstring value = env->NewStringUTF(text.c_str());
-            env->CallVoidMethod(activity, method, value);
-            env->DeleteLocalRef(value);
-        }
-        if (env->ExceptionCheck()) {
-            env->ExceptionClear();
-        }
-        env->DeleteLocalRef(activityClass);
-        env->DeleteLocalRef(activity);
-#elif defined(__EMSCRIPTEN__)
-        webShareTextJs(text.c_str(), fallback.c_str());
-#else
-        SDL_OpenURL(fallback.c_str());
-#endif
-    }
 
     void copyText(const std::string& text)
     {
@@ -841,7 +806,9 @@ namespace {
                 } else if (strcmp(channels[index].id, "report.github") == 0) {
                     openUrl(githubUrl(report));
                 } else {
-                    shareText(report.text);
+                    copyText(report.text);
+                    copiedTime = ui.now != 0 ? ui.now : 1;
+                    openUrl(telegramUrl(report));
                 }
             }
         }
@@ -963,7 +930,7 @@ namespace {
         appendJson(json, "memory", utf8(text(kTextBrowserMemory, "The browser ran out of memory for the game. Close other tabs and open the game again.")));
         appendJson(json, "form", kFormPrefillUrl);
         appendJson(json, "github", std::string(kPortIssuesUrl) + "/new");
-        appendJson(json, "telegram", kTelegramShareUrl);
+        appendJson(json, "telegram", kTelegramDirectUrl);
         appendJson(json, "formLabel", utf8(text(kTextForm, "Google Form")));
         appendJson(json, "noAccount", utf8(text(kTextNoAccount, "no account needed")));
         appendJson(json, "account", utf8(text(kTextNeedsAccount, "needs an account")));

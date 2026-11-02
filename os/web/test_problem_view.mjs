@@ -25,11 +25,11 @@ test('an abort: memory or an error, its reason without addresses or URLs', () =>
 });
 
 test('the channels get the report as it is shown; no form until its link is set', () => {
-  const texts = {form:'', github:'https://github.com/imbaner/fallout2-ce-mobile/issues/new', telegram:'https://t.me/share/url?url=x&text='};
+  const texts = {form:'', github:'https://github.com/imbaner/fallout2-ce-mobile/issues/new', telegram:'https://t.me/imbaner?direct&text='};
   const urls = reportUrls(texts, 'Игра не отвечает', 'line 1\nline 2\n');
   assert.equal(urls.form, '');
   assert.equal(urls.github, 'https://github.com/imbaner/fallout2-ce-mobile/issues/new?title=%D0%98%D0%B3%D1%80%D0%B0%20%D0%BD%D0%B5%20%D0%BE%D1%82%D0%B2%D0%B5%D1%87%D0%B0%D0%B5%D1%82&body=%60%60%60%0Aline%201%0Aline%202%0A%60%60%60%0A');
-  assert.equal(urls.telegram, 'https://t.me/share/url?url=x&text=line%201%0Aline%202%0A');
+  assert.equal(urls.telegram, 'https://t.me/imbaner?direct&text=line%201%0Aline%202%0A');
   assert.equal(reportUrls({...texts, form:'https://docs.google.com/forms/d/e/x/viewform?entry.1='}, 't', 'a b').form, 'https://docs.google.com/forms/d/e/x/viewform?entry.1=a%20b');
 });
 
