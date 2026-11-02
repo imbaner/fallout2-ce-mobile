@@ -661,9 +661,9 @@ bool SaveCatalog::setQuickRange(int firstQuick, int quickCount, int* madePermane
     }
 
     // The oldest quick saves over the new number become manual: those in the
-    // new range leave it, the others are manual where they are once the
-    // range changes.
-    for (size_t index = keep; index < quick.size(); index++) {
+    // new range leave it (the oldest first, keeping their order), the others
+    // are manual where they are once the range changes.
+    for (int index = static_cast<int>(quick.size()) - 1; index >= keep; index--) {
         int slot = quick[index];
         if (inNew(slot)) {
             int target = freeOutside(oldFirst, oldCount, newFirst, newCount);
@@ -676,8 +676,9 @@ bool SaveCatalog::setQuickRange(int firstQuick, int quickCount, int* madePermane
         }
     }
 
-    // The kept ones outside the new range move into it.
-    for (int index = 0; index < keep; index++) {
+    // The kept ones outside the new range move into it, the oldest first:
+    // in the order the quick saves fill their slots.
+    for (int index = keep - 1; index >= 0; index--) {
         int slot = quick[index];
         if (inNew(slot)) {
             continue;
