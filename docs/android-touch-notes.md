@@ -198,9 +198,14 @@ goes through mouse emulation in touchscreen (absolute) mode.
     cover): 40% through see-through figures and behind scenery, none under
     the dude and the outlines.
   - The move tile and the hit chance above the enemy as in normal combat.
-    Taps and long presses pick tiles: a critter by the tile it stands on
-    (`tacticalViewCritterAt`), items and corpses not at all. Autotest
-    `tactical`.
+    Taps and long presses pick a critter by the tile it stands on
+    (`tacticalViewCritterAt`); without a critter there, the object the game
+    would act on as without the view (items, ladders, doors, bodies), a
+    standing critter's figure aside (`touchControlsTacticalPick`; until
+    2026-11-01 nothing else could be picked, #3). With highlight on, the
+    item magnet as without the view (`touchControlsSnapToItem`); the
+    enemy's body and the tile magnets stay off (critters go by tiles).
+    Autotests `tactical`, `tacticalpickup`.
 - Combat outlines with touch controls (2026-10-09,
   `combatOutlinesFollowTurn`): the game outlines critters only while the
   cursor is a crosshair; touch controls have no cursor (a move selection

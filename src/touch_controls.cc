@@ -133,6 +133,7 @@ static TouchAction touchControlsGetActionAt(int worldX, int worldY, Object** tar
 static TouchAction touchControlsGetActionFor(Object* target, Object** targetPtr);
 static void touchControlsHandleTap(int x, int y);
 static void touchControlsSnapTap(int x, int y, int* tile, TouchAction* action, Object** target);
+static bool touchControlsSnapToItem(int x, int y, TouchAction* action, Object** target);
 static void touchControlsStickToSelection(int x, int y, int worldX, int worldY, int* tile, TouchAction* action, Object** target);
 static bool touchControlsGetBodyColumn(Object* critter, Rect* rect);
 static Object* touchControlsFindItemNear(int x, int y);
@@ -155,9 +156,9 @@ static bool radialMenuHandleGesture(const Gesture* gesture);
 //   on that tile (second tap on the same tile runs / confirms the move);
 static constexpr float kTileSnapRadiusDp = 24.0f;
 // - with item highlight on (HUD), items have priority over the ground: a tap
-//   on or near an item's sprite box uses the item. Without highlight taps
-//   pick items by their pixels as the game does, so dude can walk next to
-//   them.
+//   on or near an item's sprite box uses the item (also in the tactical
+//   view). Without highlight taps pick items by their pixels as the game
+//   does, so dude can walk next to them.
 static constexpr float kItemSnapRadiusDp = 24.0f;
 // - in combat a tap on the ground picks an enemy on the tile it stands on
 //   (can't be walked to anyway) or on its body: a narrow column over its
@@ -609,6 +610,24 @@ static TouchAction touchControlsGetActionFor(Object* target, Object** targetPtr)
     }
 }
 
+// The tactical view picks a critter by the tile it stands on (the figures,
+// see-through, cover other tiles); else the object the game would act on
+// without it, [object] (items, ladders, doors, bodies: #3, nothing could be
+// picked up in combat), a standing critter's figure aside.
+static Object* touchControlsTacticalPick(int worldX, int worldY, Object* object)
+{
+    Object* critter = tacticalViewCritterAt(tileFromScreenXY(worldX, worldY));
+    if (critter != nullptr) {
+        return critter;
+    }
+
+    if (object != nullptr && FrmId(object).objectType() == OBJ_TYPE_CRITTER && !critterIsDead(object)) {
+        return nullptr;
+    }
+
+    return object;
+}
+
 static void touchControlsHandleTap(int x, int y)
 {
     int worldX;
@@ -623,9 +642,10 @@ static void touchControlsHandleTap(int x, int y)
     int mode = gameMouseGetMode();
     if (mode >= GAME_MOUSE_MODE_USE_CROSSHAIR) {
         touchControlsClearSelection();
-        Object* object = tactical
-            ? tacticalViewCritterAt(tileFromScreenXY(worldX, worldY))
-            : playerObjectAt(worldX, worldY, OBJ_TYPE_INVALID, true, gElevation);
+        Object* object = playerObjectAt(worldX, worldY, OBJ_TYPE_INVALID, true, gElevation);
+        if (tactical) {
+            object = touchControlsTacticalPick(worldX, worldY, object);
+        }
         mapHintsSetDestination(-1);
         mapHintsSetInteraction(object);
         if (mode == GAME_MOUSE_MODE_USE_CROSSHAIR) {
@@ -641,7 +661,8 @@ static void touchControlsHandleTap(int x, int y)
     TouchAction action;
     int tile = tileFromScreenXY(worldX, worldY);
     if (tactical) {
-        action = touchControlsGetActionFor(tacticalViewCritterAt(tile), &target);
+        action = touchControlsGetActionFor(touchControlsTacticalPick(worldX, worldY, playerPrimaryTargetAt(worldX, worldY, gElevation)), &target);
+        touchControlsSnapToItem(x, y, &action, &target);
     } else {
         action = touchControlsGetActionAt(worldX, worldY, &target);
         touchControlsSnapTap(x, y, &tile, &action, &target);
@@ -734,13 +755,8 @@ static void touchControlsSnapTap(int x, int y, int* tile, TouchAction* action, O
         }
     }
 
-    if (touchHudIsHighlightActive()) {
-        Object* item = touchControlsFindItemNear(x, y);
-        if (item != nullptr) {
-            *action = TOUCH_ACTION_USE;
-            *target = item;
-            return;
-        }
+    if (touchControlsSnapToItem(x, y, action, target)) {
+        return;
     }
 
     int previousTile = isInCombat()
@@ -757,6 +773,24 @@ static void touchControlsSnapTap(int x, int y, int* tile, TouchAction* action, O
             *tile = previousTile;
         }
     }
+}
+
+// Item magnet (with highlight on, see magnets above): changes tap at screen
+// point ([x], [y]) on the ground to the item near it.
+static bool touchControlsSnapToItem(int x, int y, TouchAction* action, Object** target)
+{
+    if (*action != TOUCH_ACTION_MOVE || !touchHudIsHighlightActive()) {
+        return false;
+    }
+
+    Object* item = touchControlsFindItemNear(x, y);
+    if (item == nullptr) {
+        return false;
+    }
+
+    *action = TOUCH_ACTION_USE;
+    *target = item;
+    return true;
 }
 
 void touchControlsGetSelection(int* action, int* tile, Object** target)
@@ -940,21 +974,21 @@ static bool radialMenuOpen(int x, int y)
     int worldY;
     worldViewScreenToWorld(x, y, &worldX, &worldY);
 
-    // The tactical view: the menu of the critter standing on the tile.
+    // The tactical view: the menu of the critter standing on the tile (else
+    // of the object, as without it).
     bool tactical = tacticalViewIsShown();
-    Object* target = tactical
-        ? tacticalViewCritterAt(tileFromScreenXY(worldX, worldY))
-        : playerObjectAt(worldX, worldY, OBJ_TYPE_INVALID, true, gElevation);
+    Object* target = playerObjectAt(worldX, worldY, OBJ_TYPE_INVALID, true, gElevation);
+    if (tactical) {
+        target = touchControlsTacticalPick(worldX, worldY, target);
+    }
 
     // Item magnet (with highlight on), as for taps.
-    if (!tactical && touchHudIsHighlightActive()) {
-        Object* actionTarget;
-        if (touchControlsGetActionAt(worldX, worldY, &actionTarget) == TOUCH_ACTION_MOVE) {
-            Object* item = touchControlsFindItemNear(x, y);
-            if (item != nullptr) {
-                target = item;
-            }
-        }
+    Object* actionTarget;
+    TouchAction action = tactical
+        ? touchControlsGetActionFor(touchControlsTacticalPick(worldX, worldY, playerPrimaryTargetAt(worldX, worldY, gElevation)), &actionTarget)
+        : touchControlsGetActionAt(worldX, worldY, &actionTarget);
+    if (touchControlsSnapToItem(x, y, &action, &actionTarget)) {
+        target = actionTarget;
     }
 
     if (target == nullptr) {
