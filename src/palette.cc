@@ -27,6 +27,12 @@ unsigned char gPaletteBlack[256 * 3];
 // 0x6642D0 fade_steps
 static unsigned int gPaletteFadeDurationMs = 700;
 
+// CE: The last whole palette set or faded to is no picture (black, white):
+// the mobile UI is faded out with it. Not from `gPalette`: colors cycling
+// (`paletteSetEntriesInRange`) keep writing there while the screen is
+// black.
+static bool gPaletteBlank = false;
+
 // 0x493A00 palette_init
 void paletteInit()
 {
@@ -80,9 +86,11 @@ static void paletteFadeFor(unsigned char* palette, unsigned int durationMs)
     }
 
     // CE: The mobile UI (drawn in its own colors) fades with the picture.
-    float from = paletteIsBlank(gPalette) ? 0.0f : 1.0f;
-    float to = paletteIsBlank(palette) ? 0.0f : 1.0f;
+    bool blank = paletteIsBlank(palette);
+    float from = gPaletteBlank ? 0.0f : 1.0f;
+    float to = blank ? 0.0f : 1.0f;
     bool sceneFade = from != to;
+    gPaletteBlank = blank;
     if (sceneFade) {
         muiSceneFadeBegin(from, to, durationMs);
     }
@@ -121,7 +129,8 @@ void paletteFadeToForMenu(unsigned char* palette)
 // 0x493B48 palette_set_to
 void paletteSetEntries(unsigned char* palette)
 {
-    if (!paletteIsBlank(palette)) {
+    gPaletteBlank = paletteIsBlank(palette);
+    if (!gPaletteBlank) {
         muiSceneFadeRelease();
     }
     memcpy(gPalette, palette, sizeof(gPalette));

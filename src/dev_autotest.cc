@@ -46,8 +46,10 @@
 #include "mouse.h"
 #include "movie.h"
 #include "mui.h"
+#include "mui_draw.h"
 #include "mui_icons.h"
 #include "object.h"
+#include "palette.h"
 #include "party_member.h"
 #include "perf_monitor.h"
 #include "perk.h"
@@ -457,6 +459,10 @@ enum DevAutotestAction {
     DEV_AUTOTEST_ACTION_PAN_WITH_UI_PRESS,
     // A script's game_ui_disable ([a] = 1) or game_ui_enable ([a] = 0).
     DEV_AUTOTEST_ACTION_SCRIPT_UI,
+    // A script's gfade_out ([a] = 0) or gfade_in ([a] = 1).
+    DEV_AUTOTEST_ACTION_GAME_FADE,
+    // PASS when the mobile UI is drawn (not faded out with the picture).
+    DEV_AUTOTEST_ACTION_CHECK_UI_SHOWN,
     // The scroll limit around the dude on ([a] = 1) or off, as the settings
     // screen's row sets it.
     DEV_AUTOTEST_ACTION_SCROLL_LIMIT,
@@ -3042,6 +3048,16 @@ static const DevAutotestStep kDevAutotestFloatTextSteps[] = {
     { DEV_AUTOTEST_ACTION_PAN, 0, -260, 0, 20, "f05_dude_near_top" },
 };
 
+// A scene faded out and in by a script (gfade_out, gfade_in) while the map's
+// colors cycle (Arroyo's temple fires): the mobile UI comes back with the
+// picture (#21: scenes of Sonora and Resurrection left it invisible).
+static const DevAutotestStep kDevAutotestFadeCycleSteps[] = {
+    { DEV_AUTOTEST_ACTION_NONE, 0, 0, 0, 30, "fc00_start" },
+    { DEV_AUTOTEST_ACTION_GAME_FADE, 0, 0, 0, 60, "fc01_faded_out" },
+    { DEV_AUTOTEST_ACTION_GAME_FADE, 1, 0, 0, 30, "fc02_faded_in" },
+    { DEV_AUTOTEST_ACTION_CHECK_UI_SHOWN, 0, 0, 0, 1, "fc03_ui" },
+};
+
 // A party member in combat below its run away hit points with stimpaks
 // heals and fights on (sfall's fix, combat_ai.cc); it used to flee for the
 // rest of combat with them unused (Vic, 2026-10-13).
@@ -4063,6 +4079,9 @@ void devAutotestSetScenario(const char* name)
     } else if (strcmp(name, "pccharacter") == 0) {
         gDevAutotestSteps = kDevAutotestPcCharacterSteps;
         gDevAutotestStepCount = sizeof(kDevAutotestPcCharacterSteps) / sizeof(kDevAutotestPcCharacterSteps[0]);
+    } else if (strcmp(name, "fadecycle") == 0) {
+        gDevAutotestSteps = kDevAutotestFadeCycleSteps;
+        gDevAutotestStepCount = sizeof(kDevAutotestFadeCycleSteps) / sizeof(kDevAutotestFadeCycleSteps[0]);
     } else if (strcmp(name, "tacticalpickup") == 0) {
         gDevAutotestSteps = kDevAutotestTacticalPickupSteps;
         gDevAutotestStepCount = sizeof(kDevAutotestTacticalPickupSteps) / sizeof(kDevAutotestTacticalPickupSteps[0]);
@@ -5804,6 +5823,13 @@ void devAutotestTick()
             }
             break;
         }
+        case DEV_AUTOTEST_ACTION_GAME_FADE:
+            paletteFadeTo(step->a != 0 ? _cmap : gPaletteBlack);
+            devAutotestLog("  faded %s\n", step->a != 0 ? "in" : "out");
+            break;
+        case DEV_AUTOTEST_ACTION_CHECK_UI_SHOWN:
+            devAutotestLog("  ui alpha %.2f: %s\n", muiLayerAlpha(), muiLayerAlpha() == 1.0f ? "PASS" : "FAIL");
+            break;
         case DEV_AUTOTEST_ACTION_SCRIPT_UI:
             if (step->a != 0) {
                 gameUiDisableByScript();
