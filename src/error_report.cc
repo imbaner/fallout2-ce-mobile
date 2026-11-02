@@ -853,7 +853,10 @@ namespace {
             copiedTime = ui.now != 0 ? ui.now : 1;
         }
         if (ui.button("report.saves", { bottomRow.x + half + gap, bottomRow.y, half, buttonHeight }, text(kTextExportSaves, "Export saves"))) {
+            // Over the window's own loop (the browser's exchange waits in
+            // it): the window closes for it and comes back after.
             exportSaves = true;
+            finished = true;
         }
 
         // The report as it goes, scrolling between.
@@ -904,6 +907,7 @@ namespace {
             // over the game; the browser: its save exchange), then back
             // here.
             screen.exportSaves = false;
+            screen.finished = false;
             muiExchangeSaves(false);
         }
         gShownText.clear();
