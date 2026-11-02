@@ -24,6 +24,7 @@
 #include "display_monitor.h"
 #include "draw.h"
 #include "endgame.h"
+#include "error_report.h"
 #include "font_manager.h"
 #include "game.h"
 #include "game_charset.h"
@@ -513,6 +514,7 @@ void gameExit()
     debugPrint("\nGame Exit\n");
 
     touchLogExit();
+    errorReportExit();
     actionLog("the game closed");
     actionLogFlush();
 

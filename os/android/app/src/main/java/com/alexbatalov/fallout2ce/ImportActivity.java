@@ -429,12 +429,18 @@ public class ImportActivity extends Activity {
             } catch (IOException | RuntimeException e) {
                 Log.w(TAG, "copy failed", e);
                 String text = problemText(e, null);
+                // Not the archive's nor the phone's (their texts say what to
+                // do): the game, as it was, tells it at its start.
+                if (replacing && !(e instanceof NativeArchive.Failure) && !isNoSpace(e)) {
+                    writeProblem("replace-game copy " + e.getClass().getSimpleName());
+                }
                 runOnUiThread(() -> showError(text));
                 return;
             } finally {
                 closeQuietly(source);
             }
 
+            writeProblem(null);
             runOnUiThread(this::startGame);
         }).start();
     }
@@ -468,6 +474,29 @@ public class ImportActivity extends Activity {
         return false;
     }
 
+    // The phone's storage filled up while copying.
+    private static boolean isNoSpace(Throwable e) {
+        String text = String.valueOf(e.getMessage());
+        return text.contains("ENOSPC") || text.contains("No space left");
+    }
+
+    // A problem the game tells at its next start (error_report.cc
+    // "problem.txt": the reason's code and what failed, no paths), or none
+    // ([line] null: the replacement went through after all).
+    private void writeProblem(String line) {
+        File file = new File(getExternalFilesDir(null), "problem.txt");
+        if (line == null) {
+            //noinspection ResultOfMethodCallIgnored
+            file.delete();
+            return;
+        }
+        try (java.io.OutputStream out = new java.io.FileOutputStream(file)) {
+            out.write((line + "\n").getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        } catch (IOException e) {
+            Log.w(TAG, "problem not kept", e);
+        }
+    }
+
     // What the player is told when the chosen folder or archive can't be used
     // ([name]: the archive's file name, for the parts of a split one).
     private String problemText(Throwable e, String name) {
@@ -477,6 +506,9 @@ public class ImportActivity extends Activity {
                 names.add(folderName(root));
             }
             return getString(R.string.import_several, String.join(", ", names));
+        }
+        if (isNoSpace(e)) {
+            return getString(R.string.import_no_space_left);
         }
         if (!(e instanceof NativeArchive.Failure)) {
             return getString(R.string.import_failed, e.getMessage());

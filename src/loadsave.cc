@@ -30,6 +30,7 @@
 #include "delay.h"
 #include "display_monitor.h"
 #include "draw.h"
+#include "error_report.h"
 #include "file_utils.h"
 #include "game.h"
 #include "game_charset.h"
@@ -2297,6 +2298,7 @@ static int lsgLoadGameInSlot(int slot)
     _flptr = fileOpen(_gmpath, "rb");
     if (_flptr == nullptr) {
         debugPrint("\nLOADSAVE: ** Error opening load game file for reading! **\n");
+        errorReportSaveLoad(ErrorReason::SaveFile, slot);
         _loadingGame = false;
         return -1;
     }
@@ -2304,6 +2306,7 @@ static int lsgLoadGameInSlot(int slot)
     long pos = fileTell(_flptr);
     if (lsgLoadHeaderInSlot(slot) == -1) {
         debugPrint("\nLOADSAVE: ** Error reading save  game header! **\n");
+        errorReportSaveLoad(ErrorReason::SaveHeader, slot);
         fileClose(_flptr);
         gameReset();
         _loadingGame = false;
@@ -2321,6 +2324,7 @@ static int lsgLoadGameInSlot(int slot)
         LoadGameHandler* handler = _master_load_list[index];
         if (handler(_flptr) == -1) {
             debugPrint("\nLOADSAVE: ** Error reading load function #%d data! **\n", index);
+            errorReportSaveLoad(ErrorReason::SavePart, slot, index);
             int v12 = fileTell(_flptr);
             debugPrint("LOADSAVE: Load function #%d data size read: %ld bytes.\n", index, fileTell(_flptr) - pos);
             fileClose(_flptr);
@@ -2347,6 +2351,7 @@ static int lsgLoadGameInSlot(int slot)
         bool loaded = sfallLoadGameData(_flptr);
         fileClose(_flptr);
         if (!loaded) {
+            errorReportSaveLoad(ErrorReason::SaveSfall, slot);
             return -1;
         }
     }
@@ -2816,8 +2821,11 @@ int lsgMobileLoadGame(int slot)
 
     // As the game's window: the world is half loaded, back to the main menu.
     gameMouseSetCursor(MOUSE_CURSOR_ARROW);
-    // Error loading game! Unable to load game.
-    lsgShowError(134, 135);
+    // Why (error_report.h), else the game's "Error loading game! Unable to
+    // load game.".
+    if (!errorReportShowPending()) {
+        lsgShowError(134, 135);
+    }
     mapNewMap();
     _game_user_wants_to_quit = GAME_QUIT_REQUEST_MAIN_MENU;
     return -1;

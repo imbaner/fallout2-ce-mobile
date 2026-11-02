@@ -18,6 +18,7 @@
 #include "dev_autotest.h"
 #include "draw.h"
 #include "endgame.h"
+#include "error_report.h"
 #include "game.h"
 #include "game_commands.h"
 #include "game_mouse.h"
@@ -105,6 +106,10 @@ int falloutMain(int argc, char** argv)
 
     mainParseCommandLineArguments(argc, argv);
 
+    // CE: A previous run that ended unexpectedly is told in the main menu
+    // (error_report.h).
+    errorReportStart();
+
     // SFALL: Allow to skip intro movies
     int skipOpeningMovies = settings.ui.skip_opening_movies;
     if (skipOpeningMovies < 1 && !commandLineDevSkipOpeningMovies) {
@@ -125,6 +130,8 @@ int falloutMain(int argc, char** argv)
                 _gsound_background_play_level_music(gameSoundGetMusicOverride("main_menu_music", "07desert"), GameSoundReadLimitMode::LimitBefore);
             }
             mainMenuWindowUnhide(true);
+            // CE: A problem that brought the game here (error_report.h).
+            errorReportShowPending();
 
             mouseShowCursor();
             int devLoadGameSlot = commandLineDevLoadGameSlot;
@@ -524,6 +531,9 @@ static void mainLoop()
         scriptsHandleRequests();
 
         mapHandleTransition();
+
+        // CE: A map that didn't load (error_report.h).
+        errorReportShowPending();
 
         if (_main_game_paused != 0) {
             _main_game_paused = 0;

@@ -5,6 +5,7 @@
 #include <sstream>
 
 #include "app_update.h"
+#include "error_report.h"
 #include "game.h"
 #include "mui.h"
 #include "mui_screens.h"
@@ -74,7 +75,13 @@ namespace {
             finished = true;
         }
 
+        // The update failed in a way only we can fix (its file's checks, the
+        // installer): the problem window (error_report.h), then this one
+        // again.
+        bool report = false;
+
     private:
+        bool reported = false;
         bool automatic = false;
         bool installRequested = false;
         bool resumeInstall = false;
@@ -100,6 +107,15 @@ namespace {
             if (state == AppUpdateState::Permission && installRequested) resumeInstall = true;
             if (state == AppUpdateState::Installing) installRequested = false;
             if (state == AppUpdateState::Downloaded && (automatic || resumeInstall)) install();
+        }
+
+        bool failed = state == AppUpdateState::Error && (appUpdateError() == AppUpdateError::InvalidApk || appUpdateError() == AppUpdateError::Install);
+        if (!failed) {
+            reported = false;
+        } else if (!reported && !finished) {
+            reported = true;
+            report = true;
+            finished = true;
         }
 
         std::string current = appUpdateTag();
@@ -247,6 +263,11 @@ void muiUpdateShow()
     UpdateScreen screen;
     appUpdateSetActive(true);
     muiRunModal(&screen);
+    while (screen.report) {
+        screen.report = false;
+        errorReportUpdate(appUpdateError() == AppUpdateError::InvalidApk ? ErrorReason::UpdateCheck : ErrorReason::UpdateInstall, appUpdateErrorDetail().c_str());
+        muiRunModal(&screen);
+    }
     appUpdateSetActive(false);
 }
 

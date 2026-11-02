@@ -327,6 +327,48 @@
 {462}{}{The browser version updates itself when you open it.}
 {463}{}{Port by imbaner}
 
+# Problem reports (error_report.cc): the window, its channels, what failed.
+{470}{}{An error in the game}
+{471}{}{It's the game's error, not yours: send us a report.}
+{472}{}{Your saves are not affected.}
+{473}{}{Google Form}
+{474}{}{needs an account}
+{475}{}{no account needed}
+{476}{}{Copy the text}
+{477}{}{Copied}
+{478}{}{Tell us what went wrong: the text below goes along and helps us find the cause.}
+{479}{}{The game closed unexpectedly}
+{480}{}{The game closed unexpectedly the last time.}
+{481}{}{The game stopped because of an error.}
+{482}{}{The system closed the game}
+{483}{}{The system ran out of memory for the game. Close other apps before playing.}
+{484}{}{The browser ran out of memory for the game. Close other tabs and open the game again.}
+{485}{}{The save didn't load: %s.}
+{486}{}{The map %s didn't load: %s.}
+{487}{}{The update didn't install: %s.}
+{488}{}{Replacing the game didn't finish, the game stayed as it was.}
+{489}{}{The game isn't responding}
+{490}{}{The game has stopped responding.}
+{491}{}{Wait}
+{492}{}{Close the game}
+{493}{}{the map %s in it didn't load: %s}
+{500}{}{its file can't be opened}
+{501}{}{its header can't be read}
+{502}{}{its data can't be read}
+{503}{}{its sfall data can't be read}
+{504}{}{its file wasn't found}
+{505}{}{its file is damaged}
+{506}{}{its file is of another version}
+{507}{}{its variables can't be read}
+{508}{}{its scripts can't be read}
+{509}{}{its objects can't be read}
+{510}{}{the entrance's level doesn't exist}
+{511}{}{the entrance has no tile}
+{512}{}{its script didn't start}
+{513}{}{the random encounter wasn't set up}
+{514}{}{its file failed the checks}
+{515}{}{the system didn't install it}
+
 # The message when a party member or another critter cannot pick up an item
 # (the player's message is 905 in proto.msg).
 {1000}{}{%s cannot pick up the item.}

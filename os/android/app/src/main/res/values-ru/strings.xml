@@ -23,6 +23,7 @@
     <string name="import_progress">%1$s из %2$s</string>
     <string name="import_cancel">Отменить</string>
     <string name="import_failed">Не удалось скопировать файлы: %s</string>
+    <string name="import_no_space_left">На телефоне закончилось место во время копирования. Освободите место и попробуйте снова.</string>
     <string name="import_cancelled">Копирование отменено, скопированное удалено.</string>
     <string name="import_again">Попробовать снова</string>
     <string name="import_unreadable">Файл не читается как архив. Подходят .zip, .7z, .rar и .tar — или выберите папку с игрой.</string>

@@ -18,6 +18,7 @@
 #include <vector>
 
 #include "art.h"
+#include "error_report.h"
 #include "game.h"
 #include "interface.h"
 #include "inventory.h"
@@ -451,6 +452,8 @@ namespace {
         }
     }
 
+    // The map is one of the last events of a problem report too, with the
+    // journal off (error_report.h).
     void watchMap()
     {
         std::string map = gMapHeader.name;
@@ -460,26 +463,31 @@ namespace {
             if (!map.empty()) {
                 char text[96];
                 snprintf(text, sizeof(text), "map %s, elevation %d", map.c_str(), gElevation);
-                line(text);
+                errorReportEvent(text);
+                if (enabled()) {
+                    line(text);
+                }
             }
         }
     }
 
 } // namespace
 
+// Also one of the last events of a problem report, with the journal off
+// (error_report.h): the lines of fingers, the camera and code addresses
+// aren't these.
 void actionLog(const char* format, ...)
 {
-    if (!enabled()) {
-        return;
-    }
-
     char text[512];
     va_list args;
     va_start(args, format);
     vsnprintf(text, sizeof(text), format, args);
     va_end(args);
 
-    line(text);
+    errorReportEvent(text);
+    if (enabled()) {
+        line(text);
+    }
 }
 
 const char* actionLogObject(Object* object)
@@ -508,6 +516,8 @@ const char* actionLogObject(Object* object)
 
 void actionLogState(const char* title)
 {
+    // The title only for a problem report.
+    errorReportEvent(title);
     if (!enabled() || gDude == nullptr) {
         return;
     }
@@ -539,6 +549,13 @@ void actionLogState(const char* title)
 
 void actionLogFrame()
 {
+    // Between the game's start and its end only, not while a game or a map
+    // loads (the objects are being replaced).
+    bool playing = gDude != nullptr && gDude->tile != -1 && !_isLoadingGame() && !mapIsLoading();
+    if (playing) {
+        watchMap();
+    }
+
     if (!enabled()) {
         return;
     }
@@ -552,10 +569,7 @@ void actionLogFrame()
         line("screens: " + perfMonitorGameModeNames(modes));
     }
 
-    // Between the game's start and its end only, not while a game or a map
-    // loads (the objects are being replaced).
-    if (gDude != nullptr && gDude->tile != -1 && !_isLoadingGame() && !mapIsLoading()) {
-        watchMap();
+    if (playing) {
         watchDude(modes, modesChanged);
         watchParty(now);
         watchStaleEquipment(modes);

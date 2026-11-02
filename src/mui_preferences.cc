@@ -14,6 +14,7 @@
 #include "dbox.h"
 #include "debug.h"
 #include "dev_autotest.h"
+#include "error_report.h"
 #include "fps_limiter.h"
 #include "game.h"
 #include "game_sound.h"
@@ -819,6 +820,8 @@ namespace {
         Section section = Section::Game;
         bool resetScroll = true;
         bool pendingLicenses = false;
+        // "Report a problem": the problem window (error_report.h).
+        bool pendingReport = false;
         bool pendingUpdate = false;
         bool pendingDeleteUpdate = false;
         bool waitingUpdate = false;
@@ -1183,7 +1186,7 @@ namespace {
         separator();
         if (actionRow("prefs.about.youtube", label(441, "Videos and guides on YouTube"), label(438, "Open"))) SDL_OpenURL(kPortYouTubeUrl);
         separator();
-        if (actionRow("prefs.about.issues", label(442, "Report a problem"), label(438, "Open"))) SDL_OpenURL(kPortIssuesUrl);
+        if (actionRow("prefs.about.issues", label(442, "Report a problem"), label(438, "Open"))) pendingReport = true;
         separator();
         // The thanks with what it is not.
         group(459, "Thanks");
@@ -1304,32 +1307,10 @@ namespace {
             return;
         }
 
-#ifdef __EMSCRIPTEN__
-        // Like Android's activity, the browser overlay waits over this live
-        // preferences screen. Asyncify pauses the engine until the user store
-        // has been handed back and all filesystem caches have been refreshed.
+        // Keep un-applied edits in this screen: the exchange operates on the
+        // committed library and actual settings.
         if (action == FilesAction::ImportSaves || action == FilesAction::ExportSaves) {
-            // Keep un-applied edits in this screen, just as Android does.
-            // Exchange operates on the committed library and actual settings.
-            webExchangeSaves(action == FilesAction::ImportSaves ? "saves_import" : "saves_export");
-            inputEventQueueReset();
-            // Rotation/browser chrome may have resized SDL behind the overlay.
-            // The input reset discarded those events too; apply the current
-            // output mapping before rendering this retained screen again.
-            handleWindowSizeChanged();
-            lsgMobileSavesMayHaveChanged();
-            return;
-        }
-#endif
-
-        // The saves' import and export: the app's screen over the game (it
-        // waits behind, paused; reads the saves again when back).
-        if (action == FilesAction::ImportSaves) {
-            openGameFiles("saves_import");
-            return;
-        }
-        if (action == FilesAction::ExportSaves) {
-            openGameFiles("saves_export");
+            muiExchangeSaves(action == FilesAction::ImportSaves);
             return;
         }
 
@@ -1574,6 +1555,10 @@ namespace {
             pendingLicenses = false;
             muiLicensesShow();
         }
+        if (pendingReport) {
+            pendingReport = false;
+            errorReportShowManual();
+        }
         if (pendingUpdate) {
             pendingUpdate = false;
             if (!inGame && appUpdateHasRelease()) {
@@ -1653,6 +1638,26 @@ void muiPreferencesScreenRun(bool inGame)
     }
 
     muiRemove(&screen);
+}
+
+void muiExchangeSaves(bool import)
+{
+#ifdef __EMSCRIPTEN__
+    // Like Android's activity, the browser overlay waits over the live
+    // screen. Asyncify pauses the engine until the user store has been
+    // handed back and all filesystem caches have been refreshed.
+    webExchangeSaves(import ? "saves_import" : "saves_export");
+    inputEventQueueReset();
+    // Rotation/browser chrome may have resized SDL behind the overlay. The
+    // input reset discarded those events too; apply the current output
+    // mapping before rendering the retained screen again.
+    handleWindowSizeChanged();
+    lsgMobileSavesMayHaveChanged();
+#else
+    // The app's screen over the game (it waits behind, paused; reads the
+    // saves again when back).
+    openGameFiles(import ? "saves_import" : "saves_export");
+#endif
 }
 
 } // namespace fallout

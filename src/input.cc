@@ -17,6 +17,7 @@
 #include "delay.h"
 #include "dinput.h"
 #include "draw.h"
+#include "error_report.h"
 #include "game.h"
 #include "game_commands.h"
 #include "kb.h"
@@ -1127,6 +1128,7 @@ static void inputSetWindowActive(bool active)
 {
     if (active) {
         touchLogFocus(true);
+        errorReportFocus(true);
         actionLog("the game came back");
         gProgramIsActive = true;
         movieHandleFocusGained();
@@ -1147,6 +1149,7 @@ static void inputSetWindowActive(bool active)
         }
 
         touchLogFocus(false);
+        errorReportFocus(false);
         actionLog("the game went to the background");
         actionLogFlush();
 #if FALLOUT_TOUCH_ONLY
@@ -1318,6 +1321,7 @@ void _GNW95_process_message()
             break;
         case SDL_QUIT:
             touchLogExit();
+            errorReportExit();
             actionLog("the game closed by the system");
             actionLogFlush();
             exit(EXIT_SUCCESS);

@@ -171,6 +171,16 @@ AppUpdateError appUpdateError()
 #endif
 }
 
+std::string appUpdateErrorDetail()
+{
+    if (devAutotestIsEnabled()) return gTestError == AppUpdateError::InvalidApk ? "download InvalidApkException: digest" : "installer status 1";
+#ifdef __ANDROID__
+    return UpdateJni().string(3);
+#else
+    return {};
+#endif
+}
+
 std::string appUpdateTag()
 {
     if (devAutotestIsEnabled()) return gTestTag;

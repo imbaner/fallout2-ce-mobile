@@ -9,10 +9,11 @@ import {startAppCache} from './app-cache.js';
 import {installHint, installedApp} from './install-hint.js';
 import {countVisit, countEvent} from './visits.js';
 import {language, webText as t} from './strings.js';
+import {abortDetail, abortKind, createHangWatch, hideProblem, showProblem} from './problem-view.js';
 
 const $ = id => document.getElementById(id);
 const viewport = createGameViewport($('canvas'));
-const gameWindow = createGameWindow($('canvas'),{isBlocked:() => !$('rotate').hidden || !$('save-exchange').hidden});
+const gameWindow = createGameWindow($('canvas'),{isBlocked:() => !$('rotate').hidden || !$('save-exchange').hidden || !$('problem').hidden});
 const textInput = createTextInput($('text-input'), $('canvas'), viewport);
 const audio = createGameAudio();
 const exchangeView = createFilesView($('save-exchange'),{shadow:true});
@@ -21,7 +22,21 @@ $('save-exchange').setAttribute('aria-label',t('saves'));
 // SDL's document listeners must not receive touches/keys used in the overlay.
 for (const type of ['pointerdown','pointerup','pointermove','touchstart','touchmove','touchend','touchcancel','keydown','keyup','wheel']) {
   $('save-exchange').addEventListener(type,event => event.stopPropagation());
+  $('problem').addEventListener(type,event => event.stopPropagation());
 }
+// The game in front: its last report texts (src/error_report.h), kept so a
+// page that ends meanwhile (the system closed it) is told at the next start.
+// Away from the front the system may close it, that's no problem.
+const RUNNING_KEY = 'f2touch.running';
+const runningMark = {
+  get() { try { return localStorage.getItem(RUNNING_KEY); } catch { return null; } },
+  set(texts) { try { localStorage.setItem(RUNNING_KEY, texts); } catch { /* Private mode: not kept. */ } },
+  clear() { try { localStorage.removeItem(RUNNING_KEY); } catch { /* Nothing kept. */ } },
+};
+const hangWatch = createHangWatch();
+let watchTimer = null;
+let hangShown = false;
+const engineTexts = module => { try { return JSON.parse(module.webErrorReport.texts()); } catch { return null; } };
 let audioTiming = null;
 let diagnosticsTimer = null;
 $('text-input').setAttribute('aria-label', t('game_text'));
@@ -52,8 +67,55 @@ function rotatePrompt() {
     $('message').hidden = !updating && !portrait;
   }
 }
+// Every few seconds while playing: the hang watchdog (no new frames for 20 s,
+// 60 s while loading) and the running mark.
+function watchEngine(module) {
+  hangWatch.reset(performance.now());
+  clearInterval(watchTimer);
+  watchTimer = setInterval(() => {
+    const report = module.webErrorReport;
+    if (!running || !report) return;
+    if (document.hidden || !$('rotate').hidden || !$('save-exchange').hidden || (!hangShown && !$('problem').hidden)) {
+      hangWatch.reset(performance.now());
+      return;
+    }
+    runningMark.set(report.texts());
+    const state = report.state();
+    const stalled = hangWatch.stalled(performance.now(), state);
+    if (hangShown) {
+      if (!stalled) { hangShown = false; hideProblem($('problem')); }
+    } else if (stalled) {
+      const texts = engineTexts(module);
+      if (!texts) return;
+      hangShown = true;
+      showProblem($('problem'), {texts, title:texts.hangTitle, message:texts.hang,
+        report:texts.hangReport.replace('{state}', state.loading ? 'loading' : 'playing'), actions:[
+          {label:texts.wait, run:() => { hangShown = false; hideProblem($('problem')); hangWatch.waited(performance.now()); }},
+          {label:texts.close, run:() => { runningMark.clear(); location.reload(); }},
+        ]});
+    }
+  }, 5000);
+}
+
+// The engine stopped while playing: why, with the report (an error) or what
+// to do (the browser out of memory).
+function crashed(module, reason) {
+  const texts = module && engineTexts(module);
+  error(t('start_failed'), reason);
+  runningMark.clear();
+  if (!texts) return;
+  const reload = {label:t('try_again'), run:() => location.reload()};
+  if (abortKind(reason) === 'memory') {
+    showProblem($('problem'), {texts, title:texts.memoryTitle, message:texts.memory, actions:[reload]});
+  } else {
+    showProblem($('problem'), {texts, title:texts.crashTitle, message:texts.crash,
+      report:texts.crashReport.replace('{reason}', abortDetail(reason)), actions:[reload]});
+  }
+}
+
 function error(message, detail) {
   console.error(message, detail || '');
+  clearInterval(watchTimer);
   if (detail?.name !== 'StorageBusyError') countEvent('start-failed');
   textInput.end();
   audio.stop();
@@ -83,6 +145,8 @@ async function exited(status) {
   diagnosticsTimer = null;
   audio.stop();
   running = starting = false;
+  clearInterval(watchTimer);
+  runningMark.clear();
   delete window.falloutDev;
   $('diagnostics').hidden = true;
   document.body.classList.remove('playing');
@@ -103,7 +167,19 @@ async function exited(status) {
   appCache.check();
 }
 
+// The page ended while the game was in front the last time.
+function previousRun() {
+  const saved = runningMark.get();
+  runningMark.clear();
+  let texts = null;
+  try { texts = saved && JSON.parse(saved); } catch { return; }
+  if (!texts) return;
+  showProblem($('problem'), {texts, title:texts.crashTitle, message:texts.crashBefore, report:texts.crashBeforeReport,
+    actions:[{label:t('back'), run:() => hideProblem($('problem'))}]});
+}
+
 async function prepare() {
+  previousRun();
   await exchangeView.ready;
   if (typeof WebAssembly !== 'object') throw new Error(t('unsupported'));
   const response = await fetch(new URL('./build-info.json', import.meta.url), {cache:'no-store'});
@@ -148,7 +224,11 @@ async function play() {
       webOpenFiles:mode => { filesMode = mode; },
       locateFile:name => new URL('./' + name, import.meta.url).href,
       print:message => console.log(message), printErr:message => console.warn(message),
-      onAbort:reason => { engine?.webUserFiles?.close(); error(t('start_failed'), reason); },
+      onAbort:reason => {
+        engine?.webUserFiles?.close();
+        if (running) crashed(engine, reason);
+        else error(t('start_failed'), reason);
+      },
       onExit:status => queueMicrotask(() => {
         // The manager acquires both writer leases. Await their release instead
         // of racing a new page against the engine's asynchronous shutdown.
@@ -212,6 +292,7 @@ async function play() {
     running = true;
     rotatePrompt();
     countEvent(installedApp() ? 'start-app' : 'start-browser');
+    watchEngine(module);
     module.callMain([]);
   } catch (exception) {
     engine?.webUserFiles?.close();
@@ -233,9 +314,11 @@ for (const type of ['pointerdown', 'touchend', 'keydown']) {
   document.addEventListener(type, audio.resume, {capture:true, passive:true});
 }
 document.addEventListener('visibilitychange', () => {
+  if (document.hidden) runningMark.clear();
   audioTiming?.resetGap();
   if (!document.hidden) audio.resume();
 });
+window.addEventListener('pagehide', () => runningMark.clear());
 window.addEventListener('pageshow', event => {
   if (event.persisted && source?.kind === 'local') { location.reload(); return; }
   audioTiming?.resetGap();

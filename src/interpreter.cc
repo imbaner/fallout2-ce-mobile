@@ -9,6 +9,7 @@
 
 #include "db.h"
 #include "debug.h"
+#include "error_report.h"
 #include "export.h"
 #include "input.h"
 #include "interpreter_lib.h"
@@ -285,6 +286,11 @@ void programFatalError(const char* format, ...)
     va_list argptr;
     va_start(argptr, format);
     programPrintError(format, argptr);
+    va_end(argptr);
+
+    // CE: Kept for a problem report (error_report.h).
+    va_start(argptr, format);
+    errorReportScriptError(gInterpreterCurrentProgram != nullptr ? gInterpreterCurrentProgram->name : nullptr, format, argptr);
     va_end(argptr);
 
     if (gInterpreterCurrentProgram) {

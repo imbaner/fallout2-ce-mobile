@@ -26,6 +26,7 @@
 #include "db.h"
 #include "display_monitor.h"
 #include "elevator.h"
+#include "error_report.h"
 #include "game.h"
 #include "game_commands.h"
 #include "game_dialog.h"
@@ -537,7 +538,7 @@ enum DevAutotestAction {
     DEV_AUTOTEST_ACTION_CHECK_WIDGET,
     // Leaves the map for map file `widget`, elevation [a], tile [b] (-1 -
     // its entrance), as an exit grid does (`mapSetTransition`); logs the
-    // party's size.
+    // party's size. [c] 1 - [b] is the entrance's tile instead.
     DEV_AUTOTEST_ACTION_MAP_TRANSITION,
     // Fails unless the map loaded is map file `widget` (a map that failed to
     // load leaves an empty one without a name).
@@ -594,6 +595,17 @@ enum DevAutotestAction {
     // Waits up to [a] frames for mobile UI widget [widget] (a slow device's
     // menu still fading in), fails without it.
     DEV_AUTOTEST_ACTION_WAIT_WIDGET,
+    // Problem reports (error_report.h): [a] 0 - the problem window showing
+    // now, 1 - the text "Report a problem" would send now. FAIL unless it
+    // has [widget] (and [target]), or with a line a report can't have (only
+    // what happened, its code, the build, the scripts' errors and the last
+    // events), the hero's name, a save's description (the test saves with
+    // "Zxqdesc"), a hex number or a path outside the game's folder. [a] 0
+    // without [widget]: a window with no report (an environment problem).
+    DEV_AUTOTEST_ACTION_CHECK_REPORT,
+    // A problem the engine knows (error_report.h): [a] - `ErrorReason`,
+    // [widget] - its detail; the main loop shows it.
+    DEV_AUTOTEST_ACTION_RAISE_REPORT,
 };
 
 struct DevAutotestStep {
@@ -2326,16 +2338,103 @@ static const DevAutotestStep kDevAutotestMuiDeleteSaveSteps[] = {
     { DEV_AUTOTEST_ACTION_MUI_TAP, 0, 0, 0, 40, "d11_save", "menu.save" },
 };
 
-// Own SAVEGAME with a broken copy of the test save: loading it shows the
-// game's error and goes back to the main menu, as the game's window does.
+// Own SAVEGAME with a broken copy of the test save: loading it tells why
+// (the problem window, error_report.h) and goes back to the main menu, as
+// the game's window does.
 static const DevAutotestStep kDevAutotestMuiLoadFailedSteps[] = {
     { DEV_AUTOTEST_ACTION_NONE, 0, 0, 0, 30, "b00_start" },
     { DEV_AUTOTEST_ACTION_BACK, 0, 0, 0, 40, "b01_menu" },
     { DEV_AUTOTEST_ACTION_MUI_TAP, 0, 0, 0, 40, "b02_load", "menu.load" },
     { DEV_AUTOTEST_ACTION_MUI_TAP, 0, 0, 0, 20, "b03_slot", "loadsave.slots.1" },
     { DEV_AUTOTEST_ACTION_MUI_TAP, 0, 0, 0, 40, "b04_load_game", "loadsave.action" },
-    { DEV_AUTOTEST_ACTION_MUI_TAP, 0, 0, 0, 120, "b05_error", "dialog.primary" },
+    { DEV_AUTOTEST_ACTION_CHECK_WIDGET, 1, 0, 0, 1, "b05_report", "report.github" },
+    { DEV_AUTOTEST_ACTION_CHECK_REPORT, 0, 0, 0, 1, "b05b_reason", "Code: save-part (perks) · SLOT01" },
+    { DEV_AUTOTEST_ACTION_BACK, 0, 0, 0, 120, "b05c_closed" },
+    { DEV_AUTOTEST_ACTION_CHECK_WIDGET, 0, 0, 0, 1, "b05d_no_report", "report.github" },
     { DEV_AUTOTEST_ACTION_NONE, 0, 0, 0, 30, "b06_main_menu" },
+};
+
+// Problem reports (error_report.h). A map that doesn't load (its entrance
+// has no tile on it, as Golgotha's in #894): the window says why, with the
+// report.
+static const DevAutotestStep kDevAutotestReportMapSteps[] = {
+    { DEV_AUTOTEST_ACTION_NONE, 0, 0, 0, 30, "e00_start" },
+    { DEV_AUTOTEST_ACTION_MAP_TRANSITION, 0, 99999, 1, 90, "e01_no_entrance", "arvillag.map" },
+    { DEV_AUTOTEST_ACTION_CHECK_WIDGET, 1, 0, 0, 1, "e02_report", "report.github" },
+    { DEV_AUTOTEST_ACTION_CHECK_REPORT, 0, 0, 0, 1, "e03_reason", "Code: map-entrance", "ARVILLAG" },
+    { DEV_AUTOTEST_ACTION_BACK, 0, 0, 0, 30, "e04_closed" },
+    { DEV_AUTOTEST_ACTION_CHECK_WIDGET, 0, 0, 0, 1, "e05_no_report", "report.github" },
+};
+
+// The update's file failed its checks: the window over the update's, then
+// the update's again (its retry).
+static const DevAutotestStep kDevAutotestReportUpdateSteps[] = {
+    { DEV_AUTOTEST_ACTION_NONE, 0, 0, 0, 30, "u00_title" },
+    { DEV_AUTOTEST_ACTION_UPDATE_STATE, 7, 4, 0, 3, "u01_check_failed", "v1.3.0-mobile.99" },
+    { DEV_AUTOTEST_ACTION_MUI_TAP, 0, 0, 0, 60, "u02_update", "mainmenu.update" },
+    { DEV_AUTOTEST_ACTION_CHECK_WIDGET, 1, 0, 0, 1, "u03_report", "report.github" },
+    { DEV_AUTOTEST_ACTION_CHECK_REPORT, 0, 0, 0, 1, "u04_reason", "Code: update-check (download InvalidApkException: digest)" },
+    { DEV_AUTOTEST_ACTION_BACK, 0, 0, 0, 60, "u05_closed" },
+    { DEV_AUTOTEST_ACTION_CHECK_WIDGET, 1, 0, 0, 1, "u06_update_again", "update.download" },
+    { DEV_AUTOTEST_ACTION_CHECK_WIDGET, 0, 0, 0, 1, "u07_once", "report.github" },
+};
+
+// "Report a problem" (settings, About): the last events and the scripts'
+// errors, nothing else - no hero's name, no save's description; its
+// channels, the saves' export and back.
+static const DevAutotestStep kDevAutotestReportManualSteps[] = {
+    { DEV_AUTOTEST_ACTION_NONE, 0, 0, 0, 30, "m00_start" },
+    { DEV_AUTOTEST_ACTION_SET_NAME, 0, 0, 0, 1, "m01_named", "Zxqhero" },
+    { DEV_AUTOTEST_ACTION_SAVE_GAME, 0, 0, 0, 10, "m02_saved", "Zxqdesc" },
+    { DEV_AUTOTEST_ACTION_MISSING_SCRIPT, 0, 0, 0, 10, "m03_script_errors" },
+    { DEV_AUTOTEST_ACTION_MISSING_SCRIPT, 0, 0, 0, 10, "m04_again" },
+    { DEV_AUTOTEST_ACTION_CHECK_REPORT, 1, 0, 0, 1, "m05_text", "devautotest_missing.int for read (x2)", "Last events:" },
+    { DEV_AUTOTEST_ACTION_BACK, 0, 0, 0, 40, "m06_menu" },
+    { DEV_AUTOTEST_ACTION_MUI_TAP, 0, 0, 0, 30, "m07_settings", "menu.settings" },
+    { DEV_AUTOTEST_ACTION_MUI_TAP, 0, 0, 0, 30, "m08_about", "prefs.sections.5" },
+    { DEV_AUTOTEST_ACTION_MUI_DRAG_BY, 0, -0.5f, 0, 40, "m09_scrolled", "prefs.about" },
+    { DEV_AUTOTEST_ACTION_MUI_TAP, 0, 0, 0, 40, "m10_report", "prefs.about.issues" },
+    { DEV_AUTOTEST_ACTION_CHECK_WIDGET, 1, 0, 0, 1, "m11_window", "report.github" },
+    { DEV_AUTOTEST_ACTION_CHECK_WIDGET, 0, 0, 0, 1, "m12_no_form_yet", "report.form" },
+    { DEV_AUTOTEST_ACTION_CHECK_REPORT, 0, 0, 0, 1, "m13_report", "Code: manual", "- saved to slot 1" },
+    { DEV_AUTOTEST_ACTION_MUI_TAP, 0, 0, 0, 10, "m14_copy", "report.copy" },
+    { DEV_AUTOTEST_ACTION_MUI_TAP, 0, 0, 0, 10, "m15_github", "report.github" },
+    { DEV_AUTOTEST_ACTION_MUI_TAP, 0, 0, 0, 10, "m16_telegram", "report.telegram" },
+    { DEV_AUTOTEST_ACTION_MUI_TAP, 0, 0, 0, 60, "m17_saves", "report.saves" },
+    { DEV_AUTOTEST_ACTION_CHECK_WIDGET, 1, 0, 0, 1, "m18_back_after_saves", "report.github" },
+    { DEV_AUTOTEST_ACTION_BACK, 0, 0, 0, 40, "m19_closed" },
+    { DEV_AUTOTEST_ACTION_CHECK_WIDGET, 1, 0, 0, 1, "m20_about_again", "prefs.about.issues" },
+};
+
+// The previous run ended unexpectedly (its marker, with its last events):
+// the window in the main menu, with that run's events.
+static const DevAutotestStep kDevAutotestReportCrashSteps[] = {
+    { DEV_AUTOTEST_ACTION_NONE, 0, 0, 0, 60, "c00_title" },
+    { DEV_AUTOTEST_ACTION_CHECK_WIDGET, 1, 0, 0, 1, "c01_report", "report.github" },
+    { DEV_AUTOTEST_ACTION_CHECK_REPORT, 0, 0, 0, 1, "c02_reason", "Code: crash", "- map NEWRGO.MAP, elevation 0" },
+    { DEV_AUTOTEST_ACTION_BACK, 0, 0, 0, 40, "c03_closed" },
+    { DEV_AUTOTEST_ACTION_CHECK_WIDGET, 1, 0, 0, 1, "c04_main_menu", "mainmenu.load" },
+};
+
+// Replacing the game failed (the app's import screen left why): the window
+// in the main menu. The system closing the game for memory: what to do,
+// no report.
+static const DevAutotestStep kDevAutotestReportReplaceSteps[] = {
+    { DEV_AUTOTEST_ACTION_NONE, 0, 0, 0, 60, "r00_title" },
+    { DEV_AUTOTEST_ACTION_CHECK_WIDGET, 1, 0, 0, 1, "r01_report", "report.github" },
+    { DEV_AUTOTEST_ACTION_CHECK_REPORT, 0, 0, 0, 1, "r02_reason", "Code: replace-game (copy IOException)" },
+    { DEV_AUTOTEST_ACTION_BACK, 0, 0, 0, 40, "r03_closed" },
+    { DEV_AUTOTEST_ACTION_CHECK_WIDGET, 1, 0, 0, 1, "r04_main_menu", "mainmenu.load" },
+};
+
+static const DevAutotestStep kDevAutotestReportMemorySteps[] = {
+    { DEV_AUTOTEST_ACTION_NONE, 0, 0, 0, 30, "y00_start" },
+    { DEV_AUTOTEST_ACTION_RAISE_REPORT, static_cast<float>(ErrorReason::LowMemory), 0, 0, 30, "y01_memory", "low-memory" },
+    { DEV_AUTOTEST_ACTION_CHECK_WIDGET, 1, 0, 0, 1, "y02_window", "report.title" },
+    { DEV_AUTOTEST_ACTION_CHECK_WIDGET, 0, 0, 0, 1, "y03_no_channels", "report.github" },
+    { DEV_AUTOTEST_ACTION_CHECK_REPORT, 0, 0, 0, 1, "y04_no_report" },
+    { DEV_AUTOTEST_ACTION_BACK, 0, 0, 0, 30, "y05_closed" },
+    { DEV_AUTOTEST_ACTION_CHECK_WIDGET, 0, 0, 0, 1, "y06_gone", "report.title" },
 };
 
 // Run from the title screen without --dev-new-game. The Load button opens
@@ -3788,6 +3887,18 @@ static void devAutotestPrepareSaves()
     lsgMobileRefreshSlots();
 }
 
+// [text] into the game folder's [fileName] (what a scenario starts with).
+static void devAutotestWriteText(const char* fileName, const char* text)
+{
+    FILE* stream = fopen(fileName, "wt");
+    if (stream == nullptr) {
+        devAutotestLog("FAIL: %s not written\n", fileName);
+        return;
+    }
+    fputs(text, stream);
+    fclose(stream);
+}
+
 void devAutotestSetScenario(const char* name)
 {
     if (strcmp(name, "worldmap") == 0) {
@@ -3825,6 +3936,29 @@ void devAutotestSetScenario(const char* name)
         gDevAutotestSteps = kDevAutotestMuiLoadFailedSteps;
         gDevAutotestStepCount = sizeof(kDevAutotestMuiLoadFailedSteps) / sizeof(kDevAutotestMuiLoadFailedSteps[0]);
         gDevAutotestSaves = DevAutotestSaves::BrokenTestSaveInSlot1;
+    } else if (strcmp(name, "reportmap") == 0) {
+        gDevAutotestSteps = kDevAutotestReportMapSteps;
+        gDevAutotestStepCount = sizeof(kDevAutotestReportMapSteps) / sizeof(kDevAutotestReportMapSteps[0]);
+    } else if (strcmp(name, "reportupdate") == 0) {
+        gDevAutotestSteps = kDevAutotestReportUpdateSteps;
+        gDevAutotestStepCount = sizeof(kDevAutotestReportUpdateSteps) / sizeof(kDevAutotestReportUpdateSteps[0]);
+    } else if (strcmp(name, "reportmanual") == 0) {
+        gDevAutotestSteps = kDevAutotestReportManualSteps;
+        gDevAutotestStepCount = sizeof(kDevAutotestReportManualSteps) / sizeof(kDevAutotestReportManualSteps[0]);
+        gDevAutotestSaves = DevAutotestSaves::Empty;
+    } else if (strcmp(name, "reportcrash") == 0) {
+        // The previous run's marker (a test's own, error_report.cc).
+        gDevAutotestSteps = kDevAutotestReportCrashSteps;
+        gDevAutotestStepCount = sizeof(kDevAutotestReportCrashSteps) / sizeof(kDevAutotestReportCrashSteps[0]);
+        devAutotestWriteText("running-test.txt", "# F2 Touch is running (error_report.h)\nLast events:\n- loaded slot 2\n- map NEWRGO.MAP, elevation 0\n");
+    } else if (strcmp(name, "reportreplace") == 0) {
+        // What the app's import screen leaves (ImportActivity.java).
+        gDevAutotestSteps = kDevAutotestReportReplaceSteps;
+        gDevAutotestStepCount = sizeof(kDevAutotestReportReplaceSteps) / sizeof(kDevAutotestReportReplaceSteps[0]);
+        devAutotestWriteText("problem.txt", "replace-game copy IOException\n");
+    } else if (strcmp(name, "reportmemory") == 0) {
+        gDevAutotestSteps = kDevAutotestReportMemorySteps;
+        gDevAutotestStepCount = sizeof(kDevAutotestReportMemorySteps) / sizeof(kDevAutotestReportMemorySteps[0]);
     } else if (strcmp(name, "muiloadsavemain") == 0) {
         gDevAutotestSteps = kDevAutotestMuiMainMenuLoadSteps;
         gDevAutotestStepCount = sizeof(kDevAutotestMuiMainMenuLoadSteps) / sizeof(kDevAutotestMuiMainMenuLoadSteps[0]);
@@ -5023,6 +5157,57 @@ void devAutotestTick()
             }
             break;
         }
+        case DEV_AUTOTEST_ACTION_CHECK_REPORT: {
+            std::string text = step->a == 0 ? errorReportTestShown() : errorReportTestText(ErrorReason::Manual);
+            std::vector<std::string> problems;
+            if (step->a == 0 && step->widget == nullptr) {
+                if (!text.empty()) {
+                    problems.push_back("a report where none goes");
+                }
+            } else if (text.empty()) {
+                problems.push_back("no report");
+            }
+            for (const char* wanted : { step->widget, step->target }) {
+                if (wanted != nullptr && text.find(wanted) == std::string::npos) {
+                    problems.push_back(std::string("no \"") + wanted + "\"");
+                }
+            }
+            // Only the report's own lines: what happened first, then the
+            // fixed ones.
+            static const char* const kLines[] = { "Code: ", "F2 Touch ", "Script: ", "Last events:", "- " };
+            size_t start = 0;
+            for (int index = 0; start < text.size(); index++) {
+                size_t end = text.find('\n', start);
+                if (end == std::string::npos) {
+                    end = text.size();
+                }
+                std::string line = text.substr(start, end - start);
+                devAutotestLog("  report| %s\n", line.c_str());
+                bool allowed = index == 0 && line.compare(0, 6, "Code: ") != 0;
+                for (const char* prefix : kLines) {
+                    allowed = allowed || line.compare(0, strlen(prefix), prefix) == 0;
+                }
+                if (!allowed) {
+                    problems.push_back("line \"" + line + "\"");
+                }
+                start = end + 1;
+            }
+            // The game's folder is under these on the computer and the phone.
+            const char* home = getenv("HOME");
+            for (const char* forbidden : { "Zxqhero", "Zxqdesc", "0x", "/Users/", "/storage/", "/data/", home }) {
+                if (forbidden != nullptr && forbidden[0] != '\0' && text.find(forbidden) != std::string::npos) {
+                    problems.push_back(std::string("has \"") + forbidden + "\"");
+                }
+            }
+            for (const std::string& problem : problems) {
+                devAutotestLog("FAIL: report: %s\n", problem.c_str());
+            }
+            devAutotestLog("  report: %s\n", problems.empty() ? "PASS" : "FAIL");
+            break;
+        }
+        case DEV_AUTOTEST_ACTION_RAISE_REPORT:
+            errorReportTestRaise(static_cast<ErrorReason>(static_cast<int>(step->a)), step->widget);
+            break;
         case DEV_AUTOTEST_ACTION_UPDATE_STATE:
             appUpdateTestState(static_cast<AppUpdateState>(static_cast<int>(step->a)), step->widget, step->b != 0 ? static_cast<AppUpdateError>(static_cast<int>(step->b)) : AppUpdateError::Download);
             devAutotestLog("  update state %d tag %s\n", static_cast<int>(step->a), step->widget != nullptr ? step->widget : "");
@@ -5106,6 +5291,12 @@ void devAutotestTick()
             transition.rotation = ROTATION_NE;
             devAutotestLog("  map %d now, to %s (%d), party %d\n", static_cast<int>(gMapHeader.index), step->widget,
                 static_cast<int>(transition.map), static_cast<int>(get_all_party_members_objects(true).size()));
+            // [c] 1: [b] is the entrance's tile, as the world map sets a
+            // town's (Golgotha's had none, #894).
+            if (step->c == 1) {
+                mapSetEnteringLocation(transition.elevation, transition.tile, ROTATION_NE);
+                transition.tile = -1;
+            }
             if (transition.map == MAP_INVALID) {
                 devAutotestLog("FAIL: no map %s\n", step->widget);
             } else {

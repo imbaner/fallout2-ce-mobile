@@ -153,6 +153,21 @@ body.playing #canvas { display: block; }
 }
 #storage-warning { position:fixed; z-index:20; top:max(12px,env(safe-area-inset-top)); left:50%; transform:translateX(-50%); width:max-content; max-width:90%; padding:12px; border:1px solid #d4ab58; border-radius:8px; color:#ffe2a8; background:#171207ed; pointer-events:none; }
 #save-exchange { position:fixed; inset:0; z-index:30; background:var(--background); }
+/* The problem window the engine can't draw (problem-view.js). */
+#problem { position:fixed; inset:0; z-index:40; display:flex; align-items:center; justify-content:center;
+  padding:max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  background:rgba(0, 0, 0, 0.6); }
+#problem[hidden] { display:none; }
+.problem-panel { display:flex; flex-direction:column; gap:10px; width:min(560px, 100%); max-height:100%; box-sizing:border-box;
+  padding:16px; border:1px solid var(--border); border-radius:8px; background:var(--panel); }
+.problem-panel h2 { margin:0; font:inherit; font-size:18px; color:var(--accent); }
+.problem-message { margin:0; font-size:14px; }
+.problem-report { flex:1 1 auto; min-height:48px; margin:0; padding:8px; overflow:auto; border-radius:4px; background:#14261a;
+  color:var(--dim); font-size:11px; white-space:pre-wrap; overflow-wrap:anywhere; user-select:text; }
+.problem-channels, .problem-actions { display:flex; gap:8px; }
+.problem-channel { flex:1; display:flex; flex-direction:column; align-items:stretch; gap:2px; text-align:center; }
+.problem-channel small { color:var(--dim); font-size:11px; }
+.problem-actions button { flex:1; }
 .exchanging #rotate, .exchanging #diagnostics, .exchanging #storage-warning { display:none; }
 
 .startup #panel { width: min(400px, 100%); text-align: center; }

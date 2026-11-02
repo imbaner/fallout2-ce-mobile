@@ -19,6 +19,7 @@
 #include "debug.h"
 #include "draw.h"
 #include "elevator.h"
+#include "error_report.h"
 #include "game.h"
 #include "game_mouse.h"
 #include "game_movie.h"
@@ -1168,6 +1169,8 @@ err:
         char message[100]; // TODO: Size is probably wrong.
         snprintf(message, sizeof(message), "%s while loading map.", error);
         debugPrint(message);
+        // CE: The player is told why (error_report.h).
+        errorReportMapLoad(gMapHeader.name, error);
         mapNewMap();
         rc = -1;
     } else {

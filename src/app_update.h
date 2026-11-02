@@ -32,6 +32,9 @@ enum class AppUpdateError {
 
 AppUpdateState appUpdateState();
 AppUpdateError appUpdateError();
+// What failed (the platform's words: the installer's status, which check of
+// the APK), for the problem report.
+std::string appUpdateErrorDetail();
 std::string appUpdateTag();
 std::string appUpdateNotes();
 void appUpdateProgress(long long* done, long long* total);

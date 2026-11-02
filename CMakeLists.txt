@@ -431,6 +431,8 @@ set(FALLOUT_PLATFORM_SOURCES
     "src/touch.h"
     "src/action_log.cc"
     "src/action_log.h"
+    "src/error_report.cc"
+    "src/error_report.h"
     "src/touch_log.cc"
     "src/touch_log.h"
     "src/scan_unimplemented.cc"

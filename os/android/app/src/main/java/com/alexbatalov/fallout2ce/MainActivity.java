@@ -2,6 +2,9 @@ package com.alexbatalov.fallout2ce;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.app.ActivityManager;
+import android.app.ApplicationExitInfo;
+import android.content.ActivityNotFoundException;
 import android.content.BroadcastReceiver;
 import android.content.Intent;
 import android.content.Context;
@@ -11,6 +14,10 @@ import android.content.pm.PackageManager;
 import android.content.res.AssetManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.SystemClock;
+import android.util.Log;
 import android.view.DisplayCutout;
 import android.view.ViewConfiguration;
 import android.view.WindowInsets;
@@ -24,9 +31,39 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 public class MainActivity extends SDLActivity {
+    private static final String TAG = "Fallout2";
     private boolean noExit = false;
+    // The game's hang watchdog (error_report.h): the game runs on SDL's
+    // thread, so the system's "isn't responding" never sees it stop. Looked
+    // at every few seconds while the game is in front.
+    private static final long WATCH_INTERVAL_MS = 5000;
+    private final Handler watchHandler = new Handler(Looper.getMainLooper());
+    private final HangWatchdog watchdog = new HangWatchdog();
+    private android.app.AlertDialog hangDialog;
+    private final Runnable watch = new Runnable() {
+        @Override
+        public void run() {
+            long state;
+            try {
+                state = nativeWatchState();
+            } catch (UnsatisfiedLinkError e) {
+                return;
+            }
+            boolean stalled = watchdog.stalled(SystemClock.uptimeMillis(), state);
+            if (hangDialog != null && hangDialog.isShowing()) {
+                // It came back by itself.
+                if (!stalled) {
+                    hangDialog.dismiss();
+                }
+            } else if (stalled) {
+                showHang(HangWatchdog.loading(state));
+            }
+            watchHandler.postDelayed(this, WATCH_INTERVAL_MS);
+        }
+    };
     private final BroadcastReceiver updateReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -178,12 +215,99 @@ public class MainActivity extends SDLActivity {
     protected void onResume() {
         super.onResume();
         UpdateManager.resumed(true);
+        // Frames stop while it's away: counted from now.
+        watchdog.reset(SystemClock.uptimeMillis());
+        watchHandler.removeCallbacks(watch);
+        watchHandler.postDelayed(watch, WATCH_INTERVAL_MS);
     }
 
     @Override
     protected void onPause() {
+        watchHandler.removeCallbacks(watch);
+        if (hangDialog != null) {
+            hangDialog.dismiss();
+        }
         UpdateManager.resumed(false);
         super.onPause();
+    }
+
+    // The game shows no new frames: what it is and the report, from the
+    // game's own texts (prepared by it before it stopped).
+    private void showHang(boolean loading) {
+        String texts;
+        try {
+            texts = nativeReportTexts();
+        } catch (UnsatisfiedLinkError e) {
+            return;
+        }
+        hangDialog = ProblemDialog.hang(this, texts, loading, () -> watchdog.waited(SystemClock.uptimeMillis()), () -> {
+            // Closed on purpose: not "closed unexpectedly" at the next start.
+            nativeClosing();
+            finishAndRemoveTask();
+            android.os.Process.killProcess(android.os.Process.myPid());
+        });
+        if (hangDialog != null) {
+            hangDialog.show();
+        }
+    }
+
+    // The game's hang watchdog and its texts (error_report.cc): frames << 1
+    // | loading; the platform's texts (JSON); the game is closed by it.
+    private static native long nativeWatchState();
+    private static native String nativeReportTexts();
+    private static native void nativeClosing();
+
+    // Called from native code (error_report.cc) when the previous run didn't
+    // end cleanly: why, as the system tells (Android 11+), "" when it
+    // doesn't. The import screen's process (":import") isn't the game's.
+    public String exitReason() {
+        if (Build.VERSION.SDK_INT < 30) {
+            return "";
+        }
+        try {
+            ActivityManager manager = (ActivityManager) getSystemService(ACTIVITY_SERVICE);
+            List<ApplicationExitInfo> exits = manager.getHistoricalProcessExitReasons(getPackageName(), 0, 8);
+            for (ApplicationExitInfo info : exits) {
+                if (!getPackageName().equals(info.getProcessName())) {
+                    continue;
+                }
+                switch (info.getReason()) {
+                case ApplicationExitInfo.REASON_CRASH:
+                    return "crash";
+                case ApplicationExitInfo.REASON_CRASH_NATIVE:
+                    return "native-crash";
+                case ApplicationExitInfo.REASON_ANR:
+                    return "anr";
+                case ApplicationExitInfo.REASON_LOW_MEMORY:
+                    return "low-memory";
+                case ApplicationExitInfo.REASON_SIGNALED:
+                    return "signal " + info.getStatus();
+                default:
+                    return "exit " + info.getReason();
+                }
+            }
+        } catch (RuntimeException e) {
+            Log.w(TAG, "No exit reasons", e);
+        }
+        return "";
+    }
+
+    // Called from native code (error_report.cc, a problem report's
+    // "Telegram"): the system's sharing of [text], in Telegram when it's
+    // there.
+    public void shareText(String text) {
+        runOnUiThread(() -> share(this, text));
+    }
+
+    static void share(Activity activity, String text) {
+        Intent intent = new Intent(Intent.ACTION_SEND);
+        intent.setType("text/plain");
+        intent.putExtra(Intent.EXTRA_TEXT, text);
+        try {
+            activity.startActivity(new Intent(intent).setPackage("org.telegram.messenger"));
+        } catch (ActivityNotFoundException e) {
+            activity.startActivity(Intent.createChooser(intent, "Telegram"));
+        }
     }
 
     // The native updater's non-blocking bridge (app_update.cc).

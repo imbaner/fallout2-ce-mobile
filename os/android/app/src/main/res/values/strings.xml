@@ -27,6 +27,7 @@
     <string name="import_progress">%1$s of %2$s</string>
     <string name="import_cancel">Cancel</string>
     <string name="import_failed">Couldn\'t copy the files: %s</string>
+    <string name="import_no_space_left">The phone ran out of free space while copying. Free up space and try again.</string>
     <string name="import_cancelled">Copying cancelled. Nothing was kept.</string>
     <string name="import_again">Try again</string>
     <string name="import_unreadable">The file can\'t be read as an archive. .zip, .7z, .rar and .tar work — or choose the game\'s folder.</string>

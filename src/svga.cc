@@ -17,6 +17,7 @@
 #include "dev_autotest.h"
 #include "dinput.h"
 #include "draw.h"
+#include "error_report.h"
 #include "game.h"
 #include "interface.h"
 #include "memory.h"
@@ -748,6 +749,8 @@ void renderPresent()
     devAutotestPump();
     devAutotestCapture(gSdlRenderer);
     SDL_RenderPresent(gSdlRenderer);
+    // CE: The platform's hang watchdog counts frames (error_report.h).
+    errorReportFrame();
 #ifdef __EMSCRIPTEN__
     webUpdateRendererInfo();
 #endif

@@ -127,6 +127,11 @@ std::u32string muiPlaceText(int map, int elevation);
 // loads it only for a game, not in the main menu).
 std::u32string muiPlaceText(int map, int elevation, MessageList* names);
 
+// The saves' import ([import]) or export, as the settings' "Game files" do
+// them (mui_preferences.cc): Android - the app's screen over the game; the
+// browser - its save exchange. The screen showing waits until it's back.
+void muiExchangeSaves(bool import);
+
 // Game menu (mui_options.cc) over what shows: continue, save and load if
 // [saveLoad], settings, exit; [place] in its header (the current map's if
 // null). Returns 1 if a game was saved or loaded.

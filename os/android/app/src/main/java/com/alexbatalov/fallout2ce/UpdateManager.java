@@ -58,6 +58,9 @@ final class UpdateManager {
     private static File readyFile;
     private static int state = UNSUPPORTED;
     private static int error = NO_ERROR;
+    // What failed, for the problem report (error_report.h): the installer's
+    // status, the exception's kind.
+    private static String problem = "";
     private static int generation;
     private static boolean restoring;
     private static boolean pendingCheck, pendingManual;
@@ -117,6 +120,7 @@ final class UpdateManager {
     static synchronized int error() { return error; }
     static synchronized boolean ready() { return readyFile != null; }
     static synchronized String string(int field) {
+        if (field == 3) return problem;
         if (release == null) return "";
         return release.optString(field == 0 ? "tag" : field == 1 ? "name" : "notes", "");
     }
@@ -252,7 +256,8 @@ final class UpdateManager {
                     out.getFD().sync();
                 }
                 if (cancelled) return;
-                if (part.length() != size || !verify(part, selected)) throw new InvalidApkException();
+                if (part.length() != size) throw new InvalidApkException("size");
+                if (!verify(part, selected)) throw new InvalidApkException();
                 File complete = new File(cache(), selected.getString("tag") + ".apk");
                 synchronized (UpdateManager.class) {
                     // Cancel and promotion to a ready APK are one decision,
@@ -402,6 +407,7 @@ final class UpdateManager {
             Log.w(TAG, "Installer status " + result + ": " + intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE));
             state = ERROR;
             error = INSTALL_ERROR;
+            problem = "installer status " + result;
         }
     }
 
@@ -581,9 +587,15 @@ final class UpdateManager {
         if (run == generation) {
             state = ERROR;
             error = reason;
+            problem = operation.toLowerCase(java.util.Locale.ROOT) + " " + e.getClass().getSimpleName()
+                + (e instanceof InvalidApkException && e.getMessage() != null ? ": " + e.getMessage() : "");
         }
     }
 
     private static final class ServiceException extends IOException { }
-    private static final class InvalidApkException extends IOException { }
+    // [check]: which of the APK's checks failed, when known.
+    private static final class InvalidApkException extends IOException {
+        InvalidApkException() { }
+        InvalidApkException(String check) { super(check); }
+    }
 }
