@@ -257,34 +257,39 @@ public class MainActivity extends SDLActivity {
     private static native String nativeReportTexts();
     private static native void nativeClosing();
 
-    // Called from native code (error_report.cc) when the previous run didn't
-    // end cleanly: why, as the system tells (Android 11+), "" when it
-    // doesn't. The import screen's process (":import") isn't the game's.
-    public String exitReason() {
+    // Called from native code (error_report.cc) when the previous run (its
+    // process [pid]) didn't end cleanly: why, as the system tells (Android
+    // 11+); "none" when it wasn't the game's failure - the phone restarted
+    // (no record of that process), the app was stopped or updated; "" when
+    // the system doesn't tell.
+    public String exitReason(int pid) {
         if (Build.VERSION.SDK_INT < 30) {
             return "";
         }
         try {
             ActivityManager manager = (ActivityManager) getSystemService(ACTIVITY_SERVICE);
-            List<ApplicationExitInfo> exits = manager.getHistoricalProcessExitReasons(getPackageName(), 0, 8);
-            for (ApplicationExitInfo info : exits) {
-                if (!getPackageName().equals(info.getProcessName())) {
-                    continue;
-                }
-                switch (info.getReason()) {
-                case ApplicationExitInfo.REASON_CRASH:
-                    return "crash";
-                case ApplicationExitInfo.REASON_CRASH_NATIVE:
-                    return "native-crash";
-                case ApplicationExitInfo.REASON_ANR:
-                    return "anr";
-                case ApplicationExitInfo.REASON_LOW_MEMORY:
-                    return "low-memory";
-                case ApplicationExitInfo.REASON_SIGNALED:
-                    return "signal " + info.getStatus();
-                default:
-                    return "exit " + info.getReason();
-                }
+            List<ApplicationExitInfo> exits = manager.getHistoricalProcessExitReasons(getPackageName(), pid, 1);
+            if (exits.isEmpty()) {
+                return "none";
+            }
+            ApplicationExitInfo info = exits.get(0);
+            switch (info.getReason()) {
+            case ApplicationExitInfo.REASON_CRASH:
+                return "crash";
+            case ApplicationExitInfo.REASON_CRASH_NATIVE:
+                return "native-crash";
+            case ApplicationExitInfo.REASON_ANR:
+                return "anr";
+            case ApplicationExitInfo.REASON_LOW_MEMORY:
+                return "low-memory";
+            case ApplicationExitInfo.REASON_SIGNALED:
+                return "signal " + info.getStatus();
+            case ApplicationExitInfo.REASON_INITIALIZATION_FAILURE:
+                return "init-failure";
+            case ApplicationExitInfo.REASON_EXIT_SELF:
+                return info.getStatus() != 0 ? "exit " + info.getStatus() : "none";
+            default:
+                return "none";
             }
         } catch (RuntimeException e) {
             Log.w(TAG, "No exit reasons", e);

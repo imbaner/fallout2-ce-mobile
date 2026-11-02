@@ -2,6 +2,7 @@
 
 #include <ctype.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include <algorithm>
@@ -14,6 +15,7 @@
 
 #ifdef __ANDROID__
 #include <jni.h>
+#include <unistd.h>
 #endif
 
 #ifdef __EMSCRIPTEN__
@@ -546,7 +548,7 @@ namespace {
     std::string codeLine(const Problem& problem)
     {
         std::string line = std::string("Code: ") + reasonInfo(problem.reason).code;
-        if (!problem.detail.empty()) {
+        if (!problem.detail.empty() && problem.detail != reasonInfo(problem.reason).code) {
             line += " (" + problem.detail + ")";
         }
         if (!problem.file.empty()) {
@@ -1002,6 +1004,15 @@ namespace {
 #endif
     }
 
+    int runningProcess()
+    {
+#ifdef __ANDROID__
+        return static_cast<int>(getpid());
+#else
+        return 0;
+#endif
+    }
+
     void writeRunning()
     {
         if (!usesRunningFile()) {
@@ -1017,7 +1028,8 @@ namespace {
             lines = contextLines();
             gContextChanged = false;
         }
-        fputs("# F2 Touch is running (error_report.h)\n", stream);
+        // The process, for the system's record of how it ended.
+        fprintf(stream, "# F2 Touch is running (error_report.h), process %d\n", runningProcess());
         for (const std::string& line : lines) {
             fprintf(stream, "%s\n", line.c_str());
         }
@@ -1035,7 +1047,7 @@ namespace {
     }
 
     // The last run's lines, or false when it ended cleanly.
-    bool readRunning(std::vector<std::string>* lines)
+    bool readRunning(std::vector<std::string>* lines, int* process)
     {
         FILE* stream = fopen(runningFile(), "rt");
         if (stream == nullptr) {
@@ -1043,6 +1055,10 @@ namespace {
         }
         char buffer[512];
         while (fgets(buffer, sizeof(buffer), stream) != nullptr) {
+            const char* processText = buffer[0] == '#' ? strstr(buffer, ", process ") : nullptr;
+            if (processText != nullptr) {
+                *process = atoi(processText + strlen(", process "));
+            }
             std::string line = cleanLine(buffer);
             if (!line.empty() && line[0] != '#' && lines->size() < kEventsShown + kScriptErrorsShown + 2) {
                 lines->push_back(line);
@@ -1053,9 +1069,11 @@ namespace {
         return true;
     }
 
-    // Why the last run ended, as the system tells (Android 11+): "crash",
-    // "native-crash", "anr", "low-memory", empty when it doesn't.
-    std::string exitReason()
+    // Why the run of [process] ended, as the system tells (Android 11+):
+    // "crash", "native-crash", "anr", "low-memory", ...; "none" when it
+    // wasn't the game's failure (the phone restarted, the app was stopped or
+    // updated); empty when the system doesn't tell.
+    std::string exitReason(int process)
     {
         std::string result;
 #ifdef __ANDROID__
@@ -1065,8 +1083,8 @@ namespace {
             return result;
         }
         jclass activityClass = env->GetObjectClass(activity);
-        jmethodID method = env->GetMethodID(activityClass, "exitReason", "()Ljava/lang/String;");
-        jstring value = method != nullptr ? static_cast<jstring>(env->CallObjectMethod(activity, method)) : nullptr;
+        jmethodID method = env->GetMethodID(activityClass, "exitReason", "(I)Ljava/lang/String;");
+        jstring value = method != nullptr ? static_cast<jstring>(env->CallObjectMethod(activity, method, static_cast<jint>(process))) : nullptr;
         if (value != nullptr) {
             const char* chars = env->GetStringUTFChars(value, nullptr);
             if (chars != nullptr) {
@@ -1259,8 +1277,9 @@ void errorReportStart()
 
     Problem problem;
     std::vector<std::string> previous;
-    if ((usesRunningFile() || devAutotestIsEnabled()) && readRunning(&previous)) {
-        std::string reason = exitReason();
+    int process = 0;
+    std::string reason;
+    if ((usesRunningFile() || devAutotestIsEnabled()) && readRunning(&previous, &process) && (reason = exitReason(process)) != "none") {
         problem.reason = reason == "low-memory" ? ErrorReason::LowMemory : ErrorReason::Crash;
         problem.detail = reason;
         problem.previous = previous;
