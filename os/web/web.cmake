@@ -39,10 +39,14 @@ set_property(TARGET ${EXECUTABLE_NAME} APPEND PROPERTY LINK_DEPENDS
     "${CMAKE_SOURCE_DIR}/os/web/gamefs.js" "${CMAKE_SOURCE_DIR}/os/web/userfs.js")
 set_target_properties(${EXECUTABLE_NAME} PROPERTIES OUTPUT_NAME "fallout2-ce" SUFFIX ".js")
 
+# No version or commit in the engine: the page gives them (app_version.h),
+# so the engine's files stay the same from build to build while its code
+# does, and an update downloads only the files that changed (sw.js).
 if(NOT FALLOUT_APP_VERSION)
     set(FALLOUT_APP_VERSION "development")
-    target_compile_definitions(${EXECUTABLE_NAME} PRIVATE FALLOUT_APP_VERSION="${FALLOUT_APP_VERSION}")
 endif()
+target_compile_definitions(${EXECUTABLE_NAME} PRIVATE
+    _BUILD_AUTHOR="" _BUILD_BRANCH="" _BUILD_HASH="" _BUILD_VER="" _BUILD_DATE="")
 
 find_package(Python3 3.10 REQUIRED COMPONENTS Interpreter)
 add_subdirectory("third_party/libarchive")

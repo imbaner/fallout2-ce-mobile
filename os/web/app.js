@@ -220,6 +220,8 @@ async function play() {
     } catch { /* Fullscreen is optional, e.g. in an iOS Home Screen app. */ }
     const module = engine = await globalThis.createFallout2({
       canvas:$('canvas'), noInitialRun:true, webMouseAsTouch:source.mouseAsTouch,
+      // The engine has no version of its own (app_version.h).
+      webAppVersion:document.body.dataset.version, webAppBuild:document.body.dataset.webBuild,
       SDL2, webTextInput:textInput, webViewport:viewport,webWindow:gameWindow,
       webOpenFiles:mode => { filesMode = mode; },
       locateFile:name => new URL('./' + name, import.meta.url).href,

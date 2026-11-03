@@ -1,9 +1,20 @@
 #pragma once
 
+// A build may give its own stamp (compile definitions).
+#ifndef _BUILD_AUTHOR
 #define _BUILD_AUTHOR "@AUTHOR@"
+#endif
+#ifndef _BUILD_BRANCH
 #define _BUILD_BRANCH "@BRANCH@"
+#endif
+#ifndef _BUILD_HASH
 #define _BUILD_HASH   "@HASH@"
+#endif
+#ifndef _BUILD_VER
 #define _BUILD_VER    "@LATEST_TAG@"
+#endif
+#ifndef _BUILD_DATE
 #define _BUILD_DATE   @DATE@
+#endif
 
 #define CI_BUILD @CI_BUILD@

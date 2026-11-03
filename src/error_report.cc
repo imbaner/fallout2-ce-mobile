@@ -26,6 +26,7 @@
 #include <sys/sysctl.h>
 #endif
 
+#include "app_version.h"
 #include "debug.h"
 #include "dev_autotest.h"
 #include "loadsave.h"
@@ -37,10 +38,6 @@
 #include "settings.h"
 #include "worldmap.h"
 #include "xfile.h"
-
-#ifndef FALLOUT_APP_VERSION
-#define FALLOUT_APP_VERSION "1.3.0"
-#endif
 
 namespace fallout {
 
@@ -455,7 +452,7 @@ namespace {
     {
         static std::string line;
         if (line.empty()) {
-            line = std::string("F2 Touch ") + FALLOUT_APP_VERSION + " · " + platformName() + " · " + gameBuild();
+            line = std::string("F2 Touch ") + appVersion() + " (" + appBuild() + ") · " + platformName() + " · " + gameBuild();
         }
         return line;
     }

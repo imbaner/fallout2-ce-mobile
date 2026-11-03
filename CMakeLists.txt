@@ -433,6 +433,8 @@ set(FALLOUT_PLATFORM_SOURCES
     "src/action_log.h"
     "src/error_report.cc"
     "src/error_report.h"
+    "src/app_version.cc"
+    "src/app_version.h"
     "src/touch_log.cc"
     "src/touch_log.h"
     "src/scan_unimplemented.cc"
@@ -481,7 +483,8 @@ target_compile_definitions(${EXECUTABLE_NAME} PRIVATE FALLOUT_DIAGNOSTICS=$<BOOL
 
 # The version the app shows (Android: its versionName), CE's otherwise.
 set(FALLOUT_APP_VERSION "" CACHE STRING "Version shown in the settings' About section")
-if(FALLOUT_APP_VERSION)
+# The web page gives the engine its version (app_version.h).
+if(FALLOUT_APP_VERSION AND NOT EMSCRIPTEN)
     target_compile_definitions(${EXECUTABLE_NAME} PRIVATE FALLOUT_APP_VERSION="${FALLOUT_APP_VERSION}")
 endif()
 

@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "app_update.h"
+#include "app_version.h"
 #include "db.h"
 #include "dbox.h"
 #include "debug.h"
@@ -24,7 +25,6 @@
 #include "message.h"
 #include "mui_notify.h"
 #include "mui_update.h"
-#include "platform/git_version.h"
 #include "platform_compat.h"
 #include "preferences.h"
 #include "settings.h"
@@ -173,10 +173,6 @@ namespace {
     constexpr int kTextAboutVersion = 368;
     constexpr int kTextAboutNotice = 369;
     constexpr int kTextAboutLicenses = 372;
-
-#ifndef FALLOUT_APP_VERSION
-#define FALLOUT_APP_VERSION "1.3.0"
-#endif
 
     // The port's number of quick saves (one page, the phone's config); CE's
     // own default is none.
@@ -1083,7 +1079,7 @@ namespace {
         muiDrawTextAligned(U"F2 Touch", { rect.x + ui.dp(4.0f), y, rect.w, titleHeight }, ui.dp(16.0f), theme.text, MuiAlign::Start, MuiAlign::Center);
         y += titleHeight;
         char version[160];
-        snprintf(version, sizeof(version), muiText(kTextAboutVersion, "Version %s, build %s"), FALLOUT_APP_VERSION, _BUILD_HASH);
+        snprintf(version, sizeof(version), muiText(kTextAboutVersion, "Version %s, build %s"), appVersion(), appBuild());
         muiDrawTextAligned(muiDecodeGameText(version), { rect.x + ui.dp(4.0f), y, rect.w, line }, size, theme.textDim, MuiAlign::Start, MuiAlign::Center);
         y += line + gap;
         for (const auto& value : notice) {
