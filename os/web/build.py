@@ -9,6 +9,7 @@ import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[2]
+PORTS_DIR = '/tmp/f2touch-emscripten-ports'
 
 
 def run(command, env=None):
@@ -44,6 +45,13 @@ def main():
     output = (args.output or build / 'dist').resolve()
     env = os.environ.copy()
     env['EMSDK_PYTHON'] = sys.executable
+    # Emscripten builds its ports (SDL2, SDL2_mixer, zlib) from sources in its
+    # ports directory, without our flags, so their __FILE__ is that path. A
+    # fixed one outside the builder's home keeps local paths out of the app's
+    # files and the engine the same on every machine; the build's own cache
+    # has the ports built from there.
+    env['EM_PORTS'] = PORTS_DIR
+    env['EM_CACHE'] = str(build / 'emscripten-cache')
     if args.emsdk:
         sdk = args.emsdk.resolve()
         env['EMSDK'] = str(sdk)

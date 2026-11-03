@@ -40,6 +40,11 @@ Release uses `-O2` for compilation and linking, including optimization of the
 Asyncify-instrumented module; `-O1` is only suitable for faster iteration.
 The command runs the native tool build, web configure/build and package
 verification. A failed packaging operation leaves the previous bundle intact.
+The build has its own Emscripten cache (`<build dir>/emscripten-cache`) and
+unpacks Emscripten's ports (SDL2, SDL2_mixer, zlib) in
+`/tmp/f2touch-emscripten-ports`: their `__FILE__` strings are that path, so the
+app's files carry no local path and the same sources give the same files on
+any machine (`sw.js` then keeps the unchanged ones on an update).
 
 Install the SDK from its official source if needed:
 
