@@ -4065,31 +4065,152 @@ static void devAutotestWriteText(const char* fileName, const char* text)
     fclose(stream);
 }
 
+// A scenario that is its steps alone.
+struct DevAutotestScenario {
+    const char* name;
+    const DevAutotestStep* steps;
+    int stepCount;
+};
+
+template <size_t N>
+static constexpr DevAutotestScenario devAutotestScenario(const char* name, const DevAutotestStep (&steps)[N])
+{
+    return { name, steps, static_cast<int>(N) };
+}
+
+// In a table: MSVC can't build an else-if chain this long (C1061).
+static const DevAutotestScenario kDevAutotestScenarios[] = {
+    devAutotestScenario("worldmap", kDevAutotestWorldmapSteps),
+    devAutotestScenario("loadsave", kDevAutotestLoadSaveSteps),
+    devAutotestScenario("gamefiles", kDevAutotestGameFilesSteps),
+    devAutotestScenario("preferences", kDevAutotestPreferencesSteps),
+    devAutotestScenario("about", kDevAutotestAboutSteps),
+    devAutotestScenario("reportmap", kDevAutotestReportMapSteps),
+    devAutotestScenario("reportupdate", kDevAutotestReportUpdateSteps),
+    devAutotestScenario("reportmemory", kDevAutotestReportMemorySteps),
+    devAutotestScenario("muiloadsavemain", kDevAutotestMuiMainMenuLoadSteps),
+    devAutotestScenario("muiloadsavemainresume", kDevAutotestMuiMainMenuResumeSteps),
+    devAutotestScenario("pccharacter", kDevAutotestPcCharacterSteps),
+    devAutotestScenario("fadecycle", kDevAutotestFadeCycleSteps),
+    devAutotestScenario("tacticalpickup", kDevAutotestTacticalPickupSteps),
+    devAutotestScenario("perkeverylevel", kDevAutotestPerkEveryLevelSteps),
+    devAutotestScenario("perkowed", kDevAutotestPerkOwedSteps),
+    devAutotestScenario("character", kDevAutotestCharacterSteps),
+    devAutotestScenario("combatscreens", kDevAutotestCombatScreensSteps),
+    devAutotestScenario("pcpipboy", kDevAutotestPcPipboySteps),
+    devAutotestScenario("pipboy", kDevAutotestPipboySteps),
+    devAutotestScenario("automap", kDevAutotestAutomapSteps),
+    devAutotestScenario("movie", kDevAutotestMovieSteps),
+    devAutotestScenario("titleintro", kDevAutotestTitleIntroSteps),
+    devAutotestScenario("modbridge", kDevAutotestModBridgeSteps),
+    devAutotestScenario("death", kDevAutotestDeathSteps),
+    devAutotestScenario("endgame", kDevAutotestEndgameSteps),
+    devAutotestScenario("elevator", kDevAutotestElevatorSteps),
+    devAutotestScenario("update", kDevAutotestUpdateSteps),
+    devAutotestScenario("updateingame", kDevAutotestUpdateInGameSteps),
+    devAutotestScenario("mainmenu", kDevAutotestMainMenuSteps),
+    devAutotestScenario("newgameelder", kDevAutotestNewGameElderSteps),
+    devAutotestScenario("pipboynotworn", kDevAutotestPipboyNotWornSteps),
+    devAutotestScenario("floattext", kDevAutotestFloatTextSteps),
+    devAutotestScenario("agingfail", kDevAutotestAgingFailSteps),
+    devAutotestScenario("multihexblood", kDevAutotestMultihexBloodSteps),
+    devAutotestScenario("groundcover", kDevAutotestGroundCoverSteps),
+    devAutotestScenario("scrolllimit", kDevAutotestScrollLimitSteps),
+    devAutotestScenario("weaponpan", kDevAutotestWeaponPanSteps),
+    devAutotestScenario("firstmap", kDevAutotestFirstMapSteps),
+    devAutotestScenario("dispositions", kDevAutotestDispositionsSteps),
+    devAutotestScenario("sonoraparty", kDevAutotestSonoraPartySteps),
+    devAutotestScenario("dogmeatcontrol", kDevAutotestDogmeatControlSteps),
+    devAutotestScenario("missingscript", kDevAutotestMissingScriptSteps),
+    devAutotestScenario("movietimersoff", kDevAutotestMovieTimersOffSteps),
+    devAutotestScenario("highlightall", kDevAutotestHighlightAllSteps),
+    devAutotestScenario("highlightlook", kDevAutotestHighlightLookSteps),
+    devAutotestScenario("worldmapnames", kDevAutotestWorldmapNamesSteps),
+    devAutotestScenario("scriptsave", kDevAutotestScriptSaveSteps),
+    devAutotestScenario("stairs", kDevAutotestStairsSteps),
+    devAutotestScenario("ladderoutline", kDevAutotestLadderOutlineSteps),
+    devAutotestScenario("golgotha", kDevAutotestGolgothaSteps),
+    devAutotestScenario("mapreturn", kDevAutotestMapReturnSteps),
+    devAutotestScenario("touchlog", kDevAutotestTouchLogSteps),
+    devAutotestScenario("staletouch", kDevAutotestStaleTouchSteps),
+    devAutotestScenario("stuckfinger", kDevAutotestStuckFingerSteps),
+    devAutotestScenario("perfmap", kDevAutotestPerfMapSteps),
+    devAutotestScenario("combatspeed", kDevAutotestCombatSpeedSteps),
+    devAutotestScenario("calledshot", kDevAutotestCalledShotSteps),
+    devAutotestScenario("creation", kDevAutotestCreationSteps),
+    devAutotestScenario("party", kDevAutotestPartySteps),
+    devAutotestScenario("droparmor", kDevAutotestDropArmorSteps),
+    devAutotestScenario("missobject", kDevAutotestMissObjectSteps),
+    devAutotestScenario("partyweight", kDevAutotestPartyWeightSteps),
+    devAutotestScenario("partyweightsteal", kDevAutotestPartyWeightStealSteps),
+    devAutotestScenario("explodeleave", kDevAutotestExplodeOnLeaveSteps),
+    devAutotestScenario("multihexparty", kDevAutotestMultihexPartySteps),
+    devAutotestScenario("multihexmove", kDevAutotestMultihexMoveSteps),
+    devAutotestScenario("multihexretarget", kDevAutotestMultihexRetargetSteps),
+    devAutotestScenario("npcpickup", kDevAutotestNpcPickupSteps),
+    devAutotestScenario("retrieveobj", kDevAutotestRetrieveObjectSteps),
+    devAutotestScenario("moveaway", kDevAutotestMoveAwaySteps),
+    devAutotestScenario("burstfriendly", kDevAutotestBurstFriendlySteps),
+    devAutotestScenario("objectids", kDevAutotestObjectIdsSteps),
+    devAutotestScenario("wieldstack", kDevAutotestWieldStackSteps),
+    devAutotestScenario("drugpidsfile", kDevAutotestDrugPidsFileSteps),
+    devAutotestScenario("drugsave", kDevAutotestDrugSaveSteps),
+    devAutotestScenario("barterfixes", kDevAutotestBarterFixesSteps),
+    devAutotestScenario("barterfixesoff", kDevAutotestBarterFixesOffSteps),
+    devAutotestScenario("orig675", kDevAutotestOriginal675Steps),
+    devAutotestScenario("mapageheal", kDevAutotestMapAgeHealSteps),
+    devAutotestScenario("partycorpse", kDevAutotestPartyCorpseSteps),
+    devAutotestScenario("knockouts", kDevAutotestKnockoutsSteps),
+    devAutotestScenario("bonusmovewalk", kDevAutotestBonusMoveWalkSteps),
+    devAutotestScenario("bonusmoveload", kDevAutotestBonusMoveLoadSteps),
+    devAutotestScenario("apturn", kDevAutotestApTurnSteps),
+    devAutotestScenario("crittable", kDevAutotestCritTableSteps),
+    devAutotestScenario("talkheal", kDevAutotestTalkHealSteps),
+    devAutotestScenario("heroselect", kDevAutotestHeroSelectSteps),
+    devAutotestScenario("creationappearance", kDevAutotestCreationAppearanceSteps),
+    devAutotestScenario("heroappearance", kDevAutotestHeroAppearanceSteps),
+    devAutotestScenario("retargetleave", kDevAutotestRetargetLeaveSteps),
+    devAutotestScenario("fleeheal", kDevAutotestFleeHealSteps),
+    devAutotestScenario("pcparty", kDevAutotestPcPartySteps),
+    devAutotestScenario("testsave", kDevAutotestTestSaveSteps),
+    devAutotestScenario("loot", kDevAutotestLootSteps),
+    devAutotestScenario("pcinventory", kDevAutotestPcInventorySteps),
+    devAutotestScenario("ammo", kDevAutotestAmmoSteps),
+    devAutotestScenario("inventory", kDevAutotestInventorySteps),
+    devAutotestScenario("bartertrace", kDevAutotestBarterTraceSteps),
+    devAutotestScenario("headtrace", kDevAutotestHeadTraceSteps),
+    devAutotestScenario("dialogtrace", kDevAutotestDialogTraceSteps),
+    devAutotestScenario("barter", kDevAutotestBarterSteps),
+    devAutotestScenario("talk", kDevAutotestTalkSteps),
+    devAutotestScenario("ui", kDevAutotestUiSteps),
+    devAutotestScenario("tactical", kDevAutotestTacticalSteps),
+    devAutotestScenario("icons", kDevAutotestIconsSteps),
+    devAutotestScenario("promoworld", kDevAutotestPromoWorldSteps),
+    devAutotestScenario("photos", kDevAutotestPhotosSteps),
+    devAutotestScenario("behindcritter", kDevAutotestBehindCritterSteps),
+    devAutotestScenario("magnet", kDevAutotestMagnetSteps),
+    devAutotestScenario("hud", kDevAutotestHudSteps),
+};
+
 void devAutotestSetScenario(const char* name)
 {
-    if (strcmp(name, "worldmap") == 0) {
-        gDevAutotestSteps = kDevAutotestWorldmapSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestWorldmapSteps) / sizeof(kDevAutotestWorldmapSteps[0]);
-    } else if (strcmp(name, "loadsave") == 0) {
-        gDevAutotestSteps = kDevAutotestLoadSaveSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestLoadSaveSteps) / sizeof(kDevAutotestLoadSaveSteps[0]);
-    } else if (strcmp(name, "savehistory") == 0) {
+    for (const DevAutotestScenario& scenario : kDevAutotestScenarios) {
+        if (strcmp(name, scenario.name) == 0) {
+            gDevAutotestSteps = scenario.steps;
+            gDevAutotestStepCount = scenario.stepCount;
+            return;
+        }
+    }
+
+    // Scenarios with settings of their own.
+    if (strcmp(name, "savehistory") == 0) {
         gDevAutotestSteps = kDevAutotestSaveHistorySteps;
         gDevAutotestStepCount = sizeof(kDevAutotestSaveHistorySteps) / sizeof(kDevAutotestSaveHistorySteps[0]);
         gDevAutotestSaves = DevAutotestSaves::Empty;
-    } else if (strcmp(name, "gamefiles") == 0) {
-        gDevAutotestSteps = kDevAutotestGameFilesSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestGameFilesSteps) / sizeof(kDevAutotestGameFilesSteps[0]);
-    } else if (strcmp(name, "preferences") == 0) {
-        gDevAutotestSteps = kDevAutotestPreferencesSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestPreferencesSteps) / sizeof(kDevAutotestPreferencesSteps[0]);
     } else if (strcmp(name, "muiloadsave") == 0) {
         gDevAutotestSteps = kDevAutotestMuiLoadSaveSteps;
         gDevAutotestStepCount = sizeof(kDevAutotestMuiLoadSaveSteps) / sizeof(kDevAutotestMuiLoadSaveSteps[0]);
         gDevAutotestSaves = DevAutotestSaves::Empty;
-    } else if (strcmp(name, "about") == 0) {
-        gDevAutotestSteps = kDevAutotestAboutSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestAboutSteps) / sizeof(kDevAutotestAboutSteps[0]);
     } else if (strcmp(name, "quicksaves") == 0) {
         gDevAutotestSteps = kDevAutotestQuickSavesSteps;
         gDevAutotestStepCount = sizeof(kDevAutotestQuickSavesSteps) / sizeof(kDevAutotestQuickSavesSteps[0]);
@@ -4102,12 +4223,6 @@ void devAutotestSetScenario(const char* name)
         gDevAutotestSteps = kDevAutotestMuiLoadFailedSteps;
         gDevAutotestStepCount = sizeof(kDevAutotestMuiLoadFailedSteps) / sizeof(kDevAutotestMuiLoadFailedSteps[0]);
         gDevAutotestSaves = DevAutotestSaves::BrokenTestSaveInSlot1;
-    } else if (strcmp(name, "reportmap") == 0) {
-        gDevAutotestSteps = kDevAutotestReportMapSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestReportMapSteps) / sizeof(kDevAutotestReportMapSteps[0]);
-    } else if (strcmp(name, "reportupdate") == 0) {
-        gDevAutotestSteps = kDevAutotestReportUpdateSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestReportUpdateSteps) / sizeof(kDevAutotestReportUpdateSteps[0]);
     } else if (strcmp(name, "reportmanual") == 0) {
         gDevAutotestSteps = kDevAutotestReportManualSteps;
         gDevAutotestStepCount = sizeof(kDevAutotestReportManualSteps) / sizeof(kDevAutotestReportManualSteps[0]);
@@ -4122,82 +4237,10 @@ void devAutotestSetScenario(const char* name)
         gDevAutotestSteps = kDevAutotestReportReplaceSteps;
         gDevAutotestStepCount = sizeof(kDevAutotestReportReplaceSteps) / sizeof(kDevAutotestReportReplaceSteps[0]);
         devAutotestWriteText("problem.txt", "replace-game copy IOException\n");
-    } else if (strcmp(name, "reportmemory") == 0) {
-        gDevAutotestSteps = kDevAutotestReportMemorySteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestReportMemorySteps) / sizeof(kDevAutotestReportMemorySteps[0]);
-    } else if (strcmp(name, "muiloadsavemain") == 0) {
-        gDevAutotestSteps = kDevAutotestMuiMainMenuLoadSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestMuiMainMenuLoadSteps) / sizeof(kDevAutotestMuiMainMenuLoadSteps[0]);
-    } else if (strcmp(name, "muiloadsavemainresume") == 0) {
-        gDevAutotestSteps = kDevAutotestMuiMainMenuResumeSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestMuiMainMenuResumeSteps) / sizeof(kDevAutotestMuiMainMenuResumeSteps[0]);
     } else if (strcmp(name, "muiloadsavemainempty") == 0) {
         gDevAutotestSteps = kDevAutotestMuiMainMenuEmptySteps;
         gDevAutotestStepCount = sizeof(kDevAutotestMuiMainMenuEmptySteps) / sizeof(kDevAutotestMuiMainMenuEmptySteps[0]);
         gDevAutotestSaves = DevAutotestSaves::Empty;
-    } else if (strcmp(name, "pccharacter") == 0) {
-        gDevAutotestSteps = kDevAutotestPcCharacterSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestPcCharacterSteps) / sizeof(kDevAutotestPcCharacterSteps[0]);
-    } else if (strcmp(name, "fadecycle") == 0) {
-        gDevAutotestSteps = kDevAutotestFadeCycleSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestFadeCycleSteps) / sizeof(kDevAutotestFadeCycleSteps[0]);
-    } else if (strcmp(name, "tacticalpickup") == 0) {
-        gDevAutotestSteps = kDevAutotestTacticalPickupSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestTacticalPickupSteps) / sizeof(kDevAutotestTacticalPickupSteps[0]);
-    } else if (strcmp(name, "perkeverylevel") == 0) {
-        gDevAutotestSteps = kDevAutotestPerkEveryLevelSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestPerkEveryLevelSteps) / sizeof(kDevAutotestPerkEveryLevelSteps[0]);
-    } else if (strcmp(name, "perkowed") == 0) {
-        gDevAutotestSteps = kDevAutotestPerkOwedSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestPerkOwedSteps) / sizeof(kDevAutotestPerkOwedSteps[0]);
-    } else if (strcmp(name, "character") == 0) {
-        gDevAutotestSteps = kDevAutotestCharacterSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestCharacterSteps) / sizeof(kDevAutotestCharacterSteps[0]);
-    } else if (strcmp(name, "combatscreens") == 0) {
-        gDevAutotestSteps = kDevAutotestCombatScreensSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestCombatScreensSteps) / sizeof(kDevAutotestCombatScreensSteps[0]);
-    } else if (strcmp(name, "pcpipboy") == 0) {
-        gDevAutotestSteps = kDevAutotestPcPipboySteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestPcPipboySteps) / sizeof(kDevAutotestPcPipboySteps[0]);
-    } else if (strcmp(name, "pipboy") == 0) {
-        gDevAutotestSteps = kDevAutotestPipboySteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestPipboySteps) / sizeof(kDevAutotestPipboySteps[0]);
-    } else if (strcmp(name, "automap") == 0) {
-        gDevAutotestSteps = kDevAutotestAutomapSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestAutomapSteps) / sizeof(kDevAutotestAutomapSteps[0]);
-    } else if (strcmp(name, "movie") == 0) {
-        gDevAutotestSteps = kDevAutotestMovieSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestMovieSteps) / sizeof(kDevAutotestMovieSteps[0]);
-    } else if (strcmp(name, "titleintro") == 0) {
-        gDevAutotestSteps = kDevAutotestTitleIntroSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestTitleIntroSteps) / sizeof(kDevAutotestTitleIntroSteps[0]);
-    } else if (strcmp(name, "modbridge") == 0) {
-        gDevAutotestSteps = kDevAutotestModBridgeSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestModBridgeSteps) / sizeof(kDevAutotestModBridgeSteps[0]);
-    } else if (strcmp(name, "death") == 0) {
-        gDevAutotestSteps = kDevAutotestDeathSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestDeathSteps) / sizeof(kDevAutotestDeathSteps[0]);
-    } else if (strcmp(name, "endgame") == 0) {
-        gDevAutotestSteps = kDevAutotestEndgameSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestEndgameSteps) / sizeof(kDevAutotestEndgameSteps[0]);
-    } else if (strcmp(name, "elevator") == 0) {
-        gDevAutotestSteps = kDevAutotestElevatorSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestElevatorSteps) / sizeof(kDevAutotestElevatorSteps[0]);
-    } else if (strcmp(name, "update") == 0) {
-        gDevAutotestSteps = kDevAutotestUpdateSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestUpdateSteps) / sizeof(kDevAutotestUpdateSteps[0]);
-    } else if (strcmp(name, "updateingame") == 0) {
-        gDevAutotestSteps = kDevAutotestUpdateInGameSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestUpdateInGameSteps) / sizeof(kDevAutotestUpdateInGameSteps[0]);
-    } else if (strcmp(name, "mainmenu") == 0) {
-        gDevAutotestSteps = kDevAutotestMainMenuSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestMainMenuSteps) / sizeof(kDevAutotestMainMenuSteps[0]);
-    } else if (strcmp(name, "newgameelder") == 0) {
-        gDevAutotestSteps = kDevAutotestNewGameElderSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestNewGameElderSteps) / sizeof(kDevAutotestNewGameElderSteps[0]);
-    } else if (strcmp(name, "pipboynotworn") == 0) {
-        gDevAutotestSteps = kDevAutotestPipboyNotWornSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestPipboyNotWornSteps) / sizeof(kDevAutotestPipboyNotWornSteps[0]);
     } else if (strcmp(name, "armorlook") == 0) {
         gDevAutotestSteps = kDevAutotestArmorLookSteps;
         gDevAutotestStepCount = sizeof(kDevAutotestArmorLookSteps) / sizeof(kDevAutotestArmorLookSteps[0]);
@@ -4217,199 +4260,10 @@ void devAutotestSetScenario(const char* name)
         // Party members on the player side (off in the test game's config;
         // runtest.sh puts the config back).
         settings.qol.party_loot_and_barter = true;
-    } else if (strcmp(name, "floattext") == 0) {
-        gDevAutotestSteps = kDevAutotestFloatTextSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestFloatTextSteps) / sizeof(kDevAutotestFloatTextSteps[0]);
-    } else if (strcmp(name, "agingfail") == 0) {
-        gDevAutotestSteps = kDevAutotestAgingFailSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestAgingFailSteps) / sizeof(kDevAutotestAgingFailSteps[0]);
-    } else if (strcmp(name, "multihexblood") == 0) {
-        gDevAutotestSteps = kDevAutotestMultihexBloodSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestMultihexBloodSteps) / sizeof(kDevAutotestMultihexBloodSteps[0]);
-    } else if (strcmp(name, "groundcover") == 0) {
-        gDevAutotestSteps = kDevAutotestGroundCoverSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestGroundCoverSteps) / sizeof(kDevAutotestGroundCoverSteps[0]);
-    } else if (strcmp(name, "scrolllimit") == 0) {
-        gDevAutotestSteps = kDevAutotestScrollLimitSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestScrollLimitSteps) / sizeof(kDevAutotestScrollLimitSteps[0]);
-    } else if (strcmp(name, "weaponpan") == 0) {
-        gDevAutotestSteps = kDevAutotestWeaponPanSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestWeaponPanSteps) / sizeof(kDevAutotestWeaponPanSteps[0]);
-    } else if (strcmp(name, "firstmap") == 0) {
-        gDevAutotestSteps = kDevAutotestFirstMapSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestFirstMapSteps) / sizeof(kDevAutotestFirstMapSteps[0]);
-    } else if (strcmp(name, "dispositions") == 0) {
-        gDevAutotestSteps = kDevAutotestDispositionsSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestDispositionsSteps) / sizeof(kDevAutotestDispositionsSteps[0]);
-    } else if (strcmp(name, "sonoraparty") == 0) {
-        gDevAutotestSteps = kDevAutotestSonoraPartySteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestSonoraPartySteps) / sizeof(kDevAutotestSonoraPartySteps[0]);
-    } else if (strcmp(name, "dogmeatcontrol") == 0) {
-        gDevAutotestSteps = kDevAutotestDogmeatControlSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestDogmeatControlSteps) / sizeof(kDevAutotestDogmeatControlSteps[0]);
-    } else if (strcmp(name, "missingscript") == 0) {
-        gDevAutotestSteps = kDevAutotestMissingScriptSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestMissingScriptSteps) / sizeof(kDevAutotestMissingScriptSteps[0]);
-    } else if (strcmp(name, "movietimersoff") == 0) {
-        gDevAutotestSteps = kDevAutotestMovieTimersOffSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestMovieTimersOffSteps) / sizeof(kDevAutotestMovieTimersOffSteps[0]);
-    } else if (strcmp(name, "highlightall") == 0) {
-        gDevAutotestSteps = kDevAutotestHighlightAllSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestHighlightAllSteps) / sizeof(kDevAutotestHighlightAllSteps[0]);
-    } else if (strcmp(name, "highlightlook") == 0) {
-        gDevAutotestSteps = kDevAutotestHighlightLookSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestHighlightLookSteps) / sizeof(kDevAutotestHighlightLookSteps[0]);
-    } else if (strcmp(name, "worldmapnames") == 0) {
-        gDevAutotestSteps = kDevAutotestWorldmapNamesSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestWorldmapNamesSteps) / sizeof(kDevAutotestWorldmapNamesSteps[0]);
-    } else if (strcmp(name, "scriptsave") == 0) {
-        gDevAutotestSteps = kDevAutotestScriptSaveSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestScriptSaveSteps) / sizeof(kDevAutotestScriptSaveSteps[0]);
-    } else if (strcmp(name, "stairs") == 0) {
-        gDevAutotestSteps = kDevAutotestStairsSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestStairsSteps) / sizeof(kDevAutotestStairsSteps[0]);
-    } else if (strcmp(name, "ladderoutline") == 0) {
-        gDevAutotestSteps = kDevAutotestLadderOutlineSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestLadderOutlineSteps) / sizeof(kDevAutotestLadderOutlineSteps[0]);
     } else if (strcmp(name, "state") == 0) {
         gDevAutotestSteps = kDevAutotestStateSteps;
         gDevAutotestStepCount = sizeof(kDevAutotestStateSteps) / sizeof(kDevAutotestStateSteps[0]);
         gDevAutotestTraceItems = true;
-    } else if (strcmp(name, "golgotha") == 0) {
-        gDevAutotestSteps = kDevAutotestGolgothaSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestGolgothaSteps) / sizeof(kDevAutotestGolgothaSteps[0]);
-    } else if (strcmp(name, "mapreturn") == 0) {
-        gDevAutotestSteps = kDevAutotestMapReturnSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestMapReturnSteps) / sizeof(kDevAutotestMapReturnSteps[0]);
-    } else if (strcmp(name, "touchlog") == 0) {
-        gDevAutotestSteps = kDevAutotestTouchLogSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestTouchLogSteps) / sizeof(kDevAutotestTouchLogSteps[0]);
-    } else if (strcmp(name, "staletouch") == 0) {
-        gDevAutotestSteps = kDevAutotestStaleTouchSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestStaleTouchSteps) / sizeof(kDevAutotestStaleTouchSteps[0]);
-    } else if (strcmp(name, "stuckfinger") == 0) {
-        gDevAutotestSteps = kDevAutotestStuckFingerSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestStuckFingerSteps) / sizeof(kDevAutotestStuckFingerSteps[0]);
-    } else if (strcmp(name, "perfmap") == 0) {
-        gDevAutotestSteps = kDevAutotestPerfMapSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestPerfMapSteps) / sizeof(kDevAutotestPerfMapSteps[0]);
-    } else if (strcmp(name, "combatspeed") == 0) {
-        gDevAutotestSteps = kDevAutotestCombatSpeedSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestCombatSpeedSteps) / sizeof(kDevAutotestCombatSpeedSteps[0]);
-    } else if (strcmp(name, "calledshot") == 0) {
-        gDevAutotestSteps = kDevAutotestCalledShotSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestCalledShotSteps) / sizeof(kDevAutotestCalledShotSteps[0]);
-    } else if (strcmp(name, "creation") == 0) {
-        gDevAutotestSteps = kDevAutotestCreationSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestCreationSteps) / sizeof(kDevAutotestCreationSteps[0]);
-    } else if (strcmp(name, "party") == 0) {
-        gDevAutotestSteps = kDevAutotestPartySteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestPartySteps) / sizeof(kDevAutotestPartySteps[0]);
-    } else if (strcmp(name, "droparmor") == 0) {
-        gDevAutotestSteps = kDevAutotestDropArmorSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestDropArmorSteps) / sizeof(kDevAutotestDropArmorSteps[0]);
-    } else if (strcmp(name, "missobject") == 0) {
-        gDevAutotestSteps = kDevAutotestMissObjectSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestMissObjectSteps) / sizeof(kDevAutotestMissObjectSteps[0]);
-    } else if (strcmp(name, "partyweight") == 0) {
-        gDevAutotestSteps = kDevAutotestPartyWeightSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestPartyWeightSteps) / sizeof(kDevAutotestPartyWeightSteps[0]);
-    } else if (strcmp(name, "partyweightsteal") == 0) {
-        gDevAutotestSteps = kDevAutotestPartyWeightStealSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestPartyWeightStealSteps) / sizeof(kDevAutotestPartyWeightStealSteps[0]);
-    } else if (strcmp(name, "explodeleave") == 0) {
-        gDevAutotestSteps = kDevAutotestExplodeOnLeaveSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestExplodeOnLeaveSteps) / sizeof(kDevAutotestExplodeOnLeaveSteps[0]);
-    } else if (strcmp(name, "multihexparty") == 0) {
-        gDevAutotestSteps = kDevAutotestMultihexPartySteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestMultihexPartySteps) / sizeof(kDevAutotestMultihexPartySteps[0]);
-    } else if (strcmp(name, "multihexmove") == 0) {
-        gDevAutotestSteps = kDevAutotestMultihexMoveSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestMultihexMoveSteps) / sizeof(kDevAutotestMultihexMoveSteps[0]);
-    } else if (strcmp(name, "multihexretarget") == 0) {
-        gDevAutotestSteps = kDevAutotestMultihexRetargetSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestMultihexRetargetSteps) / sizeof(kDevAutotestMultihexRetargetSteps[0]);
-    } else if (strcmp(name, "npcpickup") == 0) {
-        gDevAutotestSteps = kDevAutotestNpcPickupSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestNpcPickupSteps) / sizeof(kDevAutotestNpcPickupSteps[0]);
-    } else if (strcmp(name, "retrieveobj") == 0) {
-        gDevAutotestSteps = kDevAutotestRetrieveObjectSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestRetrieveObjectSteps) / sizeof(kDevAutotestRetrieveObjectSteps[0]);
-    } else if (strcmp(name, "moveaway") == 0) {
-        gDevAutotestSteps = kDevAutotestMoveAwaySteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestMoveAwaySteps) / sizeof(kDevAutotestMoveAwaySteps[0]);
-    } else if (strcmp(name, "burstfriendly") == 0) {
-        gDevAutotestSteps = kDevAutotestBurstFriendlySteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestBurstFriendlySteps) / sizeof(kDevAutotestBurstFriendlySteps[0]);
-    } else if (strcmp(name, "objectids") == 0) {
-        gDevAutotestSteps = kDevAutotestObjectIdsSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestObjectIdsSteps) / sizeof(kDevAutotestObjectIdsSteps[0]);
-    } else if (strcmp(name, "wieldstack") == 0) {
-        gDevAutotestSteps = kDevAutotestWieldStackSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestWieldStackSteps) / sizeof(kDevAutotestWieldStackSteps[0]);
-    } else if (strcmp(name, "drugpidsfile") == 0) {
-        gDevAutotestSteps = kDevAutotestDrugPidsFileSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestDrugPidsFileSteps) / sizeof(kDevAutotestDrugPidsFileSteps[0]);
-    } else if (strcmp(name, "drugsave") == 0) {
-        gDevAutotestSteps = kDevAutotestDrugSaveSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestDrugSaveSteps) / sizeof(kDevAutotestDrugSaveSteps[0]);
-    } else if (strcmp(name, "barterfixes") == 0) {
-        gDevAutotestSteps = kDevAutotestBarterFixesSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestBarterFixesSteps) / sizeof(kDevAutotestBarterFixesSteps[0]);
-    } else if (strcmp(name, "barterfixesoff") == 0) {
-        gDevAutotestSteps = kDevAutotestBarterFixesOffSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestBarterFixesOffSteps) / sizeof(kDevAutotestBarterFixesOffSteps[0]);
-    } else if (strcmp(name, "orig675") == 0) {
-        gDevAutotestSteps = kDevAutotestOriginal675Steps;
-        gDevAutotestStepCount = sizeof(kDevAutotestOriginal675Steps) / sizeof(kDevAutotestOriginal675Steps[0]);
-    } else if (strcmp(name, "mapageheal") == 0) {
-        gDevAutotestSteps = kDevAutotestMapAgeHealSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestMapAgeHealSteps) / sizeof(kDevAutotestMapAgeHealSteps[0]);
-    } else if (strcmp(name, "partycorpse") == 0) {
-        gDevAutotestSteps = kDevAutotestPartyCorpseSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestPartyCorpseSteps) / sizeof(kDevAutotestPartyCorpseSteps[0]);
-    } else if (strcmp(name, "knockouts") == 0) {
-        gDevAutotestSteps = kDevAutotestKnockoutsSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestKnockoutsSteps) / sizeof(kDevAutotestKnockoutsSteps[0]);
-    } else if (strcmp(name, "bonusmovewalk") == 0) {
-        gDevAutotestSteps = kDevAutotestBonusMoveWalkSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestBonusMoveWalkSteps) / sizeof(kDevAutotestBonusMoveWalkSteps[0]);
-    } else if (strcmp(name, "bonusmoveload") == 0) {
-        gDevAutotestSteps = kDevAutotestBonusMoveLoadSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestBonusMoveLoadSteps) / sizeof(kDevAutotestBonusMoveLoadSteps[0]);
-    } else if (strcmp(name, "apturn") == 0) {
-        gDevAutotestSteps = kDevAutotestApTurnSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestApTurnSteps) / sizeof(kDevAutotestApTurnSteps[0]);
-    } else if (strcmp(name, "crittable") == 0) {
-        gDevAutotestSteps = kDevAutotestCritTableSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestCritTableSteps) / sizeof(kDevAutotestCritTableSteps[0]);
-    } else if (strcmp(name, "talkheal") == 0) {
-        gDevAutotestSteps = kDevAutotestTalkHealSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestTalkHealSteps) / sizeof(kDevAutotestTalkHealSteps[0]);
-    } else if (strcmp(name, "heroselect") == 0) {
-        gDevAutotestSteps = kDevAutotestHeroSelectSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestHeroSelectSteps) / sizeof(kDevAutotestHeroSelectSteps[0]);
-    } else if (strcmp(name, "creationappearance") == 0) {
-        gDevAutotestSteps = kDevAutotestCreationAppearanceSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestCreationAppearanceSteps) / sizeof(kDevAutotestCreationAppearanceSteps[0]);
-    } else if (strcmp(name, "heroappearance") == 0) {
-        gDevAutotestSteps = kDevAutotestHeroAppearanceSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestHeroAppearanceSteps) / sizeof(kDevAutotestHeroAppearanceSteps[0]);
-    } else if (strcmp(name, "retargetleave") == 0) {
-        gDevAutotestSteps = kDevAutotestRetargetLeaveSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestRetargetLeaveSteps) / sizeof(kDevAutotestRetargetLeaveSteps[0]);
-    } else if (strcmp(name, "fleeheal") == 0) {
-        gDevAutotestSteps = kDevAutotestFleeHealSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestFleeHealSteps) / sizeof(kDevAutotestFleeHealSteps[0]);
-    } else if (strcmp(name, "pcparty") == 0) {
-        gDevAutotestSteps = kDevAutotestPcPartySteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestPcPartySteps) / sizeof(kDevAutotestPcPartySteps[0]);
-    } else if (strcmp(name, "testsave") == 0) {
-        gDevAutotestSteps = kDevAutotestTestSaveSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestTestSaveSteps) / sizeof(kDevAutotestTestSaveSteps[0]);
-    } else if (strcmp(name, "loot") == 0) {
-        gDevAutotestSteps = kDevAutotestLootSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestLootSteps) / sizeof(kDevAutotestLootSteps[0]);
     } else if (strcmp(name, "pcbar") == 0) {
         gDevAutotestSteps = kDevAutotestPcBarSteps;
         gDevAutotestStepCount = sizeof(kDevAutotestPcBarSteps) / sizeof(kDevAutotestPcBarSteps[0]);
@@ -4426,9 +4280,6 @@ void devAutotestSetScenario(const char* name)
         gDevAutotestSteps = kDevAutotestCalledShotSteps;
         gDevAutotestStepCount = sizeof(kDevAutotestCalledShotSteps) / sizeof(kDevAutotestCalledShotSteps[0]);
         gDevAutotestTraceItems = true;
-    } else if (strcmp(name, "pcinventory") == 0) {
-        gDevAutotestSteps = kDevAutotestPcInventorySteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestPcInventorySteps) / sizeof(kDevAutotestPcInventorySteps[0]);
     } else if (strcmp(name, "inventorytrace") == 0) {
         // The inventory scenario, with everything it changes after every step.
         gDevAutotestSteps = kDevAutotestInventorySteps;
@@ -4438,39 +4289,6 @@ void devAutotestSetScenario(const char* name)
         gDevAutotestSteps = kDevAutotestLootSteps;
         gDevAutotestStepCount = sizeof(kDevAutotestLootSteps) / sizeof(kDevAutotestLootSteps[0]);
         gDevAutotestTraceItems = true;
-    } else if (strcmp(name, "ammo") == 0) {
-        gDevAutotestSteps = kDevAutotestAmmoSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestAmmoSteps) / sizeof(kDevAutotestAmmoSteps[0]);
-    } else if (strcmp(name, "inventory") == 0) {
-        gDevAutotestSteps = kDevAutotestInventorySteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestInventorySteps) / sizeof(kDevAutotestInventorySteps[0]);
-    } else if (strcmp(name, "bartertrace") == 0) {
-        gDevAutotestSteps = kDevAutotestBarterTraceSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestBarterTraceSteps) / sizeof(kDevAutotestBarterTraceSteps[0]);
-    } else if (strcmp(name, "headtrace") == 0) {
-        gDevAutotestSteps = kDevAutotestHeadTraceSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestHeadTraceSteps) / sizeof(kDevAutotestHeadTraceSteps[0]);
-    } else if (strcmp(name, "dialogtrace") == 0) {
-        gDevAutotestSteps = kDevAutotestDialogTraceSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestDialogTraceSteps) / sizeof(kDevAutotestDialogTraceSteps[0]);
-    } else if (strcmp(name, "barter") == 0) {
-        gDevAutotestSteps = kDevAutotestBarterSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestBarterSteps) / sizeof(kDevAutotestBarterSteps[0]);
-    } else if (strcmp(name, "talk") == 0) {
-        gDevAutotestSteps = kDevAutotestTalkSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestTalkSteps) / sizeof(kDevAutotestTalkSteps[0]);
-    } else if (strcmp(name, "ui") == 0) {
-        gDevAutotestSteps = kDevAutotestUiSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestUiSteps) / sizeof(kDevAutotestUiSteps[0]);
-    } else if (strcmp(name, "tactical") == 0) {
-        gDevAutotestSteps = kDevAutotestTacticalSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestTacticalSteps) / sizeof(kDevAutotestTacticalSteps[0]);
-    } else if (strcmp(name, "icons") == 0) {
-        gDevAutotestSteps = kDevAutotestIconsSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestIconsSteps) / sizeof(kDevAutotestIconsSteps[0]);
-    } else if (strcmp(name, "promoworld") == 0) {
-        gDevAutotestSteps = kDevAutotestPromoWorldSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestPromoWorldSteps) / sizeof(kDevAutotestPromoWorldSteps[0]);
     } else if (strcmp(name, "promo") == 0) {
         gDevAutotestSteps = kDevAutotestPromoSteps;
         gDevAutotestStepCount = sizeof(kDevAutotestPromoSteps) / sizeof(kDevAutotestPromoSteps[0]);
@@ -4496,18 +4314,6 @@ void devAutotestSetScenario(const char* name)
         gDevAutotestDragFrames = 30;
         gDevAutotestDragNatural = true;
         gDevAutotestSaves = DevAutotestSaves::Empty;
-    } else if (strcmp(name, "photos") == 0) {
-        gDevAutotestSteps = kDevAutotestPhotosSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestPhotosSteps) / sizeof(kDevAutotestPhotosSteps[0]);
-    } else if (strcmp(name, "behindcritter") == 0) {
-        gDevAutotestSteps = kDevAutotestBehindCritterSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestBehindCritterSteps) / sizeof(kDevAutotestBehindCritterSteps[0]);
-    } else if (strcmp(name, "magnet") == 0) {
-        gDevAutotestSteps = kDevAutotestMagnetSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestMagnetSteps) / sizeof(kDevAutotestMagnetSteps[0]);
-    } else if (strcmp(name, "hud") == 0) {
-        gDevAutotestSteps = kDevAutotestHudSteps;
-        gDevAutotestStepCount = sizeof(kDevAutotestHudSteps) / sizeof(kDevAutotestHudSteps[0]);
     } else if (strcmp(name, "webperf") == 0) {
         gDevAutotestSteps = kDevAutotestWebPerfSteps;
         gDevAutotestStepCount = sizeof(kDevAutotestWebPerfSteps) / sizeof(kDevAutotestWebPerfSteps[0]);
