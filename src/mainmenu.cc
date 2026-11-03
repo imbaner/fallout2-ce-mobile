@@ -62,7 +62,7 @@ constexpr int mainMenuOverlayDimClearIntensity = 0x10000;
 constexpr int mainMenuOverlayDimAnimationSteps = 5;
 constexpr int mainMenuOverlayDimFrameDelay = 18;
 
-typedef enum MainMenuButton {
+enum MainMenuButton : int {
     MAIN_MENU_BUTTON_INTRO,
     MAIN_MENU_BUTTON_NEW_GAME,
     MAIN_MENU_BUTTON_LOAD_GAME,
@@ -70,7 +70,15 @@ typedef enum MainMenuButton {
     MAIN_MENU_BUTTON_CREDITS,
     MAIN_MENU_BUTTON_EXIT,
     MAIN_MENU_BUTTON_COUNT,
-} MainMenuButton;
+    MAIN_MENU_BUTTON_FIRST = MAIN_MENU_BUTTON_INTRO
+};
+
+inline MainMenuButton operator++(MainMenuButton& e, int)
+{
+    MainMenuButton result = e;
+    e = static_cast<MainMenuButton>(static_cast<int>(e) + 1);
+    return result;
+}
 
 enum class MenuArt {
     Vanilla,
@@ -99,18 +107,18 @@ static unsigned int gMainMenuScreensaverDelay = 120000;
 
 struct MainMenuButtonSpec {
     int keyCode;
-    int returnValue;
+    MainMenuOption returnValue;
     int labelMessage;
 };
 
 // 0x519510 button_values / 0x519528 return_values
 static const MainMenuButtonSpec mainMenuButtonSpecs[MAIN_MENU_BUTTON_COUNT] = {
-    { KEY_LOWERCASE_I, MAIN_MENU_INTRO, 9 },
-    { KEY_LOWERCASE_N, MAIN_MENU_NEW_GAME, 10 },
-    { KEY_LOWERCASE_L, MAIN_MENU_LOAD_GAME, 11 },
-    { KEY_LOWERCASE_O, MAIN_MENU_OPTIONS, 12 },
-    { KEY_LOWERCASE_C, MAIN_MENU_CREDITS, 13 },
-    { KEY_LOWERCASE_E, MAIN_MENU_EXIT, 14 },
+    { KEY_LOWERCASE_I, MainMenuOption::Intro, 9 },
+    { KEY_LOWERCASE_N, MainMenuOption::NewGame, 10 },
+    { KEY_LOWERCASE_L, MainMenuOption::LoadGame, 11 },
+    { KEY_LOWERCASE_O, MainMenuOption::Options, 12 },
+    { KEY_LOWERCASE_C, MainMenuOption::Credits, 13 },
+    { KEY_LOWERCASE_E, MainMenuOption::Exit, 14 },
 };
 
 // 0x614840 buttons
@@ -458,7 +466,7 @@ static bool mainMenuCreateButtons(const MainMenuLayout& layout, const MainMenuOf
         blitBuffer2DScaledTrans(mainMenuButtonPressedFrmImage.getBuffer(), Buffer2D(buttonPressedData, buttonWidth, buttonHeight), 0, 0, buttonWidth, buttonHeight);
     }
 
-    for (int index = 0; index < MAIN_MENU_BUTTON_COUNT; index++) {
+    for (MainMenuButton index = MAIN_MENU_BUTTON_FIRST; index < MAIN_MENU_BUTTON_COUNT; index++) {
         Point buttonPosition = mainMenuTransformPoint(layout, MAIN_MENU_BUTTON_X, MAIN_MENU_BUTTON_Y + index * MAIN_MENU_BUTTON_Y_STEP);
         gMainMenuButtons[index] = buttonCreate(gMainMenuWindow,
             buttonPosition.x + offsets.menuX,
@@ -493,7 +501,7 @@ static void mainMenuDrawButtonLabels(const MainMenuLayout& layout, const MainMen
         fontSettings = static_cast<Color>(fontSettingsSFall & COLOR_LAST) | DRAW_TEXT_FLAG_NONE;
     }
 
-    for (int index = 0; index < MAIN_MENU_BUTTON_COUNT; index++) {
+    for (MainMenuButton index = MAIN_MENU_BUTTON_FIRST; index < MAIN_MENU_BUTTON_COUNT; index++) {
         msg.num = mainMenuButtonSpecs[index].labelMessage;
         if (!messageListGetItem(&gMiscMessageList, &msg)) {
             continue;
@@ -526,7 +534,7 @@ int mainMenuWindowInit()
         return 0;
     }
 
-    for (int index = 0; index < MAIN_MENU_BUTTON_COUNT; index++) {
+    for (MainMenuButton index = MAIN_MENU_BUTTON_FIRST; index < MAIN_MENU_BUTTON_COUNT; index++) {
         gMainMenuButtons[index] = -1;
     }
 
@@ -598,7 +606,7 @@ void mainMenuWindowFree()
 {
     mainMenuDestroySubscreenBackdrop();
 
-    for (int index = 0; index < MAIN_MENU_BUTTON_COUNT; index++) {
+    for (MainMenuButton index = MAIN_MENU_BUTTON_FIRST; index < MAIN_MENU_BUTTON_COUNT; index++) {
         if (gMainMenuButtons[index] != -1) {
             buttonDestroy(gMainMenuButtons[index]);
             gMainMenuButtons[index] = -1;
@@ -820,7 +828,7 @@ int _main_menu_is_enabled()
 }
 
 // 0x481AEC main_menu_loop
-int mainMenuWindowHandleEvents()
+MainMenuOption mainMenuWindowHandleEvents()
 {
     _in_main_menu = true;
 
@@ -831,8 +839,8 @@ int mainMenuWindowHandleEvents()
 
     unsigned int tick = getTicks();
 
-    int rc = -1;
-    while (rc == -1) {
+    MainMenuOption rc = MainMenuOption::Invalid;
+    while (rc == MainMenuOption::Invalid) {
         if (gMainMenuExitRequested) {
             gMainMenuExitRequested = false;
             _game_user_wants_to_quit = GAME_QUIT_REQUEST_EXIT;
@@ -842,7 +850,7 @@ int mainMenuWindowHandleEvents()
 
         int keyCode = inputGetInput();
 
-        for (int buttonIndex = 0; buttonIndex < MAIN_MENU_BUTTON_COUNT; buttonIndex++) {
+        for (MainMenuButton buttonIndex = MAIN_MENU_BUTTON_FIRST; buttonIndex < MAIN_MENU_BUTTON_COUNT; buttonIndex++) {
             int buttonKeyCode = mainMenuButtonSpecs[buttonIndex].keyCode;
             if (keyCode == buttonKeyCode || keyCode == toupper(buttonKeyCode)) {
                 // NOTE: Uninline.
@@ -851,7 +859,7 @@ int mainMenuWindowHandleEvents()
                 rc = mainMenuButtonSpecs[buttonIndex].returnValue;
 
                 if (buttonIndex == MAIN_MENU_BUTTON_CREDITS && (gPressedPhysicalKeys[SDL_SCANCODE_RSHIFT] != KEY_STATE_UP || gPressedPhysicalKeys[SDL_SCANCODE_LSHIFT] != KEY_STATE_UP)) {
-                    rc = MAIN_MENU_QUOTES;
+                    rc = MainMenuOption::Quotes;
                 }
 
                 break;
@@ -859,9 +867,9 @@ int mainMenuWindowHandleEvents()
         }
 
         // Mobile main menu: the tapped button.
-        if (rc == -1 && muiIsEnabled()) {
-            int choice = muiMainMenuTakeChoice();
-            if (choice != -1) {
+        if (rc == MainMenuOption::Invalid && muiIsEnabled()) {
+            MainMenuOption choice = muiMainMenuTakeChoice();
+            if (choice != MainMenuOption::Invalid) {
                 // NOTE: Uninline.
                 main_menu_play_sound("nmselec1");
                 rc = choice;
@@ -869,16 +877,16 @@ int mainMenuWindowHandleEvents()
             }
         }
 
-        if (rc == -1) {
+        if (rc == MainMenuOption::Invalid) {
             if (keyCode == KEY_CTRL_R) {
-                rc = MAIN_MENU_SELFRUN;
+                rc = MainMenuOption::SelfRun;
                 continue;
             } else if (keyCode == KEY_PLUS || keyCode == KEY_EQUAL) {
                 brightnessIncrease();
             } else if (keyCode == KEY_MINUS || keyCode == KEY_UNDERSCORE) {
                 brightnessDecrease();
             } else if (keyCode == KEY_UPPERCASE_D || keyCode == KEY_LOWERCASE_D) {
-                rc = MAIN_MENU_SCREENSAVER;
+                rc = MainMenuOption::ScreenSaver;
                 continue;
             } else if (keyCode == 1111) {
                 if ((mouseGetEvent() & MouseButtonEvent::LeftButtonRepeat) == MouseButtonEvent::None) {
@@ -890,7 +898,7 @@ int mainMenuWindowHandleEvents()
         }
 
         if (keyCode == KEY_ESCAPE || _game_user_wants_to_quit == GAME_QUIT_REQUEST_EXIT) {
-            rc = MAIN_MENU_EXIT;
+            rc = MainMenuOption::Exit;
 
             // NOTE: Uninline.
             main_menu_play_sound("nmselec1");
@@ -901,7 +909,7 @@ int mainMenuWindowHandleEvents()
             // Not on the mobile main menu: a phone left on it would start
             // the intro movie.
             if (!muiIsEnabled() && getTicksSince(tick) >= gMainMenuScreensaverDelay) {
-                rc = MAIN_MENU_TIMEOUT;
+                rc = MainMenuOption::Timeout;
             }
         }
 
@@ -944,7 +952,7 @@ static void main_menu_play_sound(const char* fileName)
 
 static void mainMenuSetButtonsEnabled(bool enabled)
 {
-    for (int index = 0; index < MAIN_MENU_BUTTON_COUNT; index++) {
+    for (MainMenuButton index = MAIN_MENU_BUTTON_FIRST; index < MAIN_MENU_BUTTON_COUNT; index++) {
         if (gMainMenuButtons[index] == -1) {
             continue;
         }

@@ -186,7 +186,7 @@ void gameCommandExecute(const GameCommand& command, bool isInCombatMode)
     case GameCommandType::QuickSave: {
         soundPlayFile("ib1p1xx1");
 
-        int rc = lsgSaveGame(LOAD_SAVE_MODE_QUICK);
+        int rc = lsgSaveGame(LoadSaveMode::Quick);
         if (rc == -1) {
             debugPrint("\n ** Error calling SaveGame()! **\n");
         } else if (rc == 1) {
@@ -200,7 +200,7 @@ void gameCommandExecute(const GameCommand& command, bool isInCombatMode)
     case GameCommandType::QuickLoad: {
         soundPlayFile("ib1p1xx1");
 
-        int rc = lsgLoadGame(LOAD_SAVE_MODE_QUICK);
+        int rc = lsgLoadGame(LoadSaveMode::Quick);
         if (rc == -1) {
             debugPrint("\n ** Error calling LoadGame()! **\n");
         } else if (rc == 1) {

@@ -8,16 +8,11 @@
 
 namespace fallout {
 
-typedef enum LoadSaveMode {
-    // Special case - loading game from main menu.
-    LOAD_SAVE_MODE_FROM_MAIN_MENU,
-
-    // Normal (full-screen) save/load screen.
-    LOAD_SAVE_MODE_NORMAL,
-
-    // Quick load/save.
-    LOAD_SAVE_MODE_QUICK,
-} LoadSaveMode;
+enum class LoadSaveMode : int {
+    FromMainMenu, // Special case - loading game from main menu.
+    Normal, // Normal (full-screen) save/load screen.
+    Quick, // Quick load/save.
+};
 
 void _InitLoadSave();
 #ifdef __EMSCRIPTEN__
@@ -26,13 +21,13 @@ bool lsgWebCommitUserChanges(bool prepared, int previousSession = -1);
 void lsgWebRestoreQuickRange(int previousCount, int previousSession);
 #endif
 void _ResetLoadSave();
-int lsgSaveGame(int mode);
+int lsgSaveGame(LoadSaveMode mode);
 // CE: Saves to [slot] (0-based) with [description] without the save window,
 // like a quick save (automated tests).
 int lsgSaveGameToSlot(int slot, const char* description);
 // CE: Loads [slot] (0-based) without the load window (automated tests).
 int lsgLoadGameFromSlot(int slot);
-int lsgLoadGame(int mode);
+int lsgLoadGame(LoadSaveMode mode);
 
 // CE: Saves for the mobile save/load screen (mui_loadsave.cc), opened by
 // `lsgSaveGame` / `lsgLoadGame` under the mobile UI. Slots are the game's

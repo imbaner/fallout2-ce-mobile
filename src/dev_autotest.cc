@@ -7786,13 +7786,13 @@ void devAutotestTick()
             break;
         }
         case DEV_AUTOTEST_ACTION_QUICK_SAVE:
-            if (lsgSaveGame(LOAD_SAVE_MODE_QUICK) != 1) {
+            if (lsgSaveGame(LoadSaveMode::Quick) != 1) {
                 devAutotestLog("FAIL: quick save\n");
                 exit(EXIT_FAILURE);
             }
             break;
         case DEV_AUTOTEST_ACTION_QUICK_LOAD:
-            if (lsgLoadGame(LOAD_SAVE_MODE_QUICK) != 1) {
+            if (lsgLoadGame(LoadSaveMode::Quick) != 1) {
                 devAutotestLog("FAIL: quick load\n");
                 exit(EXIT_FAILURE);
             }

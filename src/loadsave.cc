@@ -120,26 +120,26 @@ namespace fallout {
 typedef int LoadGameHandler(File* stream);
 typedef int SaveGameHandler(File* stream);
 
-typedef enum LoadSaveWindowType {
-    LOAD_SAVE_WINDOW_TYPE_SAVE_GAME,
-    LOAD_SAVE_WINDOW_TYPE_PICK_QUICK_SAVE_SLOT,
-    LOAD_SAVE_WINDOW_TYPE_LOAD_GAME,
-    LOAD_SAVE_WINDOW_TYPE_LOAD_GAME_FROM_MAIN_MENU,
-    LOAD_SAVE_WINDOW_TYPE_PICK_QUICK_LOAD_SLOT,
-} LoadSaveWindowType;
+enum class LoadSaveWindowType : int {
+    SaveGame,
+    PickQuickSaveSlot,
+    LoadGame,
+    LoadGameFromMainMenu,
+    PickQuickLoadSlot,
+};
 
-typedef enum LoadSaveSlotState {
-    SLOT_STATE_EMPTY,
-    SLOT_STATE_OCCUPIED,
-    SLOT_STATE_ERROR,
-    SLOT_STATE_UNSUPPORTED_VERSION,
-} LoadSaveSlotState;
+enum class LoadSaveSlotState : int {
+    Empty,
+    Occupied,
+    Error,
+    UnsupportedVersion,
+};
 
-typedef enum LoadSaveScrollDirection {
-    LOAD_SAVE_SCROLL_DIRECTION_NONE,
-    LOAD_SAVE_SCROLL_DIRECTION_UP,
-    LOAD_SAVE_SCROLL_DIRECTION_DOWN,
-} LoadSaveScrollDirection;
+enum class LoadSaveScrollDirection : int {
+    None,
+    Up,
+    Down,
+};
 
 static void loadSaveMessageListReset();
 
@@ -180,8 +180,8 @@ typedef enum LoadSaveFrm {
 } LoadSaveFrm;
 
 static int _QuickSnapShot();
-static int lsgWindowInit(int windowType);
-static int lsgWindowFree(int windowType);
+static int lsgWindowInit(LoadSaveWindowType windowType);
+static int lsgWindowFree(LoadSaveWindowType windowType);
 static int lsgPerformSaveGame();
 static int lsgWriteGameFiles();
 static bool loadSaveMessageListLoad();
@@ -198,7 +198,7 @@ static int lsgSaveHeaderInSlot(int slot);
 static int lsgLoadHeaderInSlot(int slot);
 static int _GetSlotList();
 static void loadSaveLoadSlotPage(int page);
-static void _ShowSlotList(int windowType);
+static void _ShowSlotList(LoadSaveWindowType windowType);
 static void _DrawInfoBox(int slot);
 static int _LoadTumbSlot(int slot);
 static int _GetComment(int slot);
@@ -335,7 +335,7 @@ static MessageList gLoadSaveMessageList;
 static LoadSaveSlotData _LSData[saveLoadTotalSlots];
 
 // 0x614280 LSstatus
-static int _LSstatus[saveLoadTotalSlots];
+static LoadSaveSlotState _LSstatus[saveLoadTotalSlots];
 static bool gLoadSaveSlotPageLoaded[saveLoadPages];
 
 // 0x6142A8 thumbnail_image
@@ -699,7 +699,7 @@ static int lsgNextQuickSaveSlot()
 
 // SaveGame
 // 0x47B88C
-int lsgSaveGame(int mode)
+int lsgSaveGame(LoadSaveMode mode)
 {
     ScopedGameMode gm(GameMode::kSaveGame);
 
@@ -716,7 +716,7 @@ int lsgSaveGame(int mode)
     // CE: The mobile UI has no slot picked by a previous quick save (saves
     // aren't overwritten from it): without automatic quick saves every quick
     // save opens the save screen.
-    if (mode == LOAD_SAVE_MODE_QUICK && (autoQuickSaveSlots || (!muiIsEnabled() && _quick_done))) {
+    if (mode == LoadSaveMode::Quick && (autoQuickSaveSlots || (!muiIsEnabled() && _quick_done))) {
         if (!loadSaveMessageListLoad()) {
             return -1;
         }
@@ -755,13 +755,13 @@ int lsgSaveGame(int mode)
         return lsgMobileScreenRun(true, false);
     }
 
-    touch_set_touchscreen_mode(mode == LOAD_SAVE_MODE_NORMAL);
+    touch_set_touchscreen_mode(mode == LoadSaveMode::Normal);
 
     _quick_done = false;
 
-    int windowType = mode == LOAD_SAVE_MODE_QUICK
-        ? LOAD_SAVE_WINDOW_TYPE_PICK_QUICK_SAVE_SLOT
-        : LOAD_SAVE_WINDOW_TYPE_SAVE_GAME;
+    LoadSaveWindowType windowType = mode == LoadSaveMode::Quick
+        ? LoadSaveWindowType::PickQuickSaveSlot
+        : LoadSaveWindowType::SaveGame;
     if (lsgWindowInit(windowType) == -1) {
         debugPrint("\nLOADSAVE: ** Error loading save game screen data! **\n");
         return -1;
@@ -790,15 +790,15 @@ int lsgSaveGame(int mode)
         };
         showDialogBox(_str0, body, 2, 169, 116, COLOR_AMBER, nullptr, COLOR_AMBER, DIALOG_BOX_LARGE);
 
-        lsgWindowFree(0);
+        lsgWindowFree(LoadSaveWindowType::SaveGame);
 
         return -1;
     }
 
     switch (_LSstatus[_slot_cursor]) {
-    case SLOT_STATE_EMPTY:
-    case SLOT_STATE_ERROR:
-    case SLOT_STATE_UNSUPPORTED_VERSION:
+    case LoadSaveSlotState::Empty:
+    case LoadSaveSlotState::Error:
+    case LoadSaveSlotState::UnsupportedVersion:
         blitBufferToBuffer(_snapshotBuf,
             LS_PREVIEW_WIDTH - 1,
             LS_PREVIEW_HEIGHT - 1,
@@ -817,7 +817,7 @@ int lsgSaveGame(int mode)
         break;
     }
 
-    _ShowSlotList(LOAD_SAVE_WINDOW_TYPE_SAVE_GAME);
+    _ShowSlotList(LoadSaveWindowType::SaveGame);
     _DrawInfoBox(_slot_cursor);
     windowRefresh(gLoadSaveWindow);
 
@@ -831,7 +831,7 @@ int lsgSaveGame(int mode)
         unsigned int tick = getTicks();
         int keyCode = inputGetInput();
         bool selectionChanged = false;
-        int scrollDirection = LOAD_SAVE_SCROLL_DIRECTION_NONE;
+        LoadSaveScrollDirection scrollDirection = LoadSaveScrollDirection::None;
 
         convertMouseWheelToArrowKey(&keyCode);
 
@@ -845,7 +845,7 @@ int lsgSaveGame(int mode)
                         // Move to the previous page and set cursor to the last slot on that page
                         _currentSlotPage--;
                         _slot_cursor--;
-                        _ShowSlotList(LOAD_SAVE_WINDOW_TYPE_SAVE_GAME);
+                        _ShowSlotList(LoadSaveWindowType::SaveGame);
                         windowRefresh(gLoadSaveWindow);
                     } else {
                         // Normal movement within the page
@@ -863,7 +863,7 @@ int lsgSaveGame(int mode)
                         // Move to the next page and set cursor to the first slot on that page
                         _currentSlotPage++;
                         _slot_cursor++;
-                        _ShowSlotList(LOAD_SAVE_WINDOW_TYPE_SAVE_GAME);
+                        _ShowSlotList(LoadSaveWindowType::SaveGame);
                         windowRefresh(gLoadSaveWindow);
                     } else {
                         // Normal movement within the page
@@ -894,11 +894,11 @@ int lsgSaveGame(int mode)
                 doubleClickSlot = -1;
                 break;
             case 506:
-                scrollDirection = LOAD_SAVE_SCROLL_DIRECTION_UP;
+                scrollDirection = LoadSaveScrollDirection::Up;
                 break;
 
             case 504:
-                scrollDirection = LOAD_SAVE_SCROLL_DIRECTION_DOWN;
+                scrollDirection = LoadSaveScrollDirection::Down;
                 break;
 
             case KEY_ARROW_RIGHT:
@@ -909,7 +909,7 @@ int lsgSaveGame(int mode)
 
                 int pageDelta = loadSavePageDeltaForInput(keyCode, mouseX, mouseY);
                 if (pageDelta != 0) {
-                    if (loadSaveChangePage(pageDelta, LOAD_SAVE_WINDOW_TYPE_SAVE_GAME)) {
+                    if (loadSaveChangePage(pageDelta, LoadSaveWindowType::SaveGame)) {
                         selectionChanged = true;
                         doubleClickSlot = -1;
                     }
@@ -939,7 +939,7 @@ int lsgSaveGame(int mode)
 
                 selectionChanged = true;
                 doubleClickSlot = _slot_cursor;
-                scrollDirection = LOAD_SAVE_SCROLL_DIRECTION_NONE;
+                scrollDirection = LoadSaveScrollDirection::None;
             } break;
 
             case KEY_CTRL_Q:
@@ -966,7 +966,7 @@ int lsgSaveGame(int mode)
         }
 
         if (keyCode == kLoadSaveActionDone) {
-            if (_LSstatus[_slot_cursor] == SLOT_STATE_OCCUPIED) {
+            if (_LSstatus[_slot_cursor] == LoadSaveSlotState::Occupied) {
                 rc = 1;
                 // Save game already exists, overwrite?
                 const char* title = getmsg(&gLoadSaveMessageList, &gLoadSaveMessageListItem, 131);
@@ -978,10 +978,10 @@ int lsgSaveGame(int mode)
             }
 
             selectionChanged = true;
-            scrollDirection = LOAD_SAVE_SCROLL_DIRECTION_NONE;
+            scrollDirection = LoadSaveScrollDirection::None;
         }
 
-        if (scrollDirection) {
+        if (scrollDirection != LoadSaveScrollDirection::None) {
             unsigned int scrollVelocity = 4;
             bool isScrolling = false;
             int scrollCounter = 0;
@@ -1001,28 +1001,28 @@ int lsgSaveGame(int mode)
                         }
                     }
                     // handle scrolling between pages via buttons
-                    if (scrollDirection == LOAD_SAVE_SCROLL_DIRECTION_UP) {
+                    if (scrollDirection == LoadSaveScrollDirection::Up) {
                         _slot_cursor--;
 
                         // If moving up past the first slot of the page, go to the previous page
                         if (_slot_cursor < _currentSlotPage * 10) {
                             if (_currentSlotPage > 0) {
                                 _currentSlotPage--;
-                                _ShowSlotList(LOAD_SAVE_WINDOW_TYPE_LOAD_GAME);
+                                _ShowSlotList(LoadSaveWindowType::LoadGame);
                                 windowRefresh(gLoadSaveWindow);
                                 _slot_cursor = (_currentSlotPage * 10) + 9; // Move to the last slot of the previous page
                             } else {
                                 _slot_cursor = 0; // Prevent underflow
                             }
                         }
-                    } else { // LOAD_SAVE_SCROLL_DIRECTION_DOWN
+                    } else { // Down
                         _slot_cursor++;
 
                         // If moving down past the last slot of the page, go to the next page
                         if (_slot_cursor > (_currentSlotPage * 10) + 9) {
                             if (_currentSlotPage < (saveLoadTotalSlots / 10) - 1) { // Max pages: 0-9
                                 _currentSlotPage++;
-                                _ShowSlotList(LOAD_SAVE_WINDOW_TYPE_LOAD_GAME);
+                                _ShowSlotList(LoadSaveWindowType::LoadGame);
                                 windowRefresh(gLoadSaveWindow);
                                 _slot_cursor = _currentSlotPage * 10; // Move to the first slot of the next page
                             } else {
@@ -1035,8 +1035,8 @@ int lsgSaveGame(int mode)
                     // other switches do.
                     // fixed to match load screen 'thumbnail'/'blank' updating
                     switch (_LSstatus[_slot_cursor]) {
-                    case SLOT_STATE_EMPTY:
-                    case SLOT_STATE_ERROR:
+                    case LoadSaveSlotState::Empty:
+                    case LoadSaveSlotState::Error:
                         blitBufferToBuffer(_loadsaveFrmImages[LOAD_SAVE_FRM_PREVIEW_COVER].getData(),
                             _loadsaveFrmImages[LOAD_SAVE_FRM_PREVIEW_COVER].getWidth(),
                             _loadsaveFrmImages[LOAD_SAVE_FRM_PREVIEW_COVER].getHeight(),
@@ -1061,7 +1061,7 @@ int lsgSaveGame(int mode)
                         break;
                     }
 
-                    _ShowSlotList(LOAD_SAVE_WINDOW_TYPE_SAVE_GAME);
+                    _ShowSlotList(LoadSaveWindowType::SaveGame);
                     _DrawInfoBox(_slot_cursor);
                     windowRefresh(gLoadSaveWindow);
                 }
@@ -1082,9 +1082,9 @@ int lsgSaveGame(int mode)
             if (selectionChanged) {
                 // fixed to match load screen 'thumbnail'/'blank' updating
                 switch (_LSstatus[_slot_cursor]) {
-                case SLOT_STATE_EMPTY:
-                case SLOT_STATE_ERROR:
-                case SLOT_STATE_UNSUPPORTED_VERSION:
+                case LoadSaveSlotState::Empty:
+                case LoadSaveSlotState::Error:
+                case LoadSaveSlotState::UnsupportedVersion:
                     blitBufferToBuffer(_loadsaveFrmImages[LOAD_SAVE_FRM_PREVIEW_COVER].getData(),
                         _loadsaveFrmImages[LOAD_SAVE_FRM_PREVIEW_COVER].getWidth(),
                         _loadsaveFrmImages[LOAD_SAVE_FRM_PREVIEW_COVER].getHeight(),
@@ -1110,7 +1110,7 @@ int lsgSaveGame(int mode)
                 }
 
                 _DrawInfoBox(_slot_cursor);
-                _ShowSlotList(LOAD_SAVE_WINDOW_TYPE_SAVE_GAME);
+                _ShowSlotList(LoadSaveWindowType::SaveGame);
             }
 
             windowRefresh(gLoadSaveWindow);
@@ -1182,15 +1182,15 @@ int lsgSaveGame(int mode)
                         };
                         showDialogBox(_str0, body, 2, 169, 116, COLOR_AMBER, nullptr, COLOR_AMBER, DIALOG_BOX_LARGE);
 
-                        lsgWindowFree(0);
+                        lsgWindowFree(LoadSaveWindowType::SaveGame);
 
                         return -1;
                     }
                     // fixed to match load screen 'thumbnail'/'blank' updating
                     switch (_LSstatus[_slot_cursor]) {
-                    case SLOT_STATE_EMPTY:
-                    case SLOT_STATE_ERROR:
-                    case SLOT_STATE_UNSUPPORTED_VERSION:
+                    case LoadSaveSlotState::Empty:
+                    case LoadSaveSlotState::Error:
+                    case LoadSaveSlotState::UnsupportedVersion:
                         blitBufferToBuffer(_loadsaveFrmImages[LOAD_SAVE_FRM_PREVIEW_COVER].getData(),
                             _loadsaveFrmImages[LOAD_SAVE_FRM_PREVIEW_COVER].getWidth(),
                             _loadsaveFrmImages[LOAD_SAVE_FRM_PREVIEW_COVER].getHeight(),
@@ -1215,7 +1215,7 @@ int lsgSaveGame(int mode)
                         break;
                     }
 
-                    _ShowSlotList(LOAD_SAVE_WINDOW_TYPE_SAVE_GAME);
+                    _ShowSlotList(LoadSaveWindowType::SaveGame);
                     _DrawInfoBox(_slot_cursor);
                     windowRefresh(gLoadSaveWindow);
                     _dbleclkcntr = 24;
@@ -1230,13 +1230,13 @@ int lsgSaveGame(int mode)
 
     gameMouseSetCursor(MOUSE_CURSOR_ARROW);
 
-    lsgWindowFree(LOAD_SAVE_WINDOW_TYPE_SAVE_GAME);
+    lsgWindowFree(LoadSaveWindowType::SaveGame);
 
     pipboyMessageListFree();
 
     tileWindowRefresh();
 
-    if (mode == LOAD_SAVE_MODE_QUICK) {
+    if (mode == LoadSaveMode::Quick) {
         if (rc == 1) {
             _quick_done = true;
         }
@@ -1285,7 +1285,7 @@ static int _QuickSnapShot()
 
 // LoadGame
 // 0x47C640
-int lsgLoadGame(int mode)
+int lsgLoadGame(LoadSaveMode mode)
 {
     ScopedGameMode gm(GameMode::kLoadGame);
 
@@ -1300,7 +1300,7 @@ int lsgLoadGame(int mode)
     _patches = settings.system.master_patches_path.c_str();
 
     int sessionSlot = gSaveCatalog.sessionTarget();
-    if (mode == LOAD_SAVE_MODE_QUICK && sessionSlot >= 0) {
+    if (mode == LoadSaveMode::Quick && sessionSlot >= 0) {
         _slot_cursor = sessionSlot;
         int quickSaveWindowX = (screenGetWidth() - LS_WINDOW_WIDTH) / 2;
         int quickSaveWindowY = (screenGetHeight() - LS_WINDOW_HEIGHT) / 2;
@@ -1351,23 +1351,23 @@ int lsgLoadGame(int mode)
 
     _quick_done = false;
 
-    int windowType;
+    LoadSaveWindowType windowType;
     switch (mode) {
-    case LOAD_SAVE_MODE_FROM_MAIN_MENU:
-        windowType = LOAD_SAVE_WINDOW_TYPE_LOAD_GAME_FROM_MAIN_MENU;
+    case LoadSaveMode::FromMainMenu:
+        windowType = LoadSaveWindowType::LoadGameFromMainMenu;
         break;
-    case LOAD_SAVE_MODE_NORMAL:
-        windowType = LOAD_SAVE_WINDOW_TYPE_LOAD_GAME;
+    case LoadSaveMode::Normal:
+        windowType = LoadSaveWindowType::LoadGame;
         break;
-    case LOAD_SAVE_MODE_QUICK:
-        windowType = LOAD_SAVE_WINDOW_TYPE_PICK_QUICK_LOAD_SLOT;
+    case LoadSaveMode::Quick:
+        windowType = LoadSaveWindowType::PickQuickLoadSlot;
         break;
     default:
         assert(false && "Should be unreachable");
     }
 
     int devAutoloadSlot = -1;
-    if (mode == LOAD_SAVE_MODE_FROM_MAIN_MENU && gDevLoadGameSlot != -1) {
+    if (mode == LoadSaveMode::FromMainMenu && gDevLoadGameSlot != -1) {
         devAutoloadSlot = gDevLoadGameSlot;
         gDevLoadGameSlot = -1;
     }
@@ -1375,8 +1375,8 @@ int lsgLoadGame(int mode)
     if (muiIsEnabled()) {
         int rc = devAutoloadSlot != -1
             ? lsgMobileDevLoad(devAutoloadSlot)
-            : lsgMobileScreenRun(false, mode == LOAD_SAVE_MODE_FROM_MAIN_MENU);
-        if (rc == 1 && mode == LOAD_SAVE_MODE_FROM_MAIN_MENU) {
+            : lsgMobileScreenRun(false, mode == LoadSaveMode::FromMainMenu);
+        if (rc == 1 && mode == LoadSaveMode::FromMainMenu) {
             // The title menu fades the game's indexed palette to black.
             // The classic picker restores it before play; the mobile picker
             // returns here: the colors are loaded, the main menu's loop
@@ -1386,7 +1386,7 @@ int lsgLoadGame(int mode)
         return rc;
     }
 
-    touch_set_touchscreen_mode(windowType == LOAD_SAVE_WINDOW_TYPE_LOAD_GAME || windowType == LOAD_SAVE_WINDOW_TYPE_LOAD_GAME_FROM_MAIN_MENU);
+    touch_set_touchscreen_mode(windowType == LoadSaveWindowType::LoadGame || windowType == LoadSaveWindowType::LoadGameFromMainMenu);
 
     if (lsgWindowInit(windowType) == -1) {
         debugPrint("\nLOADSAVE: ** Error loading save game screen data! **\n");
@@ -1399,7 +1399,7 @@ int lsgLoadGame(int mode)
         gameMouseSetCursor(MOUSE_CURSOR_ARROW);
         windowRefresh(gLoadSaveWindow);
         renderPresent();
-        if (mode == LOAD_SAVE_MODE_FROM_MAIN_MENU) {
+        if (mode == LoadSaveMode::FromMainMenu) {
             mainMenuShowSubscreen(true);
         }
         soundPlayFile("iisxxxx1");
@@ -1418,7 +1418,7 @@ int lsgLoadGame(int mode)
             _slot_cursor = devAutoloadSlot;
             _currentSlotPage = devAutoloadSlot / slotsPerPage;
             loadSaveLoadSlotPage(_currentSlotPage);
-            if (_LSstatus[_slot_cursor] == SLOT_STATE_OCCUPIED) {
+            if (_LSstatus[_slot_cursor] == LoadSaveSlotState::Occupied) {
                 devAutoloadPending = true;
             } else {
                 debugPrint("LOADSAVE: dev load slot %d is not occupied\n", _slot_cursor + 1);
@@ -1429,9 +1429,9 @@ int lsgLoadGame(int mode)
     }
 
     switch (_LSstatus[_slot_cursor]) {
-    case SLOT_STATE_EMPTY:
-    case SLOT_STATE_ERROR:
-    case SLOT_STATE_UNSUPPORTED_VERSION:
+    case LoadSaveSlotState::Empty:
+    case LoadSaveSlotState::Error:
+    case LoadSaveSlotState::UnsupportedVersion:
         blitBufferToBuffer(_loadsaveFrmImages[LOAD_SAVE_FRM_PREVIEW_COVER].getData(),
             _loadsaveFrmImages[LOAD_SAVE_FRM_PREVIEW_COVER].getWidth(),
             _loadsaveFrmImages[LOAD_SAVE_FRM_PREVIEW_COVER].getHeight(),
@@ -1450,11 +1450,11 @@ int lsgLoadGame(int mode)
         break;
     }
 
-    _ShowSlotList(LOAD_SAVE_WINDOW_TYPE_LOAD_GAME);
+    _ShowSlotList(LoadSaveWindowType::LoadGame);
     _DrawInfoBox(_slot_cursor);
     windowRefresh(gLoadSaveWindow);
     renderPresent();
-    if (mode == LOAD_SAVE_MODE_FROM_MAIN_MENU) {
+    if (mode == LoadSaveMode::FromMainMenu) {
         mainMenuShowSubscreen(true);
     }
     _dbleclkcntr = 24;
@@ -1469,7 +1469,7 @@ int lsgLoadGame(int mode)
         int keyCode = devAutoloadPending ? kLoadSaveActionDone : inputGetInput();
         devAutoloadPending = false;
         bool selectionChanged = false;
-        int scrollDirection = LOAD_SAVE_SCROLL_DIRECTION_NONE;
+        LoadSaveScrollDirection scrollDirection = LoadSaveScrollDirection::None;
 
         convertMouseWheelToArrowKey(&keyCode);
 
@@ -1483,7 +1483,7 @@ int lsgLoadGame(int mode)
                         // Move to the previous page and set cursor to the last slot on that page
                         _currentSlotPage--;
                         _slot_cursor--;
-                        _ShowSlotList(LOAD_SAVE_WINDOW_TYPE_LOAD_GAME);
+                        _ShowSlotList(LoadSaveWindowType::LoadGame);
                         windowRefresh(gLoadSaveWindow);
                     } else {
                         // Normal movement within the page
@@ -1501,7 +1501,7 @@ int lsgLoadGame(int mode)
                         // Move to the next page and set cursor to the first slot on that page
                         _currentSlotPage++;
                         _slot_cursor++;
-                        _ShowSlotList(LOAD_SAVE_WINDOW_TYPE_LOAD_GAME);
+                        _ShowSlotList(LoadSaveWindowType::LoadGame);
                         windowRefresh(gLoadSaveWindow);
                     } else {
                         // Normal movement within the page
@@ -1532,10 +1532,10 @@ int lsgLoadGame(int mode)
                 doubleClickSlot = -1;
                 break;
             case 506:
-                scrollDirection = LOAD_SAVE_SCROLL_DIRECTION_UP;
+                scrollDirection = LoadSaveScrollDirection::Up;
                 break;
             case 504:
-                scrollDirection = LOAD_SAVE_SCROLL_DIRECTION_DOWN;
+                scrollDirection = LoadSaveScrollDirection::Down;
                 break;
             case KEY_ARROW_RIGHT:
             case KEY_ARROW_LEFT:
@@ -1545,7 +1545,7 @@ int lsgLoadGame(int mode)
 
                 int pageDelta = loadSavePageDeltaForInput(keyCode, mouseX, mouseY);
                 if (pageDelta != 0) {
-                    if (loadSaveChangePage(pageDelta, LOAD_SAVE_WINDOW_TYPE_LOAD_GAME)) {
+                    if (loadSaveChangePage(pageDelta, LoadSaveWindowType::LoadGame)) {
                         selectionChanged = true;
                         doubleClickSlot = -1;
                     }
@@ -1575,7 +1575,7 @@ int lsgLoadGame(int mode)
 
                 selectionChanged = true;
                 doubleClickSlot = _slot_cursor;
-                scrollDirection = LOAD_SAVE_SCROLL_DIRECTION_NONE;
+                scrollDirection = LoadSaveScrollDirection::None;
             } break;
 
             case KEY_MINUS:
@@ -1601,17 +1601,17 @@ int lsgLoadGame(int mode)
         }
 
         if (keyCode == kLoadSaveActionDone) {
-            if (_LSstatus[_slot_cursor] != SLOT_STATE_EMPTY) {
+            if (_LSstatus[_slot_cursor] != LoadSaveSlotState::Empty) {
                 rc = 1;
             } else {
                 rc = -1;
             }
 
             selectionChanged = true;
-            scrollDirection = LOAD_SAVE_SCROLL_DIRECTION_NONE;
+            scrollDirection = LoadSaveScrollDirection::None;
         }
 
-        if (scrollDirection != LOAD_SAVE_SCROLL_DIRECTION_NONE) {
+        if (scrollDirection != LoadSaveScrollDirection::None) {
             unsigned int scrollVelocity = 4;
             bool isScrolling = false;
             int scrollCounter = 0;
@@ -1631,21 +1631,21 @@ int lsgLoadGame(int mode)
                         }
                     }
                     // handle scrolling between pages via buttons
-                    if (scrollDirection == LOAD_SAVE_SCROLL_DIRECTION_UP) {
+                    if (scrollDirection == LoadSaveScrollDirection::Up) {
                         _slot_cursor--;
 
                         // If moving up past the first slot of the page, go to the previous page
                         if (_slot_cursor < _currentSlotPage * 10) {
                             if (_currentSlotPage > 0) {
                                 _currentSlotPage--;
-                                _ShowSlotList(LOAD_SAVE_WINDOW_TYPE_LOAD_GAME);
+                                _ShowSlotList(LoadSaveWindowType::LoadGame);
                                 windowRefresh(gLoadSaveWindow);
                                 _slot_cursor = (_currentSlotPage * 10) + 9; // Move to the last slot of the previous page
                             } else {
                                 _slot_cursor = 0; // Don't go under
                             }
                         }
-                    } else { // LOAD_SAVE_SCROLL_DIRECTION_DOWN
+                    } else { // Down
                         soundPlayFile("ib1p1xx1");
                         _slot_cursor++;
 
@@ -1653,7 +1653,7 @@ int lsgLoadGame(int mode)
                         if (_slot_cursor > (_currentSlotPage * 10) + 9) {
                             if (_currentSlotPage < (saveLoadTotalSlots / 10) - 1) { // Max pages: 0-9
                                 _currentSlotPage++;
-                                _ShowSlotList(LOAD_SAVE_WINDOW_TYPE_LOAD_GAME);
+                                _ShowSlotList(LoadSaveWindowType::LoadGame);
                                 windowRefresh(gLoadSaveWindow);
                                 _slot_cursor = _currentSlotPage * 10; // Move to the first slot of the next page
                             } else {
@@ -1663,9 +1663,9 @@ int lsgLoadGame(int mode)
                     }
 
                     switch (_LSstatus[_slot_cursor]) {
-                    case SLOT_STATE_EMPTY:
-                    case SLOT_STATE_ERROR:
-                    case SLOT_STATE_UNSUPPORTED_VERSION:
+                    case LoadSaveSlotState::Empty:
+                    case LoadSaveSlotState::Error:
+                    case LoadSaveSlotState::UnsupportedVersion:
                         blitBufferToBuffer(_loadsaveFrmImages[LOAD_SAVE_FRM_PREVIEW_COVER].getData(),
                             _loadsaveFrmImages[LOAD_SAVE_FRM_PREVIEW_COVER].getWidth(),
                             _loadsaveFrmImages[LOAD_SAVE_FRM_PREVIEW_COVER].getHeight(),
@@ -1690,7 +1690,7 @@ int lsgLoadGame(int mode)
                         break;
                     }
 
-                    _ShowSlotList(LOAD_SAVE_WINDOW_TYPE_LOAD_GAME);
+                    _ShowSlotList(LoadSaveWindowType::LoadGame);
                     _DrawInfoBox(_slot_cursor);
                     windowRefresh(gLoadSaveWindow);
                 }
@@ -1710,9 +1710,9 @@ int lsgLoadGame(int mode)
         } else {
             if (selectionChanged) {
                 switch (_LSstatus[_slot_cursor]) {
-                case SLOT_STATE_EMPTY:
-                case SLOT_STATE_ERROR:
-                case SLOT_STATE_UNSUPPORTED_VERSION:
+                case LoadSaveSlotState::Empty:
+                case LoadSaveSlotState::Error:
+                case LoadSaveSlotState::UnsupportedVersion:
                     blitBufferToBuffer(_loadsaveFrmImages[LOAD_SAVE_FRM_PREVIEW_COVER].getData(),
                         _loadsaveFrmImages[LOAD_SAVE_FRM_PREVIEW_COVER].getWidth(),
                         _loadsaveFrmImages[LOAD_SAVE_FRM_PREVIEW_COVER].getHeight(),
@@ -1738,7 +1738,7 @@ int lsgLoadGame(int mode)
                 }
 
                 _DrawInfoBox(_slot_cursor);
-                _ShowSlotList(LOAD_SAVE_WINDOW_TYPE_LOAD_GAME);
+                _ShowSlotList(LoadSaveWindowType::LoadGame);
             }
 
             windowRefresh(gLoadSaveWindow);
@@ -1752,7 +1752,7 @@ int lsgLoadGame(int mode)
 
         if (rc == 1) {
             switch (_LSstatus[_slot_cursor]) {
-            case SLOT_STATE_UNSUPPORTED_VERSION:
+            case LoadSaveSlotState::UnsupportedVersion:
                 soundPlayFile("iisxxxx1");
                 stringCopy(_str0, getmsg(&gLoadSaveMessageList, &gLoadSaveMessageListItem, 134));
                 stringCopy(_str1, getmsg(&gLoadSaveMessageList, &gLoadSaveMessageListItem, 136));
@@ -1760,7 +1760,7 @@ int lsgLoadGame(int mode)
                 showDialogBox(_str0, body, 2, 169, 116, COLOR_AMBER, nullptr, COLOR_AMBER, DIALOG_BOX_LARGE);
                 rc = -1;
                 break;
-            case SLOT_STATE_ERROR:
+            case LoadSaveSlotState::Error:
                 soundPlayFile("iisxxxx1");
                 stringCopy(_str0, getmsg(&gLoadSaveMessageList, &gLoadSaveMessageListItem, 134));
                 stringCopy(_str1, getmsg(&gLoadSaveMessageList, &gLoadSaveMessageListItem, 136));
@@ -1787,17 +1787,17 @@ int lsgLoadGame(int mode)
         sharedFpsLimiter.throttle();
     }
 
-    if (mode == LOAD_SAVE_MODE_FROM_MAIN_MENU && rc == 0) {
+    if (mode == LoadSaveMode::FromMainMenu && rc == 0) {
         mainMenuFadeOutForMenuReturn(true);
     }
 
-    lsgWindowFree(mode == LOAD_SAVE_MODE_FROM_MAIN_MENU
-            ? LOAD_SAVE_WINDOW_TYPE_LOAD_GAME_FROM_MAIN_MENU
-            : LOAD_SAVE_WINDOW_TYPE_LOAD_GAME);
+    lsgWindowFree(mode == LoadSaveMode::FromMainMenu
+            ? LoadSaveWindowType::LoadGameFromMainMenu
+            : LoadSaveWindowType::LoadGame);
 
     pipboyMessageListFree();
 
-    if (mode == LOAD_SAVE_MODE_QUICK) {
+    if (mode == LoadSaveMode::Quick) {
         if (rc == 1) {
             _quick_done = true;
         }
@@ -1817,7 +1817,7 @@ int lsgGetTotalSlotCount()
 }
 
 // 0x47D2E4
-static int lsgWindowInit(int windowType)
+static int lsgWindowInit(LoadSaveWindowType windowType)
 {
     gLoadSaveWindowOldFont = fontGetCurrent();
     fontSetCurrent(103);
@@ -1843,7 +1843,7 @@ static int lsgWindowInit(int windowType)
     _thumbnail_image = _snapshot;
     _snapshotBuf = _snapshot + LS_PREVIEW_SIZE;
 
-    if (windowType != LOAD_SAVE_WINDOW_TYPE_LOAD_GAME_FROM_MAIN_MENU) {
+    if (windowType != LoadSaveWindowType::LoadGameFromMainMenu) {
         gLoadSaveWindowIsoWasEnabled = isoDisable();
     }
 
@@ -1851,7 +1851,7 @@ static int lsgWindowInit(int windowType)
 
     gameMouseSetCursor(MOUSE_CURSOR_ARROW);
 
-    if (windowType == LOAD_SAVE_WINDOW_TYPE_SAVE_GAME || windowType == LOAD_SAVE_WINDOW_TYPE_PICK_QUICK_SAVE_SLOT) {
+    if (windowType == LoadSaveWindowType::SaveGame || windowType == LoadSaveWindowType::PickQuickSaveSlot) {
         bool gameMouseWasVisible = gameMouseObjectsIsVisible();
         if (gameMouseWasVisible) {
             gameMouseObjectsHide();
@@ -1887,7 +1887,7 @@ static int lsgWindowInit(int windowType)
             loadSaveMessageListReset();
             fontSetCurrent(gLoadSaveWindowOldFont);
 
-            if (windowType != LOAD_SAVE_WINDOW_TYPE_LOAD_GAME_FROM_MAIN_MENU) {
+            if (windowType != LoadSaveWindowType::LoadGameFromMainMenu) {
                 if (gLoadSaveWindowIsoWasEnabled) {
                     isoEnable();
                 }
@@ -1913,7 +1913,7 @@ static int lsgWindowInit(int windowType)
         loadSaveMessageListReset();
         fontSetCurrent(gLoadSaveWindowOldFont);
 
-        if (windowType != LOAD_SAVE_WINDOW_TYPE_LOAD_GAME_FROM_MAIN_MENU) {
+        if (windowType != LoadSaveWindowType::LoadGameFromMainMenu) {
             if (gLoadSaveWindowIsoWasEnabled) {
                 isoEnable();
             }
@@ -1929,20 +1929,20 @@ static int lsgWindowInit(int windowType)
 
     int messageId;
     switch (windowType) {
-    case LOAD_SAVE_WINDOW_TYPE_SAVE_GAME:
+    case LoadSaveWindowType::SaveGame:
         // SAVE GAME
         messageId = 102;
         break;
-    case LOAD_SAVE_WINDOW_TYPE_PICK_QUICK_SAVE_SLOT:
+    case LoadSaveWindowType::PickQuickSaveSlot:
         // PICK A QUICK SAVE SLOT
         messageId = 103;
         break;
-    case LOAD_SAVE_WINDOW_TYPE_LOAD_GAME:
-    case LOAD_SAVE_WINDOW_TYPE_LOAD_GAME_FROM_MAIN_MENU:
+    case LoadSaveWindowType::LoadGame:
+    case LoadSaveWindowType::LoadGameFromMainMenu:
         // LOAD GAME
         messageId = 100;
         break;
-    case LOAD_SAVE_WINDOW_TYPE_PICK_QUICK_LOAD_SLOT:
+    case LoadSaveWindowType::PickQuickLoadSlot:
         // PICK A QUICK LOAD SLOT
         messageId = 101;
         break;
@@ -2042,7 +2042,7 @@ static int lsgWindowInit(int windowType)
 }
 
 // 0x47D824
-static int lsgWindowFree(int windowType)
+static int lsgWindowFree(LoadSaveWindowType windowType)
 {
     loadSavePersistSelectedSlot();
 
@@ -2056,7 +2056,7 @@ static int lsgWindowFree(int windowType)
 
     internal_free(_snapshot);
 
-    if (windowType != LOAD_SAVE_WINDOW_TYPE_LOAD_GAME_FROM_MAIN_MENU) {
+    if (windowType != LoadSaveWindowType::LoadGameFromMainMenu) {
         if (gLoadSaveWindowIsoWasEnabled) {
             isoEnable();
         }
@@ -2629,28 +2629,28 @@ static void loadSaveLoadSlotPage(int page)
         // Something without SAVE.DAT is a broken save.
         int fileSize;
         if (!gSaveCatalog.entry(index).present) {
-            _LSstatus[index] = SLOT_STATE_EMPTY;
+            _LSstatus[index] = LoadSaveSlotState::Empty;
         } else if (dbGetFileSize(_str, &fileSize) != 0) {
-            _LSstatus[index] = SLOT_STATE_ERROR;
+            _LSstatus[index] = LoadSaveSlotState::Error;
         } else {
             _flptr = fileOpen(_str, "rb");
 
             if (_flptr == nullptr) {
                 debugPrint("\nLOADSAVE: ** Error opening save  game for reading! **\n");
-                _LSstatus[index] = SLOT_STATE_ERROR;
+                _LSstatus[index] = LoadSaveSlotState::Error;
                 continue;
             }
 
             if (lsgLoadHeaderInSlot(index) == -1) {
                 if (_ls_error_code == 1) {
                     debugPrint("LOADSAVE: ** save file #%d is an older version! **\n", _slot_cursor);
-                    _LSstatus[index] = SLOT_STATE_UNSUPPORTED_VERSION;
+                    _LSstatus[index] = LoadSaveSlotState::UnsupportedVersion;
                 } else {
                     debugPrint("LOADSAVE: ** Save file #%d corrupt! **", index);
-                    _LSstatus[index] = SLOT_STATE_ERROR;
+                    _LSstatus[index] = LoadSaveSlotState::Error;
                 }
             } else {
-                _LSstatus[index] = SLOT_STATE_OCCUPIED;
+                _LSstatus[index] = LoadSaveSlotState::Occupied;
             }
 
             fileClose(_flptr);
@@ -2728,16 +2728,16 @@ bool lsgMobileGetSlotInfo(int slot, MobileSaveSlotInfo* info)
 
     *info = MobileSaveSlotInfo();
     switch (_LSstatus[slot]) {
-    case SLOT_STATE_EMPTY:
+    case LoadSaveSlotState::Empty:
         info->state = MobileSaveSlotState::Empty;
         break;
-    case SLOT_STATE_OCCUPIED:
+    case LoadSaveSlotState::Occupied:
         info->state = MobileSaveSlotState::Occupied;
         break;
-    case SLOT_STATE_ERROR:
+    case LoadSaveSlotState::Error:
         info->state = MobileSaveSlotState::Corrupt;
         break;
-    case SLOT_STATE_UNSUPPORTED_VERSION:
+    case LoadSaveSlotState::UnsupportedVersion:
         info->state = MobileSaveSlotState::OldVersion;
         break;
     }
@@ -3143,7 +3143,7 @@ static bool lsgMobileWriteWidePreview(int slot)
 
 // 0x47E6D8
 
-static void _ShowSlotList(int windowType)
+static void _ShowSlotList(LoadSaveWindowType windowType)
 {
     loadSaveLoadSlotPage(_currentSlotPage);
 
@@ -3157,27 +3157,27 @@ static void _ShowSlotList(int windowType)
 
     for (int index = startIndex; index < endIndex; index++) {
         Color color = index == _slot_cursor ? COLOR_LIGHT_YELLOW : COLOR_GREEN;
-        const char* text = getmsg(&gLoadSaveMessageList, &gLoadSaveMessageListItem, windowType != 0 ? 110 : 109);
+        const char* text = getmsg(&gLoadSaveMessageList, &gLoadSaveMessageListItem, windowType != LoadSaveWindowType::SaveGame ? 110 : 109);
         snprintf(_str, sizeof(_str), "[   %s %.2d:   ]", text, index + 1);
         fontDrawText(gLoadSaveWindowBuffer + LS_WINDOW_WIDTH * y + 55, _str, LS_WINDOW_WIDTH, LS_WINDOW_WIDTH, color);
 
         y += fontGetLineHeight();
         switch (_LSstatus[index]) {
-        case SLOT_STATE_OCCUPIED:
+        case LoadSaveSlotState::Occupied:
             strcpy(_str, _LSData[index].description);
             break;
-        case SLOT_STATE_EMPTY:
+        case LoadSaveSlotState::Empty:
             // - EMPTY -
             text = getmsg(&gLoadSaveMessageList, &gLoadSaveMessageListItem, 111);
             snprintf(_str, sizeof(_str), "       %s", text);
             break;
-        case SLOT_STATE_ERROR:
+        case LoadSaveSlotState::Error:
             // - CORRUPT SAVE FILE -
             text = getmsg(&gLoadSaveMessageList, &gLoadSaveMessageListItem, 112);
             snprintf(_str, sizeof(_str), "%s", text);
             color = COLOR_AMBER;
             break;
-        case SLOT_STATE_UNSUPPORTED_VERSION:
+        case LoadSaveSlotState::UnsupportedVersion:
             // - OLD VERSION -
             text = getmsg(&gLoadSaveMessageList, &gLoadSaveMessageListItem, 113);
             snprintf(_str, sizeof(_str), " %s", text);
@@ -3250,7 +3250,7 @@ static void _DrawInfoBox(int slot)
     Color color = COLOR_GREEN;
 
     switch (_LSstatus[slot]) {
-    case SLOT_STATE_OCCUPIED:
+    case LoadSaveSlotState::Occupied:
         if (1) {
             LoadSaveSlotData* ptr = &(_LSData[slot]);
             // raise this one pixel as well to match above
@@ -3299,18 +3299,18 @@ static void _DrawInfoBox(int slot)
             }
         }
         return;
-    case SLOT_STATE_EMPTY:
+    case LoadSaveSlotState::Empty:
         // Empty.
         text = getmsg(&gLoadSaveMessageList, &gLoadSaveMessageListItem, 114);
         dest = gLoadSaveWindowBuffer + LS_WINDOW_WIDTH * 262 + 404;
         break;
-    case SLOT_STATE_ERROR:
+    case LoadSaveSlotState::Error:
         // Error!
         text = getmsg(&gLoadSaveMessageList, &gLoadSaveMessageListItem, 115);
         dest = gLoadSaveWindowBuffer + LS_WINDOW_WIDTH * 262 + 404;
         color = COLOR_AMBER;
         break;
-    case SLOT_STATE_UNSUPPORTED_VERSION:
+    case LoadSaveSlotState::UnsupportedVersion:
         // Old version.
         text = getmsg(&gLoadSaveMessageList, &gLoadSaveMessageListItem, 116);
         dest = gLoadSaveWindowBuffer + LS_WINDOW_WIDTH * 262 + 400;
@@ -3326,9 +3326,9 @@ static void _DrawInfoBox(int slot)
 // 0x47EC48
 static int _LoadTumbSlot(int slot)
 {
-    if (_LSstatus[_slot_cursor] != SLOT_STATE_EMPTY
-        && _LSstatus[_slot_cursor] != SLOT_STATE_ERROR
-        && _LSstatus[_slot_cursor] != SLOT_STATE_UNSUPPORTED_VERSION) {
+    if (_LSstatus[_slot_cursor] != LoadSaveSlotState::Empty
+        && _LSstatus[_slot_cursor] != LoadSaveSlotState::Error
+        && _LSstatus[_slot_cursor] != LoadSaveSlotState::UnsupportedVersion) {
         snprintf(_str, sizeof(_str), "%s\\%s%.2d\\%s", "SAVEGAME", "SLOT", _slot_cursor + 1, "SAVE.DAT");
         debugPrint(" Filename %s\n", _str);
 
@@ -3457,7 +3457,7 @@ static int _GetComment(int slot)
     windowRefresh(window);
 
     char description[LOAD_SAVE_DESCRIPTION_LENGTH];
-    if (_LSstatus[_slot_cursor] == SLOT_STATE_OCCUPIED) {
+    if (_LSstatus[_slot_cursor] == LoadSaveSlotState::Occupied) {
         strncpy(description, _LSData[slot].description, LOAD_SAVE_DESCRIPTION_LENGTH);
     } else {
         memset(description, '\0', LOAD_SAVE_DESCRIPTION_LENGTH);

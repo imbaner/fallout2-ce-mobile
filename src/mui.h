@@ -10,6 +10,7 @@
 
 #include "art_defs.h"
 #include "combat_defs.h"
+#include "mainmenu.h"
 #include "mui_draw.h"
 #include "obj_types.h"
 #include "touch.h"
@@ -379,8 +380,8 @@ void muiMainMenuHide();
 // In windows: the buttons fade out over the picture before a screen opens
 // over it (waits for it).
 void muiMainMenuLeave();
-// The button tapped since the last call, -1 - none.
-int muiMainMenuTakeChoice();
+// The button tapped since the last call, `MainMenuOption::Invalid` - none.
+MainMenuOption muiMainMenuTakeChoice();
 
 // Premade character selector (mui_character_selector.cc,
 // character_selector.cc `characterSelectorOpen`), same results.

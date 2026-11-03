@@ -241,13 +241,13 @@ int muiGameMenuRun(bool saveLoad, const std::u32string* place)
         screen.pending = GameMenuScreen::Action::None;
         switch (action) {
         case GameMenuScreen::Action::Save:
-            if (lsgSaveGame(LOAD_SAVE_MODE_NORMAL) == 1) {
+            if (lsgSaveGame(LoadSaveMode::Normal) == 1) {
                 result = 1;
                 screen.finished = true;
             }
             break;
         case GameMenuScreen::Action::Load:
-            if (lsgLoadGame(LOAD_SAVE_MODE_NORMAL) == 1) {
+            if (lsgLoadGame(LoadSaveMode::Normal) == 1) {
                 result = 1;
                 screen.finished = true;
             }

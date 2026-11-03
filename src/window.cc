@@ -2460,7 +2460,7 @@ int scriptWindowMoviePlaying()
 }
 
 // 0x4BB23C
-bool scriptWindowSetMovieFlags(int flags)
+bool scriptWindowSetMovieFlags(MovieFlags flags)
 {
     if (movieSetFlags(flags) != 0) {
         return false;

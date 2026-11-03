@@ -60,9 +60,9 @@ namespace {
         bool coversScreen() override { return true; }
         void build(MuiContext& ui) override;
         // Exit, as the game's menu does on Esc.
-        void back() override { choice = MAIN_MENU_EXIT; }
+        void back() override { choice = MainMenuOption::Exit; }
 
-        int choice = -1;
+        MainMenuOption choice = MainMenuOption::Invalid;
         // Going away in windows (`muiMainMenuLeave`): the buttons fade out
         // over the picture.
         unsigned int leaveTime = 0;
@@ -153,7 +153,7 @@ namespace {
             MuiRect rect = { column.x, y, column.w, continueHeight };
             bool pressed = false;
             if (ui.touchable("mainmenu.continue", rect, &pressed)) {
-                choice = MAIN_MENU_CONTINUE;
+                choice = MainMenuOption::Continue;
             }
             muiFillRoundRect(rect, ui.dp(theme.radius), pressed ? theme.buttonPressed : theme.buttonPrimary);
             MuiColor text = pressed ? theme.buttonText : theme.buttonPrimaryText;
@@ -171,15 +171,15 @@ namespace {
             const char* id;
             int textId;
             const char* fallback;
-            int choice;
+            MainMenuOption choice;
         };
         const Button buttons[] = {
-            { "mainmenu.new", kTextNewGame, "New game", MAIN_MENU_NEW_GAME },
-            { "mainmenu.load", kTextLoadGame, "Load game", MAIN_MENU_LOAD_GAME },
-            { "mainmenu.settings", kTextSettings, "Settings", MAIN_MENU_OPTIONS },
+            { "mainmenu.new", kTextNewGame, "New game", MainMenuOption::NewGame },
+            { "mainmenu.load", kTextLoadGame, "Load game", MainMenuOption::LoadGame },
+            { "mainmenu.settings", kTextSettings, "Settings", MainMenuOption::Options },
         };
         for (const Button& button : buttons) {
-            if (button.choice == MAIN_MENU_LOAD_GAME && !hasSaves) {
+            if (button.choice == MainMenuOption::LoadGame && !hasSaves) {
                 continue;
             }
             if (ui.button(button.id, { column.x, y, column.w, buttonHeight }, muiDecodeGameText(muiText(button.textId, button.fallback)))) {
@@ -199,9 +199,9 @@ namespace {
 
         // Seldom used ones in a row.
         const Button small[] = {
-            { "mainmenu.intro", kTextIntro, "Intro", MAIN_MENU_INTRO },
-            { "mainmenu.credits", kTextCredits, "Credits", MAIN_MENU_CREDITS },
-            { "mainmenu.exit", kTextExit, "Exit", MAIN_MENU_EXIT },
+            { "mainmenu.intro", kTextIntro, "Intro", MainMenuOption::Intro },
+            { "mainmenu.credits", kTextCredits, "Credits", MainMenuOption::Credits },
+            { "mainmenu.exit", kTextExit, "Exit", MainMenuOption::Exit },
         };
         float smallWidth = (column.w - gap * 2.0f) / 3.0f;
         for (int index = 0; index < 3; index++) {
@@ -343,10 +343,10 @@ void muiMainMenuHide()
     gMainMenuScreen = nullptr;
 }
 
-int muiMainMenuTakeChoice()
+MainMenuOption muiMainMenuTakeChoice()
 {
     if (gMainMenuScreen == nullptr) {
-        return -1;
+        return MainMenuOption::Invalid;
     }
 
     if (gMainMenuScreen->pendingUpdate) {
@@ -354,8 +354,8 @@ int muiMainMenuTakeChoice()
         muiUpdateShow();
     }
 
-    int choice = gMainMenuScreen->choice;
-    gMainMenuScreen->choice = -1;
+    MainMenuOption choice = gMainMenuScreen->choice;
+    gMainMenuScreen->choice = MainMenuOption::Invalid;
     return choice;
 }
 
