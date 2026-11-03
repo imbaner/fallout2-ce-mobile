@@ -55,6 +55,11 @@ struct RadialMenu {
     bool open = false;
     Object* target = nullptr;
 
+    // What it was opened on (see `radialMenuIsStale`).
+    bool inCombat = false;
+    int map = -1;
+    int elevation = 0;
+
     // Screen point the menu was opened at (mouse cursor is placed there when
     // the action is performed).
     int anchorX = 0;
@@ -144,6 +149,7 @@ static void touchControlsClearSelection();
 static bool radialMenuOpen(int x, int y);
 static bool radialMenuOpenItems(const GameMouseActionMenuItem* items, int itemsLength, int x, int y);
 static void radialMenuClose();
+static bool radialMenuIsStale();
 static int radialMenuHitTest(int x, int y);
 static void radialMenuHighlight(int index);
 static void radialMenuSelect(int index);
@@ -244,6 +250,10 @@ static void touchControlsNotifyScripts(bool pressed)
 void touchControlsProcessGestures()
 {
     tacticalViewUpdate();
+
+    if (radialMenuIsStale()) {
+        radialMenuClose();
+    }
 
     if (!touchControlsIsNative()) {
         return;
@@ -1139,6 +1149,9 @@ static bool radialMenuOpenItems(const GameMouseActionMenuItem* items, int itemsL
     gRadialMenu.centerX = centerX;
     gRadialMenu.centerY = centerY;
     gRadialMenu.open = true;
+    gRadialMenu.inCombat = isInCombat();
+    gRadialMenu.map = gMapHeader.index;
+    gRadialMenu.elevation = gElevation;
     gRadialMenu.target = nullptr;
     gRadialMenu.anchorX = x;
     gRadialMenu.anchorY = y;
@@ -1200,6 +1213,23 @@ static void radialMenuClose()
     gRadialMenu.target = nullptr;
     gRadialMenu.itemsLength = 0;
     gRadialMenu.highlightedItem = -1;
+}
+
+// The map's menu lasts as long as the map takes input: what starts under it
+// (a talk the dude walked to, a window) would stay behind the menu, which is
+// the top screen and takes the touches. A combat offers other actions, another
+// map or elevation has no such target.
+static bool radialMenuIsStale()
+{
+    if (!gRadialMenu.open || gRadialMenu.modal) {
+        return false;
+    }
+
+    return !gameMouseIsMapInputEnabled()
+        || muiHasModal()
+        || isInCombat() != gRadialMenu.inCombat
+        || gMapHeader.index != gRadialMenu.map
+        || gElevation != gRadialMenu.elevation;
 }
 
 static MuiIcon radialMenuIcon(int menuItem)

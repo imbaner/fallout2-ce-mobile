@@ -173,6 +173,8 @@ enum DevAutotestAction {
     // of dude and the speaker, checksums of global, map and the speaker's
     // local variables (one run of the game's logic gives the same lines).
     DEV_AUTOTEST_ACTION_LOG_DIALOG,
+    // The talk's reply: `a` 0 - remembered, 1 - checks it is another one.
+    DEV_AUTOTEST_ACTION_CHECK_REPLY,
     // Logs the game's windows made since the scenario started (hidden ones
     // too).
     DEV_AUTOTEST_ACTION_LOG_NEW_WINDOWS,
@@ -988,6 +990,54 @@ static const DevAutotestStep kDevAutotestTacticalSteps[] = {
     { DEV_AUTOTEST_ACTION_CHECK_TACTICAL, 0, 1, 0, 1, "v19_hidden_kept" },
     { DEV_AUTOTEST_ACTION_START_COMBAT, 0, 0, 0, 60, "v20_next_combat" },
     { DEV_AUTOTEST_ACTION_CHECK_TACTICAL, 1, 1, 0, 1, "v21_shown_again" },
+};
+
+// #22: the map's menu opened while the dude walks to talk: the talk starting
+// under it closes it and takes the touches.
+static const DevAutotestStep kDevAutotestTalkMenuSteps[] = {
+    { DEV_AUTOTEST_ACTION_NONE, 0, 0, 0, 30, "tm00_map" },
+    { DEV_AUTOTEST_ACTION_CENTER_CRITTER, 0, 0, 0, 10, "tm01_center_critter" },
+    { DEV_AUTOTEST_ACTION_TOUCH_TAP_CRITTER, 0, 0, 0, 5, "tm02_walk" },
+    { DEV_AUTOTEST_ACTION_TOUCH_LONG_PRESS_CRITTER, 0, 0, 0, 5, "tm03_menu" },
+    { DEV_AUTOTEST_ACTION_CHECK_WIDGET, 1, 0, 0, 1, "tm04_menu_open", "radial.3" },
+    { DEV_AUTOTEST_ACTION_WAIT_TALKING, 900, 0, 0, 60, "tm05_talking" },
+    { DEV_AUTOTEST_ACTION_CHECK_WIDGET, 0, 0, 0, 1, "tm06_menu_closed", "radial.3" },
+    { DEV_AUTOTEST_ACTION_CHECK_REPLY, 0, 0, 0, 1, "tm07_reply" },
+    { DEV_AUTOTEST_ACTION_MUI_TAP, 0, 0, 0, 90, "tm08_option", "talk.options.0" },
+    { DEV_AUTOTEST_ACTION_CHECK_REPLY, 1, 0, 0, 1, "tm09_answered" },
+};
+
+// A talk started without a walk (as a script's), and leaving the map, under
+// the menu of the dude standing.
+static const DevAutotestStep kDevAutotestScriptTalkMenuSteps[] = {
+    { DEV_AUTOTEST_ACTION_NONE, 0, 0, 0, 30, "sm00_map" },
+    { DEV_AUTOTEST_ACTION_CENTER_CRITTER, 0, 0, 0, 10, "sm01_center_critter" },
+    { DEV_AUTOTEST_ACTION_TOUCH_LONG_PRESS_CRITTER, 0, 0, 0, 5, "sm02_menu" },
+    { DEV_AUTOTEST_ACTION_CHECK_WIDGET, 1, 0, 0, 1, "sm03_menu_open", "radial.3" },
+    { DEV_AUTOTEST_ACTION_TALK_TO_PID, 0, 0, 0, 1, "sm04_talk" },
+    { DEV_AUTOTEST_ACTION_WAIT_TALKING, 300, 0, 0, 60, "sm05_talking" },
+    { DEV_AUTOTEST_ACTION_CHECK_WIDGET, 0, 0, 0, 1, "sm06_menu_closed", "radial.3" },
+};
+
+static const DevAutotestStep kDevAutotestMapChangeMenuSteps[] = {
+    { DEV_AUTOTEST_ACTION_NONE, 0, 0, 0, 30, "mm00_map" },
+    { DEV_AUTOTEST_ACTION_CENTER_CRITTER, 0, 0, 0, 10, "mm01_center_critter" },
+    { DEV_AUTOTEST_ACTION_TOUCH_LONG_PRESS_CRITTER, 0, 0, 0, 5, "mm02_menu" },
+    { DEV_AUTOTEST_ACTION_CHECK_WIDGET, 1, 0, 0, 1, "mm03_menu_open", "radial.3" },
+    { DEV_AUTOTEST_ACTION_MAP_TRANSITION, 0, -1, 0, 150, "mm04_ncr", "ncr1.map" },
+    { DEV_AUTOTEST_ACTION_CHECK_WIDGET, 0, 0, 0, 1, "mm05_menu_closed", "radial.3" },
+};
+
+// The same for a combat starting under the map's menu: it goes too, the
+// dude's turn takes taps on the map.
+static const DevAutotestStep kDevAutotestCombatMenuSteps[] = {
+    { DEV_AUTOTEST_ACTION_NONE, 0, 0, 0, 30, "cm00_map" },
+    { DEV_AUTOTEST_ACTION_CENTER_CRITTER, 0, 0, 0, 10, "cm01_center_critter" },
+    { DEV_AUTOTEST_ACTION_TOUCH_LONG_PRESS_CRITTER, 0, 0, 0, 5, "cm02_menu" },
+    { DEV_AUTOTEST_ACTION_CHECK_WIDGET, 1, 0, 0, 1, "cm03_menu_open", "radial.3" },
+    { DEV_AUTOTEST_ACTION_START_COMBAT, 0, 0, 0, 60, "cm04_combat" },
+    { DEV_AUTOTEST_ACTION_LOG_COMBAT, 0, 0, 0, 1, "cm05_log" },
+    { DEV_AUTOTEST_ACTION_CHECK_WIDGET, 0, 0, 0, 1, "cm06_menu_closed", "radial.3" },
 };
 
 // #3: in combat with the tactical view, an item on the ground is picked up
@@ -4093,6 +4143,10 @@ static const DevAutotestScenario kDevAutotestScenarios[] = {
     devAutotestScenario("pccharacter", kDevAutotestPcCharacterSteps),
     devAutotestScenario("fadecycle", kDevAutotestFadeCycleSteps),
     devAutotestScenario("tacticalpickup", kDevAutotestTacticalPickupSteps),
+    devAutotestScenario("talkmenu", kDevAutotestTalkMenuSteps),
+    devAutotestScenario("scripttalkmenu", kDevAutotestScriptTalkMenuSteps),
+    devAutotestScenario("mapchangemenu", kDevAutotestMapChangeMenuSteps),
+    devAutotestScenario("combatmenu", kDevAutotestCombatMenuSteps),
     devAutotestScenario("perkeverylevel", kDevAutotestPerkEveryLevelSteps),
     devAutotestScenario("perkowed", kDevAutotestPerkOwedSteps),
     devAutotestScenario("character", kDevAutotestCharacterSteps),
@@ -4811,8 +4865,9 @@ void devAutotestTick()
             }
             break;
         case DEV_AUTOTEST_ACTION_TALK_TO_PID: {
+            // `a` 0: the nearest critter.
             int pid = 0x01000000 | static_cast<int>(step->a);
-            Object* critter = devAutotestFindCritterOfPid(pid);
+            Object* critter = step->a != 0 ? devAutotestFindCritterOfPid(pid) : devAutotestFindNearestCritter();
             if (critter != nullptr) {
                 // Next to the critter: no walk, the same start every run.
                 int tile = tileGetTileInDirection(critter->tile, ROTATION_SW, 1);
@@ -4895,6 +4950,17 @@ void devAutotestTick()
         case DEV_AUTOTEST_ACTION_LOG_DIALOG:
             devAutotestLogDialog();
             break;
+        case DEV_AUTOTEST_ACTION_CHECK_REPLY: {
+            static std::string reply;
+            const char* text = gameDialogIsTalking() ? gameDialogGetReplyText() : "";
+            if (step->a == 0) {
+                reply = text;
+                devAutotestLog("  reply: %s\n", text);
+            } else {
+                devAutotestLog("  reply: %s: %s\n", text, reply != text ? "PASS" : "FAIL");
+            }
+            break;
+        }
         case DEV_AUTOTEST_ACTION_LOG_NEW_WINDOWS: {
             // The first one takes the windows there are.
             if (!gDevAutotestStartWindowsTaken) {
