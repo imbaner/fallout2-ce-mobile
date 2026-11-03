@@ -7191,7 +7191,8 @@ void devAutotestTick()
         }
         case DEV_AUTOTEST_ACTION_MULTIHEX_BLOOD: {
             // A Wanamingo: a multihex critter that ages (no CRITTER_NO_AGE).
-            constexpr int kWanamingoPid = 0x10000F2;
+            // Static: the lambda below uses it without a capture (MSVC).
+            static constexpr int kWanamingoPid = 0x10000F2;
             int count = static_cast<int>(step->b);
             auto countHere = [](int* bodies, int* stains) {
                 *bodies = 0;
