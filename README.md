@@ -72,7 +72,10 @@ APK's SHA-256 is checked against GitHub's release metadata; its package,
 version and signing certificate are checked against the installed app.
 Full licenses are available separately, offline, in About.
 
-**Web.** A new version is downloaded and checked whole in the background and applied only while no game is running; an interrupted download keeps the previous version. The game files and saves are kept apart from the app's files and stay.
+**Web.** New versions come from the site by themselves. The start screen shows the version and build at the bottom, for example `1.3.0-mobile.9 · 960fcb10`. The game files and saves are kept apart from the app's files and stay; an interrupted download keeps the previous version.
+
+- **Build 960fcb10 and later.** When you open the app, a new version downloads in the background ("Downloading an update…" under the Play button; only the files that changed) and the start screen reloads into it by itself. A game started meanwhile keeps running on the current version; the new one comes when you're back on the start screen or on the next start.
+- **Builds up to 0903a2ec** (only a build number at the bottom). The whole app, about 7 MB, downloads silently. Open the app and stay on the start screen until it reloads by itself (up to about half a minute), or close the app fully and open it again. This brings 960fcb10 and the faster way of updating.
 
 ## Known limitations
 
