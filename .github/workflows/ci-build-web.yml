@@ -29,8 +29,25 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install SDL2 for audio conversion checks
-        run: sudo apt-get update && sudo apt-get install -y libsdl2-dev
+      - name: Install Emscripten SDK
+        run: |
+          mkdir -p out/web
+          git clone --depth 1 https://github.com/emscripten-core/emsdk.git out/web/emsdk
+          WEB_EMSCRIPTEN_VERSION="$(cat os/web/emscripten-version.txt)"
+          python out/web/emsdk/emsdk.py install "$WEB_EMSCRIPTEN_VERSION"
+          python out/web/emsdk/emsdk.py activate "$WEB_EMSCRIPTEN_VERSION"
+
+      - name: SDL2 of the web build for audio conversion checks
+        # The web mixer's test runs on the SDL release Emscripten's port builds
+        # into the app: SDL2's resampler depends on how audio is fed to it, and
+        # the distribution's SDL2 or an SDL3-based sdl2-compat differ.
+        run: |
+          SDL_TAG="$(python -c "import re; print(re.search(r\"TAG = '([^']+)'\", open('out/web/emsdk/upstream/emscripten/tools/ports/sdl2.py').read()).group(1))")"
+          git clone --depth 1 --branch "$SDL_TAG" https://github.com/libsdl-org/SDL.git out/web/sdl2-src
+          cmake -S out/web/sdl2-src -B out/web/sdl2-build -DCMAKE_BUILD_TYPE=Release -DSDL_TEST=OFF -DCMAKE_INSTALL_PREFIX="$PWD/out/web/sdl2"
+          cmake --build out/web/sdl2-build --parallel 4
+          cmake --install out/web/sdl2-build
+          echo "$PWD/out/web/sdl2/bin" >> "$GITHUB_PATH"
 
       - name: Node for storage tests
         uses: actions/setup-node@v4
@@ -45,14 +62,6 @@ jobs:
         run: |
           python -m unittest discover -s os/web -p 'test_*.py'
           node --test os/web/test_*.mjs
-
-      - name: Install Emscripten SDK
-        run: |
-          mkdir -p out/web
-          git clone --depth 1 https://github.com/emscripten-core/emsdk.git out/web/emsdk
-          WEB_EMSCRIPTEN_VERSION="$(cat os/web/emscripten-version.txt)"
-          python out/web/emsdk/emsdk.py install "$WEB_EMSCRIPTEN_VERSION"
-          python out/web/emsdk/emsdk.py activate "$WEB_EMSCRIPTEN_VERSION"
 
       - name: Build engine and package current ce.dat
         run: python os/web/build.py --emsdk out/web/emsdk --jobs 4

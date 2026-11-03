@@ -1,5 +1,6 @@
-// Exercise the real browser mixer with SDL's independent whole-file conversion
-// as a reference. No audio device or game assets are needed.
+// Exercise the real browser mixer with SDL's own conversion of the whole
+// sound, fed frame by frame, as a reference. No audio device or game assets
+// are needed.
 #include <SDL.h>
 #include <algorithm>
 #include <cassert>
@@ -49,7 +50,12 @@ static std::vector<float> reference(const std::vector<Uint8>& data, int bits, in
     SDL_AudioStream* converter = SDL_NewAudioStream(bits == 16 ? AUDIO_S16 : AUDIO_S8, channels, rate,
         AUDIO_F32SYS, 2, 48000);
     assert(converter);
-    assert(SDL_AudioStreamPut(converter, data.data(), data.size()) == 0);
+    // Frame by frame: SDL2's resampler (2.30; 2.32, the web build's) drops
+    // part of a big Put, while small ones convert exactly, whatever their
+    // size up to the mixer's 256 frames.
+    const size_t frameSize = bits / 8 * channels;
+    for (size_t pos = 0; pos < data.size(); pos += frameSize)
+        assert(SDL_AudioStreamPut(converter, data.data() + pos, frameSize) == 0);
     assert(SDL_AudioStreamFlush(converter) == 0);
     const int available = SDL_AudioStreamAvailable(converter);
     assert(available >= 0);
