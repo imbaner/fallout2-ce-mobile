@@ -3,6 +3,7 @@
 #include <cstring>
 #include <initializer_list>
 #include <emscripten.h>
+#include <unistd.h>
 
 static int exercise(int argc, char** argv)
 {
@@ -22,6 +23,9 @@ static int exercise(int argc, char** argv)
     for (size_t i = 0; i < size; ++i) if (data[i] != i % 251) return 4;
     std::fclose(input); std::free(data);
     if (reopened) {
+        // The fresh mount has none of the slot's nodes cached: access() must
+        // wait for them like open() (the game checks ce.sav this way on load).
+        if (access("DATA/SAVEGAME/SLOT01/SAVE.DAT", F_OK) != 0) return 13;
         FILE* save = std::fopen("DATA/SAVEGAME/SLOT01/SAVE.DAT", "rb");
         if (!save) return 5;
         char bytes[5] = {};

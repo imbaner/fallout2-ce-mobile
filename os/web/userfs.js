@@ -85,13 +85,17 @@ addToLibrary({
 
 // Reuse the already wrapped SDK bodies (wrapSyscallFunction has run). These
 // aliases are local JS helpers: i64 conversion stays on the public syscall.
+// Every path syscall that can reach the user VFS must be here: an unwrapped
+// one lets a cache miss escape Asyncify and the engine never resumes (libc
+// access() is faccessat).
 for (const symbol of ['__syscall_openat','__syscall_mkdirat','__syscall_mknodat',
   '__syscall_newfstatat','__syscall_stat64','__syscall_lstat64','__syscall_fstat64',
   '__syscall_getdents64','__syscall_unlinkat','__syscall_renameat','__syscall_truncate64',
   '__syscall_ftruncate64','__syscall_readlinkat','__syscall_utimensat','__syscall_chmod','__syscall_fchmod',
-  '__syscall_fchdir','__syscall_chdir','__syscall_rmdir','__syscall_access']) {
+  '__syscall_fchdir','__syscall_chdir','__syscall_rmdir','__syscall_faccessat']) {
   const original = LibraryManager.library[symbol];
-  if (!original) continue;
+  // A name the pinned SDK doesn't have is a mistake here, not an optional one.
+  if (!original) throw new Error('userfs.js: no SDK syscall ' + symbol);
   const alias = 'UserNative' + symbol, additions = {};
   additions['$' + alias] = original;
   additions['$' + alias + '__deps'] = LibraryManager.library[symbol + '__deps'] || [];
