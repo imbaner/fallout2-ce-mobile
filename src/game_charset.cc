@@ -8,6 +8,7 @@
 
 #include "debug.h"
 #include "font_manager.h"
+#include "message.h"
 #include "platform_compat.h"
 #include "settings.h"
 
@@ -907,6 +908,28 @@ namespace {
     constexpr int kLookAlikesMajority = 3;
     constexpr int kLookAlikesLeast = 6;
 
+    const Charset* const kLatinCharsets[] = {
+        &kWestern,
+        &kCentralEuropean,
+        &kTurkish,
+        &kBaltic,
+    };
+
+    // Short ones, in every translation, with words in the language's letters.
+    const char* const kSampleTexts[] = {
+        "game\\stat.msg",
+        "game\\skill.msg",
+        "game\\perk.msg",
+        "game\\trait.msg",
+        "game\\misc.msg",
+    };
+
+    // Bytes inside the sample's words another code page reads as letters and
+    // the language's doesn't, as against the other way round. Polish in
+    // windows-1252: 534 to 0; Czech: 2 to 0, others none.
+    constexpr int kWordBytesLeast = 20;
+    constexpr int kWordBytesMajority = 10;
+
     const Charset* gCharset = nullptr;
     // The game's texts are in its language (`[system] language`).
     bool gTextsInLanguage = true;
@@ -988,8 +1011,74 @@ namespace {
         return Alphabet::Latin;
     }
 
-    // The device's first language of [alphabet] (one of `kLanguages`).
-    const Language* deviceLanguage(Alphabet alphabet)
+    bool isLatinLetter(char16_t ch)
+    {
+        return ch >= 0x00C0 && ch <= 0x017F && ch != 0x00D7 && ch != 0x00F7;
+    }
+
+    bool isWordByte(unsigned char ch)
+    {
+        return ch >= 0x80 || (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z');
+    }
+
+    // Counts the bytes over 0x7F with a letter or another such byte on both
+    // sides: a word's letters wherever the language has them, punctuation
+    // stands at a word's ends.
+    void countWordBytes(const char* text, int* counts)
+    {
+        const unsigned char* bytes = reinterpret_cast<const unsigned char*>(text);
+        for (size_t index = 1; bytes[index] != '\0' && bytes[index + 1] != '\0'; index++) {
+            if (bytes[index] >= 0x80 && isWordByte(bytes[index - 1]) && isWordByte(bytes[index + 1])) {
+                counts[bytes[index]]++;
+            }
+        }
+    }
+
+    // [named] unless the game's words read as letters only in another Latin
+    // code page: a translation put in another language's folder (Sonora's
+    // language packs). It shows only where [named] has no letters for the
+    // bytes: Polish in a Western language, not Czech or Hungarian, whose
+    // bytes are letters in windows-1252 too.
+    const Charset* textsCharset(const Charset* named)
+    {
+        int counts[256] = {};
+        for (const char* path : kSampleTexts) {
+            MessageList messageList;
+            if (messageListInit(&messageList) && messageListLoad(&messageList, path)) {
+                for (int index = 0; index < messageList.entries_num; index++) {
+                    if (messageList.entries[index].text[0] != '\0') {
+                        countWordBytes(messageList.entries[index].text, counts);
+                    }
+                }
+            }
+            messageListFree(&messageList);
+        }
+
+        const Charset* found = named;
+        int mostLetters = 0;
+        for (const Charset* charset : kLatinCharsets) {
+            int letters = 0;
+            int lost = 0;
+            for (int byte = 0x80; byte < 0x100; byte++) {
+                bool letter = isLatinLetter(charset->table[byte - 0x80]);
+                bool namedLetter = isLatinLetter(named->table[byte - 0x80]);
+                if (letter && !namedLetter) {
+                    letters += counts[byte];
+                } else if (namedLetter && !letter) {
+                    lost += counts[byte];
+                }
+            }
+
+            if (letters >= kWordBytesLeast && letters >= lost * kWordBytesMajority && letters > mostLetters) {
+                found = charset;
+                mostLetters = letters;
+            }
+        }
+        return found;
+    }
+
+    // The device's first language in [charset] (one of `kLanguages`).
+    const Language* deviceLanguage(const Charset* charset)
     {
         const Language* found = nullptr;
         SDL_Locale* locales = SDL_GetPreferredLocales();
@@ -998,7 +1087,7 @@ namespace {
         }
         for (SDL_Locale* locale = locales; locale->language != nullptr && found == nullptr; locale++) {
             for (const Language& language : kLanguages) {
-                if (compat_stricmp(language.code, locale->language) == 0 && language.charset->alphabet == alphabet) {
+                if (compat_stricmp(language.code, locale->language) == 0 && language.charset == charset) {
                     found = &language;
                     break;
                 }
@@ -1016,19 +1105,25 @@ void gameCharsetInit()
     const Charset* named = charsetOfLanguage(language);
     Alphabet drawn = fontsAlphabet();
 
-    gTextsInLanguage = drawn == Alphabet::Latin || drawn == named->alphabet;
+    if (drawn == Alphabet::Cyrillic) {
+        gCharset = &kCyrillic;
+    } else if (drawn == Alphabet::Greek) {
+        gCharset = &kGreek;
+    } else {
+        gCharset = named->alphabet == Alphabet::Latin ? textsCharset(named) : named;
+    }
+
+    gTextsInLanguage = gCharset == named;
     if (gTextsInLanguage) {
-        gCharset = named;
         gUiLanguage = language;
     } else {
-        gCharset = drawn == Alphabet::Cyrillic ? &kCyrillic : &kGreek;
-        const Language* device = deviceLanguage(drawn);
+        const Language* device = deviceLanguage(gCharset);
         gUiLanguage = device != nullptr ? device->name : "english";
     }
 
     debugPrint("Game texts: %s%s, mobile UI in %s\n",
         gCharset->name,
-        gTextsInLanguage ? "" : " (the fonts', not the language's)",
+        gTextsInLanguage ? "" : " (not the language's)",
         gUiLanguage.c_str());
 }
 

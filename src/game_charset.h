@@ -16,6 +16,10 @@ namespace fallout {
 //   the accented letters their own way.
 // - When the language says another alphabet than the fonts, the fonts are
 //   right (a translation put in the English folder).
+// - When words of the game's texts have bytes the language's code page reads
+//   as no letters and another Latin one as letters, that one is right (Polish
+//   in the English folder). Translations whose bytes are letters in both
+//   (Czech, Hungarian in a Western language) can't be told this way.
 
 // After the game's fonts are loaded.
 void gameCharsetInit();
@@ -32,7 +36,7 @@ const char* gameCharsetName();
 bool gameCharsetIsCyrillic();
 
 // The language of the mobile UI's texts (`game\ce.msg`): the game's, when
-// its texts are in it; otherwise the device's when its alphabet is the
+// its texts are in it; otherwise the device's when its code page is the
 // texts', or English.
 const char* gameCharsetUiLanguage();
 

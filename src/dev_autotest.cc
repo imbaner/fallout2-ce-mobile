@@ -28,6 +28,7 @@
 #include "elevator.h"
 #include "error_report.h"
 #include "game.h"
+#include "game_charset.h"
 #include "game_commands.h"
 #include "game_dialog.h"
 #include "game_mouse.h"
@@ -175,6 +176,8 @@ enum DevAutotestAction {
     DEV_AUTOTEST_ACTION_LOG_DIALOG,
     // The talk's reply: `a` 0 - remembered, 1 - checks it is another one.
     DEV_AUTOTEST_ACTION_CHECK_REPLY,
+    // Checks the code page of the game's texts (`widget`).
+    DEV_AUTOTEST_ACTION_CHECK_CHARSET,
     // Logs the game's windows made since the scenario started (hidden ones
     // too).
     DEV_AUTOTEST_ACTION_LOG_NEW_WINDOWS,
@@ -990,6 +993,21 @@ static const DevAutotestStep kDevAutotestTacticalSteps[] = {
     { DEV_AUTOTEST_ACTION_CHECK_TACTICAL, 0, 1, 0, 1, "v19_hidden_kept" },
     { DEV_AUTOTEST_ACTION_START_COMBAT, 0, 0, 0, 60, "v20_next_combat" },
     { DEV_AUTOTEST_ACTION_CHECK_TACTICAL, 1, 1, 0, 1, "v21_shown_again" },
+};
+
+// #25: the code page of a translation, wherever it lies (the copies of the
+// game in out/dev/testgame-cs-*, made by charset-games.sh): the texts of the
+// character screen, read by it.
+static const DevAutotestStep kDevAutotestCharsetCentralSteps[] = {
+    { DEV_AUTOTEST_ACTION_NONE, 0, 0, 0, 10, "cc00_map" },
+    { DEV_AUTOTEST_ACTION_CHECK_CHARSET, 0, 0, 0, 1, "cc01_texts", "windows-1250" },
+    { DEV_AUTOTEST_ACTION_COMMAND, static_cast<int>(GameCommandType::Character), 0, 0, 60, "cc02_character" },
+};
+
+static const DevAutotestStep kDevAutotestCharsetWesternSteps[] = {
+    { DEV_AUTOTEST_ACTION_NONE, 0, 0, 0, 10, "cw00_map" },
+    { DEV_AUTOTEST_ACTION_CHECK_CHARSET, 0, 0, 0, 1, "cw01_texts", "windows-1252" },
+    { DEV_AUTOTEST_ACTION_COMMAND, static_cast<int>(GameCommandType::Character), 0, 0, 60, "cw02_character" },
 };
 
 // #22: the map's menu opened while the dude walks to talk: the talk starting
@@ -4143,6 +4161,8 @@ static const DevAutotestScenario kDevAutotestScenarios[] = {
     devAutotestScenario("pccharacter", kDevAutotestPcCharacterSteps),
     devAutotestScenario("fadecycle", kDevAutotestFadeCycleSteps),
     devAutotestScenario("tacticalpickup", kDevAutotestTacticalPickupSteps),
+    devAutotestScenario("charsetcentral", kDevAutotestCharsetCentralSteps),
+    devAutotestScenario("charsetwestern", kDevAutotestCharsetWesternSteps),
     devAutotestScenario("talkmenu", kDevAutotestTalkMenuSteps),
     devAutotestScenario("scripttalkmenu", kDevAutotestScriptTalkMenuSteps),
     devAutotestScenario("mapchangemenu", kDevAutotestMapChangeMenuSteps),
@@ -4949,6 +4969,10 @@ void devAutotestTick()
             break;
         case DEV_AUTOTEST_ACTION_LOG_DIALOG:
             devAutotestLogDialog();
+            break;
+        case DEV_AUTOTEST_ACTION_CHECK_CHARSET:
+            devAutotestLog("  game texts: %s, expected %s: %s\n", gameCharsetName(), step->widget,
+                strcmp(gameCharsetName(), step->widget) == 0 ? "PASS" : "FAIL");
             break;
         case DEV_AUTOTEST_ACTION_CHECK_REPLY: {
             static std::string reply;
