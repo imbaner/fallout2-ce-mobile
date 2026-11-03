@@ -31,11 +31,31 @@ async function verified(path, expected) {
   return new Response(bytes, {headers:{'Content-Type':response.headers.get('Content-Type') || 'application/octet-stream'}});
 }
 
+// The same file of an earlier build of this scope, checked as a download is:
+// an update downloads only the files that changed (the engine's stay the same
+// while its code does). A cache that can't be read is downloaded past.
+async function reused(path, expected, earlier) {
+  for (const name of earlier) {
+    try {
+      const response = await (await caches.open(name)).match(new URL(path, SCOPE));
+      if (!response) continue;
+      const bytes = await response.arrayBuffer();
+      if (bytes.byteLength === expected.bytes && await sha256(bytes) === expected.sha256) {
+        return new Response(bytes, {headers:{'Content-Type':response.headers.get('Content-Type') || 'application/octet-stream'}});
+      }
+    } catch {
+      // The download below.
+    }
+  }
+  return null;
+}
+
 async function precache() {
+  const earlier = (await caches.keys()).filter(name => name.startsWith(PREFIX) && name !== CACHE);
   const cache = await caches.open(CACHE);
   try {
     for (const [path, expected] of Object.entries(BUILD.files)) {
-      await cache.put(new URL(path, SCOPE), await verified(path, expected));
+      await cache.put(new URL(path, SCOPE), await reused(path, expected, earlier) || await verified(path, expected));
     }
     // build-info.json lists this worker's own hash, so it is checked by content.
     const text = await (await download('build-info.json')).text(), info = JSON.parse(text);

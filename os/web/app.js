@@ -54,17 +54,21 @@ let source = null;
 let starting = false;
 let running = false;
 let updating = false;
+let downloading = false;
 let filesMode = null;
 const appCache = startAppCache({idle:() => !!source && !starting && !running,
-  onApplying:value => { updating = value; rotatePrompt(); }});
+  onApplying:value => { updating = value; rotatePrompt(); },
+  onDownloading:value => { downloading = value; rotatePrompt(); }});
 
 function rotatePrompt() {
   const portrait = innerHeight > innerWidth && matchMedia('(pointer:coarse)').matches;
   $('rotate').hidden = !(running && portrait);
   if (source && !starting && !running && !document.body.classList.contains('error')) {
+    // A download doesn't hold Play: a game started meanwhile runs this build,
+    // the new one comes after it.
     $('play').disabled = portrait || updating;
-    $('message').textContent = updating ? t('updating') : portrait ? t('rotate') : '';
-    $('message').hidden = !updating && !portrait;
+    $('message').textContent = updating ? t('updating') : portrait ? t('rotate') : downloading ? t('update_downloading') : '';
+    $('message').hidden = !updating && !portrait && !downloading;
   }
 }
 // Every few seconds while playing: the hang watchdog (no new frames for 20 s,
@@ -187,7 +191,7 @@ async function prepare() {
   const build = await response.json();
   document.body.dataset.version = build.version;
   document.body.dataset.webBuild = build.buildId || build.files['fallout2-ce.wasm'].sha256.slice(0, 8);
-  $('build-tag').textContent = document.body.dataset.webBuild;
+  $('build-tag').textContent = build.version + ' · ' + document.body.dataset.webBuild;
   source = await developmentFiles() || await localFiles();
   if (!source) { location.replace('./files.html'); return; }
   $('play').hidden = !source;

@@ -2,7 +2,8 @@
 // launcher, engine and workers always match and start without a network.
 // A new build is applied only while the launcher is idle in the app's only
 // window; otherwise it waits until every window of the app has closed.
-export function startAppCache({idle = () => false, onApplying = () => {}} = {}) {
+// onDownloading tells while a new build is being installed.
+export function startAppCache({idle = () => false, onApplying = () => {}, onDownloading = () => {}} = {}) {
   const container = globalThis.navigator?.serviceWorker;
   if (!container || !globalThis.isSecureContext) return {check() {}};
   let registration = null, applying = false, reloading = false, fallback = null;
@@ -31,18 +32,30 @@ export function startAppCache({idle = () => false, onApplying = () => {}} = {}) 
     applying = false; onApplying(false);
   }
   container.addEventListener('controllerchange', () => { if (applying) reload(); });
+  // A new build while the page has one: an uncontrolled first visit is
+  // installing the app itself.
+  const follow = worker => {
+    if (!worker || !container.controller) return;
+    onDownloading(true);
+    worker.addEventListener('statechange', () => {
+      if (worker.state === 'installing') return;
+      onDownloading(false);
+      if (worker.state === 'installed') check();
+    });
+  };
   container.register(new URL('./sw.js', import.meta.url)).then(value => {
     registration = value;
-    value.addEventListener('updatefound', () => {
-      const worker = value.installing;
-      worker?.addEventListener('statechange', () => { if (worker.state === 'installed') check(); });
-    });
+    value.addEventListener('updatefound', () => follow(value.installing));
+    follow(value.installing);
     check();
   }).catch(error => console.warn('Offline app cache is unavailable', error));
-  // An installed app may stay in memory for days: look for a new build when
-  // it comes back to an idle launcher, not only on a cold start.
+  // An installed app may stay in memory for days: when it comes back to an
+  // idle launcher, a build that arrived meanwhile (during a game) is applied,
+  // and a newer one looked for.
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden && idle()) registration?.update().catch(() => {});
+    if (document.hidden || !idle()) return;
+    check();
+    registration?.update().catch(() => {});
   });
   return {check};
 }

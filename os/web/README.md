@@ -236,8 +236,12 @@ See [save-storage.md](save-storage.md). No automatic telemetry is installed.
 
 `sw.js` is the app's service worker. `package.py` fills it with every other
 file of the build and its SHA-256, so each build is a new worker version.
-Installing it downloads each file past the HTTP cache, checks its size and
-hash, and stores the whole set in one cache per build (`fallout2-app:<scope>:<build>`).
+Installing it takes each file from an earlier build's cache when its size and
+hash match, otherwise downloads it past the HTTP cache and checks them, and
+stores the whole set in one cache per build (`fallout2-app:<scope>:<build>`).
+An update downloads only the files that changed: the engine has no version or
+commit compiled in (the page gives them, `src/app_version.h`), so its WASM and
+JS stay the same while its code does.
 Any failure discards that cache and the previous build stays in use. The worker
 then answers requests for the build's own files from that cache, whatever the
 query string, so the launcher, file manager, engine, WASM and workers always
@@ -247,12 +251,15 @@ network. Game resources and saves stay in IndexedDB; the worker never touches th
 
 The worker never claims an open page: the first visit runs from the network and
 the next start is offline-capable. A new build installs in the background and
-waits. `app-cache.js` lets it take over only while the launcher is idle (no game
-starting or running) and the app has a single window; the launcher then shows
-"Updating the app…" and reloads. Otherwise the new build waits until every window
-is closed, as browsers do by default. Activation removes the older caches of the
-same scope only, so several copies of the app may share an origin. The launcher
-also looks for a new build when an idle app comes back to the foreground.
+waits; meanwhile the launcher shows "Downloading an update…" and Play still
+starts the current build. `app-cache.js` lets it take over only while the
+launcher is idle (no game starting or running) and the app has a single window;
+the launcher then shows "Updating the app…" and reloads. Otherwise the new build
+waits until every window is closed, as browsers do by default. Activation removes
+the older caches of the same scope only, so several copies of the app may share
+an origin. When an idle app comes back to the foreground, the launcher applies a
+build installed meanwhile (during a game) and looks for a newer one. The
+launcher's footer shows the version and the build id.
 
 After the game's main returns, the web wrapper explicitly finishes the runtime
 with `emscripten_force_exit`, so pending asynchronous callbacks cannot defer
