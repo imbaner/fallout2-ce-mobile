@@ -153,7 +153,10 @@ enum DevAutotestAction {
     DEV_AUTOTEST_ACTION_HERO_SELECT,
     // a = 0: logs the stairs and ladders of the dude's elevation and uses
     // the one at tile b (else the nearest) as the player would; a = 1: logs
-    // where the dude is.
+    // where the dude is; a = 2: puts the dude next to that one and taps it
+    // (touch); a = 3: taps it again (the second tap in combat); a = 4:
+    // checks the dude left its elevation and its outline is as before the
+    // tap.
     DEV_AUTOTEST_ACTION_USE_STAIRS,
     // Not saved scripts (as party members') at the end of the critter
     // scripts, over an extent's edge; the map's scripts written and read
@@ -1605,6 +1608,12 @@ static const DevAutotestStep kDevAutotestPcBarSteps[] = {
 };
 
 static Object* gDevAutotestPlacedItem = nullptr;
+
+// The stairs tapped by DEV_AUTOTEST_ACTION_USE_STAIRS, their elevation and
+// outline before the tap.
+static Object* gDevAutotestStairs = nullptr;
+static MapElevation gDevAutotestStairsElevation = ELEVATION_FIRST;
+static int gDevAutotestStairsOutline = 0;
 static Object* gDevAutotestPlacedPrevious = nullptr;
 
 // Trace scenarios: the items' state is logged after every step.
@@ -1833,6 +1842,39 @@ static void devAutotestStartTouch(float startX, float startY, float endX, float 
     devAutotestLog("  touch (%.0f, %.0f) -> (%.0f, %.0f), hold %d, move %d frames, world %d, map input %d\n", startX, startY, endX, endY, holdFrames, moveFrames,
         worldViewIsWorldAt(static_cast<int>(startX), static_cast<int>(startY)) ? 1 : 0,
         gameMouseIsMapInputEnabled() ? 1 : 0);
+}
+
+// Taps [object] where the game picks it (others may cover parts of its
+// picture: the dude next to it, walls), as near its middle as there is.
+static void devAutotestTapObject(Object* object)
+{
+    if (object == nullptr) {
+        return;
+    }
+
+    Rect worldRect;
+    objectGetRect(object, &worldRect);
+    int centerX = (worldRect.left + worldRect.right) / 2;
+    int centerY = (worldRect.top + worldRect.bottom) / 2;
+    int worldX = centerX;
+    int worldY = centerY;
+    int nearest = INT_MAX;
+    for (int y = worldRect.top; y <= worldRect.bottom; y += 2) {
+        for (int x = worldRect.left; x <= worldRect.right; x += 2) {
+            int distance = (x - centerX) * (x - centerX) + (y - centerY) * (y - centerY);
+            if (distance < nearest && playerObjectAt(x, y, OBJ_TYPE_INVALID, true, object->elevation) == object) {
+                nearest = distance;
+                worldX = x;
+                worldY = y;
+            }
+        }
+    }
+
+    int x;
+    int y;
+    worldViewWorldToScreen(worldX, worldY, &x, &y);
+    devAutotestLog("  tap object %08x at (%d, %d): %s\n", ProtoId(object).pid(), x, y, nearest != INT_MAX ? "picked there" : "NOT PICKED anywhere");
+    devAutotestStartTouch(x, y, x, y, 1, 0);
 }
 
 // Returns true when the touch is complete.
@@ -3692,6 +3734,23 @@ static const DevAutotestStep kDevAutotestStairsSteps[] = {
     { DEV_AUTOTEST_ACTION_USE_STAIRS, 1, 0, 0, 1, "st03_where" },
 };
 
+// The green outline of the object the dude uses goes when he's done, also
+// when using it took him to another elevation (stairs, ladders): it stayed
+// on them for good (the player's report, 2026-11-03). The tanker's ladder
+// down and the stairs up again, by taps out of combat and in combat (one
+// tap selects, the second uses). Run with --dev-map=sftanker.map.
+static const DevAutotestStep kDevAutotestLadderOutlineSteps[] = {
+    { DEV_AUTOTEST_ACTION_NONE, 0, 0, 0, 30, "lo00_map" },
+    // Close: the dude next to the stairs covers less of them.
+    { DEV_AUTOTEST_ACTION_ZOOM_AT_DUDE, 2.0f, 0, 0, 20, "lo00b_zoom" },
+    { DEV_AUTOTEST_ACTION_USE_STAIRS, 2, 20882, 0, 400, "lo01_ladder" },
+    { DEV_AUTOTEST_ACTION_USE_STAIRS, 4, 0, 0, 1, "lo02_down" },
+    { DEV_AUTOTEST_ACTION_START_COMBAT, 0, 0, 0, 60, "lo03_combat" },
+    { DEV_AUTOTEST_ACTION_USE_STAIRS, 2, 0, 0, 20, "lo04_selected" },
+    { DEV_AUTOTEST_ACTION_USE_STAIRS, 3, 0, 0, 400, "lo05_stairs" },
+    { DEV_AUTOTEST_ACTION_USE_STAIRS, 4, 0, 0, 1, "lo06_up" },
+};
+
 // A map's scripts with party members' over an extent's edge: CE wrote the
 // extents with lengths that didn't add up to the count, and since its
 // check of the lengths a saved map with them didn't load (issue #16: the
@@ -4209,6 +4268,9 @@ void devAutotestSetScenario(const char* name)
     } else if (strcmp(name, "stairs") == 0) {
         gDevAutotestSteps = kDevAutotestStairsSteps;
         gDevAutotestStepCount = sizeof(kDevAutotestStairsSteps) / sizeof(kDevAutotestStairsSteps[0]);
+    } else if (strcmp(name, "ladderoutline") == 0) {
+        gDevAutotestSteps = kDevAutotestLadderOutlineSteps;
+        gDevAutotestStepCount = sizeof(kDevAutotestLadderOutlineSteps) / sizeof(kDevAutotestLadderOutlineSteps[0]);
     } else if (strcmp(name, "state") == 0) {
         gDevAutotestSteps = kDevAutotestStateSteps;
         gDevAutotestStepCount = sizeof(kDevAutotestStateSteps) / sizeof(kDevAutotestStateSteps[0]);
@@ -5639,7 +5701,19 @@ void devAutotestTick()
         case DEV_AUTOTEST_ACTION_USE_STAIRS: {
             Map map = mapGetCurrentMap();
             devAutotestLog("  map %d (%s) elevation %d, dude tile %d\n", map, gMapHeader.name, gDude->elevation, gDude->tile);
-            if (step->a != 0) {
+            if (step->a == 3) {
+                devAutotestTapObject(gDevAutotestStairs);
+                break;
+            }
+            if (step->a == 4) {
+                bool left = gDude->elevation != gDevAutotestStairsElevation;
+                int outline = gDevAutotestStairs != nullptr ? gDevAutotestStairs->outline : -1;
+                devAutotestLog("  dude left elevation %d: %d; stairs outline %08x (before the tap %08x): %s\n",
+                    gDevAutotestStairsElevation, left ? 1 : 0, outline, gDevAutotestStairsOutline,
+                    left && outline == gDevAutotestStairsOutline ? "PASS" : "FAIL");
+                break;
+            }
+            if (step->a != 0 && step->a != 2) {
                 break;
             }
             Object* nearest = nullptr;
@@ -5666,7 +5740,23 @@ void devAutotestTick()
                     nearestDistance = distance;
                 }
             }
-            if (nearest != nullptr) {
+            if (nearest != nullptr && step->a == 2) {
+                // Next to it, the same start every run.
+                for (int rotation = 0; rotation < ROTATION_COUNT; rotation++) {
+                    int tile = tileGetTileInDirection(nearest->tile, static_cast<Rotation>(rotation), 1);
+                    if (_obj_blocking_at(gDude, tile, nearest->elevation) == nullptr) {
+                        Rect rect;
+                        objectSetLocation(gDude, tile, nearest->elevation, &rect);
+                        break;
+                    }
+                }
+                tileSetCenter(nearest->tile, TILE_SET_CENTER_REFRESH_WINDOW);
+                gDevAutotestStairs = nearest;
+                gDevAutotestStairsElevation = nearest->elevation;
+                gDevAutotestStairsOutline = nearest->outline;
+                devAutotestLog("  tapping %08x at tile %d from tile %d\n", ProtoId(nearest).pid(), nearest->tile, gDude->tile);
+                devAutotestTapObject(nearest);
+            } else if (nearest != nullptr) {
                 devAutotestLog("  using %08x at tile %d\n", ProtoId(nearest).pid(), nearest->tile);
                 _action_use_an_object(gDude, nearest);
             } else {
@@ -8521,6 +8611,12 @@ void devAutotestTick()
             devAutotestLog("  in combat %d, dude ap %d, dude tile %d, game mouse mode %d\n", isInCombat() ? 1 : 0, gDude->data.critter.combat.ap, gDude->tile, gameMouseGetMode());
             break;
         case DEV_AUTOTEST_ACTION_START_COMBAT: {
+            // As the "A" key, nothing in combat (a second combat loop inside
+            // the first would end the combat twice).
+            if (isInCombat()) {
+                devAutotestLog("  already in combat\n");
+                break;
+            }
             Object* critter = devAutotestFindNearestCritter();
             if (critter != nullptr) {
                 float x;

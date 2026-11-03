@@ -57,9 +57,22 @@ namespace {
     };
     MoveCost gMoveCost;
 
+    // [object] at the elevation shown.
     bool objectExists(Object* object)
     {
         for (Object* candidate = objectFindFirstAtElevation(gElevation); candidate != nullptr; candidate = objectFindNextAtElevation()) {
+            if (candidate == object) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // [object] on the map at any elevation: stairs and ladders take the dude
+    // to another elevation before he's done using them.
+    bool objectOnMap(Object* object)
+    {
+        for (Object* candidate = objectFindFirst(); candidate != nullptr; candidate = objectFindNext()) {
             if (candidate == object) {
                 return true;
             }
@@ -90,7 +103,7 @@ namespace {
 
     void clearInteraction()
     {
-        if (gInteraction != nullptr && objectExists(gInteraction)) {
+        if (gInteraction != nullptr && objectOnMap(gInteraction)) {
             // The rect while outlined covers the outline too.
             Rect rect;
             objectGetRect(gInteraction, &rect);
