@@ -211,6 +211,10 @@ enum DevAutotestAction {
     // FAIL unless a talk option has the text `widget` (`a` 1) or none has it
     // (`a` 0).
     DEV_AUTOTEST_ACTION_CHECK_TALK_OPTION,
+    // In the script of a critter of the map: `set_self(dude_obj)` twice, then
+    // `use_obj_on_obj` (`a` 0) or `use_obj` (`a` 1). FAIL unless `self_obj`
+    // is the critter again after it.
+    DEV_AUTOTEST_ACTION_CHECK_SET_SELF_USE,
     // Runs the commands of `kDevAutotestOpcodeCases`, each in a program of
     // its own: FAIL unless it leaves one result of the right kind, or stops
     // the script if it should.
@@ -1361,6 +1365,15 @@ static const DevAutotestStep kDevAutotestNecklaceNoneSteps[] = {
     { DEV_AUTOTEST_ACTION_CHECK_GLOBAL_VAR, 697, 1, 0, 1, "nh53_accepted" },
 };
 
+// sfall's notes: for `use_obj` and `use_obj_on_obj` `set_self` is called twice
+// (--dev-map=arvillag.map, a map with scripted critters).
+static const DevAutotestStep kDevAutotestSetSelfUseSteps[] = {
+    { DEV_AUTOTEST_ACTION_WAIT_MAP_LOADED, 1500, 0, 0, 30, "ss00_map" },
+    { DEV_AUTOTEST_ACTION_GIVE_ITEM, 40, 0, 0, 1, "ss01_stimpak" },
+    { DEV_AUTOTEST_ACTION_CHECK_SET_SELF_USE, 0, 0, 0, 30, "ss02_use_on" },
+    { DEV_AUTOTEST_ACTION_CHECK_SET_SELF_USE, 1, 0, 0, 30, "ss03_use" },
+};
+
 // Commands that take any type: each leaves a result or stops the script.
 static const DevAutotestStep kDevAutotestOpcodesSteps[] = {
     { DEV_AUTOTEST_ACTION_NONE, 0, 0, 0, 30, "oc00_map" },
@@ -2355,6 +2368,76 @@ static std::string devAutotestRunOpcodeCase(const DevAutotestOpcodeCase& testCas
 
     programFree(program);
     return text;
+}
+
+// [testUse] 0 and 1 of `DEV_AUTOTEST_ACTION_CHECK_SET_SELF_USE`, as commands put
+// for a while in the program of a critter: only there `self_obj` means
+// something.
+static void devAutotestCheckSetSelfUse(int testUse)
+{
+    constexpr int kPushInt = 0xC001;
+    constexpr int kSelfObj = 0x80BC;
+    constexpr int kDudeObj = 0x80BF;
+    constexpr int kUseObj = 0x80DB;
+    constexpr int kObjCarryingPidObj = 0x810D;
+    constexpr int kUseObjOnObj = 0x8145;
+    constexpr int kSetSelf = 0x8206;
+    constexpr int kStimpakPid = 40;
+
+    Object* critter = nullptr;
+    Script* script = nullptr;
+    for (Object* object = objectFindFirst(); object != nullptr && critter == nullptr; object = objectFindNext()) {
+        if (object != gDude
+            && FrmId(object).objectType() == OBJ_TYPE_CRITTER
+            && object->sid != -1
+            && scriptGetScript(object->sid, &script) != -1
+            && script->program != nullptr) {
+            critter = object;
+        }
+    }
+    if (critter == nullptr) {
+        devAutotestLog("  no critter with a running script: FAIL\n");
+        return;
+    }
+
+    std::vector<unsigned char> code;
+    devAutotestPushCode(&code, kDudeObj);
+    devAutotestPushCode(&code, kSetSelf);
+    devAutotestPushCode(&code, kDudeObj);
+    devAutotestPushCode(&code, kSetSelf);
+    int commands = 5;
+    if (testUse == 0) {
+        devAutotestPushCode(&code, kDudeObj);
+        devAutotestPushCodeValue(&code, kPushInt, kStimpakPid);
+        devAutotestPushCode(&code, kObjCarryingPidObj);
+        devAutotestPushCode(&code, kDudeObj);
+        devAutotestPushCode(&code, kUseObjOnObj);
+        commands += 5;
+    } else {
+        devAutotestPushCode(&code, kDudeObj);
+        devAutotestPushCode(&code, kUseObj);
+        commands += 2;
+    }
+    devAutotestPushCode(&code, kSelfObj);
+
+    Program* program = script->program;
+    unsigned char* data = program->data;
+    int instructionPointer = program->instructionPointer;
+    int flags = program->flags;
+    program->data = code.data();
+    program->instructionPointer = 0;
+    program->flags = 0;
+    programInterpret(program, commands);
+    program->data = data;
+    program->instructionPointer = instructionPointer;
+    program->flags = flags;
+
+    ProgramValue self = programStackPopValue(program);
+    bool used = testUse != 0 || objectGetCarriedObjectByProtoId(gDude, ProtoId(kStimpakPid)) == nullptr;
+    const char* who = self.pointerValue == critter ? "critter" : self.pointerValue == gDude ? "dude"
+                                                                                           : "other";
+    devAutotestLog("  self_obj after the command: %s, used %d: %s\n", who, used ? 1 : 0,
+        self.pointerValue == critter && used ? "PASS" : "FAIL");
 }
 
 static Object* devAutotestFindCritterOfScript(const char* name)
@@ -4844,6 +4927,7 @@ static const DevAutotestScenario kDevAutotestScenarios[] = {
     devAutotestScenario("necklaceshelf", kDevAutotestNecklaceShelfSteps),
     devAutotestScenario("necklacenone", kDevAutotestNecklaceNoneSteps),
     devAutotestScenario("opcodes", kDevAutotestOpcodesSteps),
+    devAutotestScenario("setselfuse", kDevAutotestSetSelfUseSteps),
     devAutotestScenario("worldposoff", kDevAutotestWorldPosOffSteps),
     devAutotestScenario("worldareaoff", kDevAutotestWorldAreaOffSteps),
     devAutotestScenario("worldareamark", kDevAutotestWorldAreaMarkSteps),
@@ -5773,6 +5857,9 @@ void devAutotestTick()
             devAutotestLog("  option \"%s\" %d: %s\n", step->widget, found ? 1 : 0, found == (step->a != 0) ? "PASS" : "FAIL");
             break;
         }
+        case DEV_AUTOTEST_ACTION_CHECK_SET_SELF_USE:
+            devAutotestCheckSetSelfUse(static_cast<int>(step->a));
+            break;
         case DEV_AUTOTEST_ACTION_CHECK_OPCODES:
             for (const DevAutotestOpcodeCase& testCase : kDevAutotestOpcodeCases) {
                 std::string wrong = devAutotestRunOpcodeCase(testCase);
