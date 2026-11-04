@@ -923,6 +923,11 @@ static bool wmSubtileCoordsValid(int x, int y)
         && y < SUBTILE_GRID_HEIGHT * (wmMaxTileNum / wmNumHorizontalTiles);
 }
 
+static bool wmWorldPosIsOnMap(int x, int y)
+{
+    return x >= 0 && y >= 0 && wmSubtileCoordsValid(x / WM_SUBTILE_SIZE, y / WM_SUBTILE_SIZE);
+}
+
 static int wmSubtileNameOverrideKey(int x, int y)
 {
     return x + y * (wmNumHorizontalTiles * SUBTILE_GRID_WIDTH);
@@ -3713,6 +3718,13 @@ static int wmWorldMapFunc(int a1)
 
     wmResetTrailMarkers();
 
+    // CE: Entering a map of an area off the map takes the party there, and
+    // `set_world_map_pos` and saves keep any position. Travel needs a subtile.
+    if (!wmWorldPosIsOnMap(wmGenData.worldPosX, wmGenData.worldPosY)) {
+        debugPrint("\nwmWorldMapFunc: party at (%d, %d) is off the map", wmGenData.worldPosX, wmGenData.worldPosY);
+        wmGenDataClampWorldPosToBounds();
+    }
+
     if (wmInterfaceInit() == -1) {
         wmInterfaceExit();
         return -1;
@@ -4217,6 +4229,10 @@ static int wmPartyFindCurSubTile()
 // 0x4C0C00 wmFindCurSubTileFromPos
 static int wmFindCurSubTileFromPos(int x, int y, SubtileInfo** subtilePtr)
 {
+    if (!wmWorldPosIsOnMap(x, y)) {
+        return -1;
+    }
+
     int tileIndex = y / WM_TILE_HEIGHT * wmNumHorizontalTiles + x / WM_TILE_WIDTH % wmNumHorizontalTiles;
     TileInfo* tile = &(wmTileInfoList[tileIndex]);
 
@@ -6713,14 +6729,17 @@ bool wmAreaMarkVisitedState(City areaIdx, VisitedState state)
     int y;
     wmAreaGetMarkWorldPos(city, &x, &y);
 
+    // CE: An area of a mod can lie off the map: no subtiles to mark there, the
+    // area still takes the state scripts ask for.
     SubtileInfo* subtile;
-    if (wmFindCurSubTileFromPos(x, y, &subtile) == -1) {
-        return false;
+    bool onMap = wmFindCurSubTileFromPos(x, y, &subtile) == 0;
+    if (!onMap) {
+        debugPrint("\nwmAreaMarkVisitedState: area %d at (%d, %d) is off the map", areaIdx, x, y);
     }
 
-    SubtileState oldSubtileState = subtile->state;
+    SubtileState oldSubtileState = onMap ? subtile->state : SUBTILE_STATE_UNKNOWN;
 
-    if (city->state == CITY_STATE_KNOWN && state != VisitedState::Unknown) {
+    if (onMap && city->state == CITY_STATE_KNOWN && state != VisitedState::Unknown) {
         if (state == VisitedState::Visited) {
             wmMarkSubTileRadiusVisited(x, y);
         } else if (!noRadius) {
@@ -6731,9 +6750,11 @@ bool wmAreaMarkVisitedState(City areaIdx, VisitedState state)
     city->visitedState = state;
 
     if (state == VisitedState::Known) {
-        subtile->state = oldSubtileState == SUBTILE_STATE_UNKNOWN
-            ? SUBTILE_STATE_KNOWN
-            : oldSubtileState;
+        if (onMap) {
+            subtile->state = oldSubtileState == SUBTILE_STATE_UNKNOWN
+                ? SUBTILE_STATE_KNOWN
+                : oldSubtileState;
+        }
     } else if (state == VisitedState::Visited && oldVisitedState == VisitedState::Unknown) {
         city->visitedState = VisitedState::Known;
     }
