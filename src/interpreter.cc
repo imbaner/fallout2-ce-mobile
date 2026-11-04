@@ -931,7 +931,7 @@ static void opConditionalOperatorNotEqual(Program* program)
             strings[0] = stringBuffers[0];
             break;
         default:
-            assert(false && "Should be unreachable");
+            result = true;
         }
 
         result = strcmp(strings[1], strings[0]) != 0;
@@ -952,7 +952,7 @@ static void opConditionalOperatorNotEqual(Program* program)
             result = value[1].floatValue != (float)value[0].integerValue;
             break;
         default:
-            assert(false && "Should be unreachable");
+            result = true;
         }
         break;
     case VALUE_TYPE_INT:
@@ -974,7 +974,7 @@ static void opConditionalOperatorNotEqual(Program* program)
             result = (uintptr_t)(value[1].integerValue) != (uintptr_t)(value[0].pointerValue);
             break;
         default:
-            assert(false && "Should be unreachable");
+            result = true;
         }
         break;
     case VALUE_TYPE_PTR:
@@ -986,7 +986,9 @@ static void opConditionalOperatorNotEqual(Program* program)
             result = value[1].pointerValue != value[0].pointerValue;
             break;
         default:
-            assert(false && "Should be unreachable");
+            // CE: A string or a float next to an object: as numbers in the
+            // original, they don't match.
+            result = true;
         }
         break;
     default:
@@ -1027,7 +1029,7 @@ static void opConditionalOperatorEqual(Program* program)
             strings[0] = stringBuffers[0];
             break;
         default:
-            assert(false && "Should be unreachable");
+            result = false;
         }
 
         result = strcmp(strings[1], strings[0]) == 0;
@@ -1048,7 +1050,7 @@ static void opConditionalOperatorEqual(Program* program)
             result = value[1].floatValue == (float)value[0].integerValue;
             break;
         default:
-            assert(false && "Should be unreachable");
+            result = false;
         }
         break;
     case VALUE_TYPE_INT:
@@ -1070,7 +1072,7 @@ static void opConditionalOperatorEqual(Program* program)
             result = (uintptr_t)(value[1].integerValue) == (uintptr_t)(value[0].pointerValue);
             break;
         default:
-            assert(false && "Should be unreachable");
+            result = false;
         }
         break;
     case VALUE_TYPE_PTR:
@@ -1082,7 +1084,9 @@ static void opConditionalOperatorEqual(Program* program)
             result = value[1].pointerValue == value[0].pointerValue;
             break;
         default:
-            assert(false && "Should be unreachable");
+            // CE: A string or a float next to an object: as numbers in the
+            // original, they don't match.
+            result = false;
         }
         break;
     default:
@@ -1104,6 +1108,10 @@ static void opConditionalOperatorLessThanEquals(Program* program)
         value[arg] = programStackPopValue(program);
     }
 
+    auto fatalInvalidComparison = [&value]() {
+        programFatalError("Invalid comparison: <= does not support %s and %s.", value[1].typeDebugString(), value[0].typeDebugString());
+    };
+
     switch (value[1].opcode) {
     case VALUE_TYPE_STRING:
     case VALUE_TYPE_DYNAMIC_STRING:
@@ -1123,7 +1131,7 @@ static void opConditionalOperatorLessThanEquals(Program* program)
             strings[0] = stringBuffers[0];
             break;
         default:
-            assert(false && "Should be unreachable");
+            fatalInvalidComparison();
         }
 
         result = strcmp(strings[1], strings[0]) <= 0;
@@ -1144,7 +1152,7 @@ static void opConditionalOperatorLessThanEquals(Program* program)
             result = value[1].floatValue <= (float)value[0].integerValue;
             break;
         default:
-            assert(false && "Should be unreachable");
+            fatalInvalidComparison();
         }
         break;
     case VALUE_TYPE_INT:
@@ -1163,7 +1171,7 @@ static void opConditionalOperatorLessThanEquals(Program* program)
             result = value[1].integerValue <= value[0].integerValue;
             break;
         default:
-            assert(false && "Should be unreachable");
+            fatalInvalidComparison();
         }
         break;
     // Nevada folks tend to use "object <= 0" to test objects for nulls.
@@ -1178,11 +1186,11 @@ static void opConditionalOperatorLessThanEquals(Program* program)
             }
             break;
         default:
-            assert(false && "Should be unreachable");
+            fatalInvalidComparison();
         }
         break;
     default:
-        assert(false && "Should be unreachable");
+        fatalInvalidComparison();
     }
 
     programStackPushInteger(program, result);
