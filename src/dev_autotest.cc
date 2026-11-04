@@ -2158,7 +2158,7 @@ static Object* devAutotestFindObjectOfScript(const char* name)
     return nullptr;
 }
 
-// A command with its arguments: `operands` of a binary operator, one letter
+// A command with its arguments: `operands` of an operator, one letter
 // each (O the dude, N no object, 0 and 5 numbers, F a float, S a string), or
 // the numbers `a`, `b`, `c` for `operands` nullptr. It gives the object or
 // string of the letter `result`, the number `value` for `=`, stops the script
@@ -2221,6 +2221,8 @@ static const DevAutotestOpcodeCase kDevAutotestOpcodeCases[] = {
     { 0x8035, "OS", 'X' },
     { 0x8035, "FO", 'X' },
     { 0x8035, "OF", 'X' },
+    // graphics_funcs_available()
+    { 0x8165, "", '=', 0 },
     // critter_attempt_placement(0, 1, 0)
     { 0x80FF, nullptr, '=', -1, 0, 1, 0 },
     // metarule2_explosions: the setters, then a metarule that doesn't exist.
@@ -2309,8 +2311,9 @@ static std::string devAutotestRunOpcodeCase(const DevAutotestOpcodeCase& testCas
 
     std::vector<unsigned char> code;
     if (testCase.operands != nullptr) {
-        devAutotestPushCodeOperand(&code, testCase.operands[0]);
-        devAutotestPushCodeOperand(&code, testCase.operands[1]);
+        for (const char* operand = testCase.operands; *operand != '\0'; operand++) {
+            devAutotestPushCodeOperand(&code, *operand);
+        }
     } else {
         devAutotestPushCodeValue(&code, kPushInt, testCase.a);
         devAutotestPushCodeValue(&code, kPushInt, testCase.b);
