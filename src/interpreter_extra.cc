@@ -1781,6 +1781,10 @@ static void opUseObject(Program* program)
         }
     }
 
+    // SFALL: The original looks for the script here, then for its object, so
+    // `set_self` is called twice for this command. Both are used up now.
+    scriptContextSetOverrideSelf(program, nullptr);
+
     if (self == nullptr) {
         scriptPredefinedError(program, "use_obj", SCRIPT_ERROR_OBJECT_IS_NULL);
         return;
@@ -4666,6 +4670,10 @@ static void opUseObjectOnObject(Program* program)
     if (!scriptContextConsumeOverrideSelf(program, &self)) {
         self = scriptGetSelf(program);
     }
+
+    // SFALL: The original looks for the script here, then for its object, so
+    // `set_self` is called twice for this command. Both are used up now.
+    scriptContextSetOverrideSelf(program, nullptr);
 
     if (self == nullptr) {
         scriptPredefinedError(program, "use_obj_on_obj", SCRIPT_ERROR_OBJECT_IS_NULL);
