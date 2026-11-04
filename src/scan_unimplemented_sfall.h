@@ -134,7 +134,6 @@ static struct SfallOpcodeInfo opcodeInfoArray[] = {
     { 0x162, "tap_key" },
     { 0x163, "get_year" },
     { 0x164, "game_loaded" },
-    { 0x165, "graphics_funcs_available" },
     { 0x166, "load_shader" },
     { 0x167, "free_shader" },
     { 0x168, "activate_shader" },

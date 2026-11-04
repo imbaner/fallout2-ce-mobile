@@ -329,6 +329,15 @@ static void op_game_loaded(Program* program)
     programStackPushInteger(program, loaded ? 1 : 0);
 }
 
+// graphics_funcs_available
+//
+// In sfall it tells if the shader functions below can be used, which takes its
+// DX9 graphics modes. CE has neither, this changes together with them.
+static void op_graphics_funcs_available(Program* program)
+{
+    programStackPushInteger(program, 0);
+}
+
 static void op_sneak_success(Program* program)
 {
     programStackPushInteger(program, dudeIsSneaking() ? 1 : 0);
@@ -2455,6 +2464,8 @@ void sfallOpcodesInit()
     interpreterRegisterOpcode(0x8164, op_game_loaded);
 
     // 0x8165 - bool graphics_funcs_available()
+    interpreterRegisterOpcode(0x8165, op_graphics_funcs_available);
+
     // 0x8166 - int  load_shader(string path)
     // 0x8167 - void free_shader(int ID)
     // 0x8168 - void activate_shader(int ID)
