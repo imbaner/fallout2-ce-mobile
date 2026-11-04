@@ -20,12 +20,12 @@
 #include "art.h"
 #include "character_editor.h"
 #include "combat.h"
-#include "door_targets.h"
 #include "combat_ai.h"
 #include "content_config.h"
 #include "critter.h"
 #include "db.h"
 #include "display_monitor.h"
+#include "door_targets.h"
 #include "elevator.h"
 #include "error_report.h"
 #include "game.h"
@@ -1275,55 +1275,63 @@ static const DevAutotestStep kDevAutotestDartsSteps[] = {
 // Resurrection's necklace in New Hope (--dev-map=nh_vill.map, the game's first
 // map): the doctor's talk, then Oswald asks to plant the necklace of his son
 // who stole it, on Rachel or on her shelf.
-#define DEV_AUTOTEST_NEW_HOPE_DOCTOR_STEPS \
+#define DEV_AUTOTEST_NEW_HOPE_DOCTOR_STEPS                              \
     { DEV_AUTOTEST_ACTION_WAIT_TALKING, 600, 0, 0, 10, "nh00_doctor" }, \
-    { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh01" }, \
-    { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh02" }, \
-    { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh03" }, \
-    { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh04" }, \
-    { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh05" }, \
-    { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh06" }, \
-    { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh07" }, \
-    { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh08" }, \
-    { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh09" }, \
-    { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh10" }, \
-    { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh11" }, \
-    { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh12" }, \
-    { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 60, "nh13" }
+        { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh01" },     \
+        { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh02" },     \
+        { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh03" },     \
+        { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh04" },     \
+        { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh05" },     \
+        { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh06" },     \
+        { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh07" },     \
+        { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh08" },     \
+        { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh09" },     \
+        { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh10" },     \
+        { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh11" },     \
+        { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh12" },     \
+    {                                                                   \
+        DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 60, "nh13"          \
+    }
 
-#define DEV_AUTOTEST_NEW_HOPE_OSWALD_STEPS \
-    { DEV_AUTOTEST_ACTION_TALK_TO_SCRIPT, 0, 0, 0, 30, "nh20_oswald", "nhoswald.int" }, \
-    { DEV_AUTOTEST_ACTION_WAIT_TALKING, 60, 0, 0, 10, "nh21_talking" }, \
-    { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh22_search" }, \
-    { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 60, "nh23_bye" }, \
-    { DEV_AUTOTEST_ACTION_GIVE_ITEM, kDevAutotestNecklacePid, 0, 0, 1, "nh24_found" }, \
-    { DEV_AUTOTEST_ACTION_SET_GLOBAL_VAR, 698, 1, 0, 1, "nh25_son_found" }, \
-    { DEV_AUTOTEST_ACTION_TALK_TO_SCRIPT, 0, 0, 0, 30, "nh26_oswald", "nhoswald.int" }, \
-    { DEV_AUTOTEST_ACTION_WAIT_TALKING, 60, 0, 0, 10, "nh27_talking" }, \
-    { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh28_news" }, \
-    { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh29_necklace" }, \
-    { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh30_return" }, \
-    { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh31_suggest" }, \
-    { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh32_see" }, \
-    { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 60, "nh33_bye" }
+#define DEV_AUTOTEST_NEW_HOPE_OSWALD_STEPS                                                  \
+    { DEV_AUTOTEST_ACTION_TALK_TO_SCRIPT, 0, 0, 0, 30, "nh20_oswald", "nhoswald.int" },     \
+        { DEV_AUTOTEST_ACTION_WAIT_TALKING, 60, 0, 0, 10, "nh21_talking" },                 \
+        { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh22_search" },                  \
+        { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 60, "nh23_bye" },                     \
+        { DEV_AUTOTEST_ACTION_GIVE_ITEM, kDevAutotestNecklacePid, 0, 0, 1, "nh24_found" },  \
+        { DEV_AUTOTEST_ACTION_SET_GLOBAL_VAR, 698, 1, 0, 1, "nh25_son_found" },             \
+        { DEV_AUTOTEST_ACTION_TALK_TO_SCRIPT, 0, 0, 0, 30, "nh26_oswald", "nhoswald.int" }, \
+        { DEV_AUTOTEST_ACTION_WAIT_TALKING, 60, 0, 0, 10, "nh27_talking" },                 \
+        { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh28_news" },                    \
+        { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh29_necklace" },                \
+        { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh30_return" },                  \
+        { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh31_suggest" },                 \
+        { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh32_see" },                     \
+    {                                                                                       \
+        DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 60, "nh33_bye"                          \
+    }
 
 // To the question if she forgot where the necklace is: "Just asking" and,
 // when it's planted, the words that have her find it.
-#define DEV_AUTOTEST_NEW_HOPE_RACHEL_STEPS \
+#define DEV_AUTOTEST_NEW_HOPE_RACHEL_STEPS                                              \
     { DEV_AUTOTEST_ACTION_TALK_TO_SCRIPT, 0, 0, 0, 30, "nh40_rachel", "nhrachel.int" }, \
-    { DEV_AUTOTEST_ACTION_WAIT_TALKING, 60, 0, 0, 10, "nh41_talking" }, \
-    { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh42_husband" }, \
-    { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh43_help" }, \
-    { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh44_continue" }, \
-    { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh45_forgot" }
+        { DEV_AUTOTEST_ACTION_WAIT_TALKING, 60, 0, 0, 10, "nh41_talking" },             \
+        { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh42_husband" },             \
+        { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh43_help" },                \
+        { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh44_continue" },            \
+    {                                                                                   \
+        DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh45_forgot"                   \
+    }
 
-#define DEV_AUTOTEST_NEW_HOPE_FOUND_STEPS \
+#define DEV_AUTOTEST_NEW_HOPE_FOUND_STEPS                                                  \
     { DEV_AUTOTEST_ACTION_CHECK_TALK_OPTION, 1, 0, 0, 1, "nh50_option", "missed a spot" }, \
-    { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 1, 0, 0, 30, "nh51_missed" }, \
-    { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh52_again" }, \
-    { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 60, "nh53_goodbye" }, \
-    { DEV_AUTOTEST_ACTION_CHECK_TALKING, 0, 0, 0, 1, "nh54_over" }, \
-    { DEV_AUTOTEST_ACTION_CHECK_GLOBAL_VAR, 709, 2, 0, 1, "nh55_done" }
+        { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 1, 0, 0, 30, "nh51_missed" },                 \
+        { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh52_again" },                  \
+        { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 60, "nh53_goodbye" },                \
+        { DEV_AUTOTEST_ACTION_CHECK_TALKING, 0, 0, 0, 1, "nh54_over" },                    \
+    {                                                                                      \
+        DEV_AUTOTEST_ACTION_CHECK_GLOBAL_VAR, 709, 2, 0, 1, "nh55_done"                    \
+    }
 
 static constexpr int kDevAutotestNecklacePid = 542;
 
