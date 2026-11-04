@@ -199,6 +199,13 @@ enum DevAutotestAction {
     DEV_AUTOTEST_ACTION_SET_TARGET_SETTINGS,
     // FAIL unless map variable `a` is `b`.
     DEV_AUTOTEST_ACTION_CHECK_MAP_VAR,
+    // Puts the party on the world map at (`a`, `b`).
+    DEV_AUTOTEST_ACTION_SET_WORLD_POS,
+    // FAIL unless the party is on a world map `a` wide and `b` high, with `c`
+    // 1 unless it left the place of the last check.
+    DEV_AUTOTEST_ACTION_CHECK_WORLD_POS,
+    // FAIL unless the visited state of area `a` is `b`.
+    DEV_AUTOTEST_ACTION_CHECK_AREA_STATE,
     // As TALK_TO_PID, the critter with the script file `widget`.
     DEV_AUTOTEST_ACTION_TALK_TO_SCRIPT,
     // Logs the game's windows made since the scenario started (hidden ones
@@ -1247,6 +1254,41 @@ static const DevAutotestStep kDevAutotestDartsSteps[] = {
     { DEV_AUTOTEST_ACTION_CHECK_SELECTION, 3, 0, 0, 1, "dt12_selected" },
     { DEV_AUTOTEST_ACTION_TOUCH_TAP_DOOR, 20901, 0, 0, 150, "dt13_throw" },
     { DEV_AUTOTEST_ACTION_CHECK_MAP_VAR, 14, 1, 0, 1, "dt14_thrown" },
+};
+
+// The party off the world map (a script's `set_world_map_pos`, an old save):
+// it opens with the party on the map, and it walks.
+static const DevAutotestStep kDevAutotestWorldPosOffSteps[] = {
+    { DEV_AUTOTEST_ACTION_NONE, 0, 0, 0, 30, "wo00_map" },
+    { DEV_AUTOTEST_ACTION_SET_WORLD_POS, 5000, 5000, 0, 1, "wo01_off" },
+    { DEV_AUTOTEST_ACTION_OPEN_WORLDMAP, 0, 0, 0, 1, "wo02_open" },
+    { DEV_AUTOTEST_ACTION_NONE, 0, 0, 0, 40, "wo03_worldmap" },
+    { DEV_AUTOTEST_ACTION_CHECK_WORLD_POS, 1400, 1500, 0, 1, "wo04_on_map" },
+    { DEV_AUTOTEST_ACTION_FINGER, 0, 0.3f, 0.4f, 2, "wo05_down" },
+    { DEV_AUTOTEST_ACTION_FINGER, 1, 0.3f, 0.4f, 200, "wo06_travel" },
+    { DEV_AUTOTEST_ACTION_CHECK_WORLD_POS, 1400, 1500, 1, 1, "wo07_walked" },
+};
+
+// Resurrection's map of an area off its world map (run with `asan-`): going
+// there takes the party off the map too, as its broken lifts do.
+static const DevAutotestStep kDevAutotestWorldAreaOffSteps[] = {
+    { DEV_AUTOTEST_ACTION_NONE, 0, 0, 0, 30, "wa00_map" },
+    { DEV_AUTOTEST_ACTION_MAP_TRANSITION, 0, -1, 0, 120, "wa00_there", "rndmacg.map" },
+    { DEV_AUTOTEST_ACTION_CHECK_MAP, 0, 0, 0, 1, "wa00_loaded", "rndmacg.map" },
+    { DEV_AUTOTEST_ACTION_OPEN_WORLDMAP, 0, 0, 0, 1, "wa01_open" },
+    { DEV_AUTOTEST_ACTION_NONE, 0, 0, 0, 40, "wa02_worldmap" },
+    { DEV_AUTOTEST_ACTION_CHECK_WORLD_POS, 1050, 900, 0, 1, "wa03_on_map" },
+    { DEV_AUTOTEST_ACTION_FINGER, 0, 0.3f, 0.4f, 2, "wa04_down" },
+    { DEV_AUTOTEST_ACTION_FINGER, 1, 0.3f, 0.4f, 200, "wa05_travel" },
+    { DEV_AUTOTEST_ACTION_CHECK_WORLD_POS, 1050, 900, 1, 1, "wa06_walked" },
+};
+
+// Resurrection's Albuquerque (--dev-map=alb_pred.map, run with `asan-`): its
+// script marks area 24, off the world map, on the first visit. The mark
+// stays.
+static const DevAutotestStep kDevAutotestWorldAreaMarkSteps[] = {
+    { DEV_AUTOTEST_ACTION_NONE, 0, 0, 0, 30, "wm00_map" },
+    { DEV_AUTOTEST_ACTION_CHECK_AREA_STATE, 24, 1, 0, 1, "wm01_known" },
 };
 
 // #25: the code page of a translation, wherever it lies (the copies of the
@@ -4457,6 +4499,9 @@ static const DevAutotestScenario kDevAutotestScenarios[] = {
     devAutotestScenario("partytarget", kDevAutotestPartyTargetSteps),
     devAutotestScenario("doorgrenade", kDevAutotestDoorGrenadeSteps),
     devAutotestScenario("darts", kDevAutotestDartsSteps),
+    devAutotestScenario("worldposoff", kDevAutotestWorldPosOffSteps),
+    devAutotestScenario("worldareaoff", kDevAutotestWorldAreaOffSteps),
+    devAutotestScenario("worldareamark", kDevAutotestWorldAreaMarkSteps),
     devAutotestScenario("charsetcentral", kDevAutotestCharsetCentralSteps),
     devAutotestScenario("charsetwestern", kDevAutotestCharsetWesternSteps),
     devAutotestScenario("talkmenu", kDevAutotestTalkMenuSteps),
@@ -5352,6 +5397,28 @@ void devAutotestTick()
             mapGetGlobalVar(static_cast<int>(step->a), value);
             devAutotestLog("  map var %d: %d: %s\n", static_cast<int>(step->a), value.integerValue,
                 value.integerValue == static_cast<int>(step->b) ? "PASS" : "FAIL");
+            break;
+        }
+        case DEV_AUTOTEST_ACTION_SET_WORLD_POS:
+            wmSetPartyWorldPos(static_cast<int>(step->a), static_cast<int>(step->b));
+            break;
+        case DEV_AUTOTEST_ACTION_CHECK_WORLD_POS: {
+            static int lastX = -1;
+            static int lastY = -1;
+            int x;
+            int y;
+            wmGetPartyWorldPos(&x, &y);
+            bool onMap = x >= 0 && x < static_cast<int>(step->a) && y >= 0 && y < static_cast<int>(step->b);
+            bool moved = step->c == 0 || x != lastX || y != lastY;
+            devAutotestLog("  party at (%d, %d), was (%d, %d): %s\n", x, y, lastX, lastY, onMap && moved ? "PASS" : "FAIL");
+            lastX = x;
+            lastY = y;
+            break;
+        }
+        case DEV_AUTOTEST_ACTION_CHECK_AREA_STATE: {
+            VisitedState state = wmAreaVisitedState(static_cast<City>(static_cast<int>(step->a)));
+            devAutotestLog("  area %d state %d: %s\n", static_cast<int>(step->a), static_cast<int>(state),
+                static_cast<int>(state) == static_cast<int>(step->b) ? "PASS" : "FAIL");
             break;
         }
         case DEV_AUTOTEST_ACTION_CHECK_CHARSET:
