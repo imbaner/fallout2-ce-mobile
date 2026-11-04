@@ -11,6 +11,7 @@
 #include "combat.h"
 #include "critter.h"
 #include "dev_autotest.h"
+#include "door_targets.h"
 #include "draw.h"
 #include "game.h"
 #include "game_mouse.h"
@@ -250,6 +251,7 @@ static void touchControlsNotifyScripts(bool pressed)
 void touchControlsProcessGestures()
 {
     tacticalViewUpdate();
+    doorTargetsUpdate();
 
     if (radialMenuIsStale()) {
         radialMenuClose();
@@ -578,7 +580,7 @@ static void touchControlsClearSelection()
 // Decides what tap at a map point should do. Objects are the ones the mouse
 // gets in arrow mode (`playerPrimaryTargetAt`), except that walls and
 // decorations are walked to (look is in the radial menu) and enemies in combat
-// are attacked.
+// are attacked, doors too when the weapon may change them (door_targets.h).
 static TouchAction touchControlsGetActionAt(int worldX, int worldY, Object** targetPtr)
 {
     return touchControlsGetActionFor(playerPrimaryTargetAt(worldX, worldY, gElevation), targetPtr);
@@ -601,7 +603,7 @@ static TouchAction touchControlsGetActionFor(Object* target, Object** targetPtr)
 
         *targetPtr = target;
 
-        if (isInCombat() && !critterIsDead(target) && !objectIsPartyMember(target)) {
+        if (isInCombat() && !critterIsDead(target) && (!objectIsPartyMember(target) || !settings.enhancements.no_party_member_targets)) {
             return TOUCH_ACTION_ATTACK;
         }
 
@@ -610,6 +612,10 @@ static TouchAction touchControlsGetActionFor(Object* target, Object** targetPtr)
         *targetPtr = target;
         return TOUCH_ACTION_USE;
     case OBJ_TYPE_SCENERY:
+        if (isInCombat() && doorTargetCanBeAttacked(target)) {
+            *targetPtr = target;
+            return TOUCH_ACTION_ATTACK;
+        }
         if (_obj_action_can_use(target)) {
             *targetPtr = target;
             return TOUCH_ACTION_USE;
@@ -621,14 +627,21 @@ static TouchAction touchControlsGetActionFor(Object* target, Object** targetPtr)
 }
 
 // The tactical view picks a critter by the tile it stands on (the figures,
-// see-through, cover other tiles); else the object the game would act on
-// without it, [object] (items, ladders, doors, bodies: #3, nothing could be
-// picked up in combat), a standing critter's figure aside.
+// see-through, cover other tiles), a door that is a target by its tile too;
+// else the object the game would act on without it, [object] (items, ladders,
+// doors, bodies: #3, nothing could be picked up in combat), a standing
+// critter's figure aside.
 static Object* touchControlsTacticalPick(int worldX, int worldY, Object* object)
 {
-    Object* critter = tacticalViewCritterAt(tileFromScreenXY(worldX, worldY));
+    int tile = tileFromScreenXY(worldX, worldY);
+    Object* critter = tacticalViewCritterAt(tile);
     if (critter != nullptr) {
         return critter;
+    }
+
+    Object* door = doorTargetAt(tile);
+    if (door != nullptr) {
+        return door;
     }
 
     if (object != nullptr && FrmId(object).objectType() == OBJ_TYPE_CRITTER && !critterIsDead(object)) {

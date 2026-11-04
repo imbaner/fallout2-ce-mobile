@@ -173,6 +173,10 @@ namespace {
     constexpr int kTextAboutVersion = 368;
     constexpr int kTextAboutNotice = 369;
     constexpr int kTextAboutLicenses = 372;
+    constexpr int kTextDoorTargets = 516;
+    constexpr int kTextDoorTargetsNote = 517;
+    constexpr int kTextPartyTargets = 518;
+    constexpr int kTextPartyTargetsNote = 519;
 
     // The port's number of quick saves (one page, the phone's config); CE's
     // own default is none.
@@ -206,6 +210,8 @@ namespace {
         bool mainMenuContinue;
         bool worldmapFollow;
         bool tacticalView;
+        bool doorTargetsBreakableOnly;
+        bool noPartyMemberTargets;
         bool saveCompatibility;
         bool barterUnitPrice;
         bool highlightContainers;
@@ -238,6 +244,8 @@ namespace {
         values.mainMenuContinue = settings.enhancements.main_menu_continue;
         values.worldmapFollow = settings.enhancements.worldmap_follow_party;
         values.tacticalView = settings.enhancements.tactical_view;
+        values.doorTargetsBreakableOnly = settings.enhancements.door_targets_breakable_only;
+        values.noPartyMemberTargets = settings.enhancements.no_party_member_targets;
         values.saveCompatibility = settings.enhancements.save_compatibility;
         values.barterUnitPrice = settings.enhancements.barter_unit_price;
         values.highlightContainers = settings.enhancements.highlight_containers;
@@ -271,6 +279,8 @@ namespace {
         values.mainMenuContinue = EnhancementSettings().main_menu_continue;
         values.worldmapFollow = EnhancementSettings().worldmap_follow_party;
         values.tacticalView = EnhancementSettings().tactical_view;
+        values.doorTargetsBreakableOnly = EnhancementSettings().door_targets_breakable_only;
+        values.noPartyMemberTargets = EnhancementSettings().no_party_member_targets;
         values.saveCompatibility = EnhancementSettings().save_compatibility;
         values.barterUnitPrice = EnhancementSettings().barter_unit_price;
         values.highlightContainers = EnhancementSettings().highlight_containers;
@@ -365,6 +375,8 @@ namespace {
             settings.enhancements.main_menu_continue = values.mainMenuContinue;
             settings.enhancements.worldmap_follow_party = values.worldmapFollow;
             settings.enhancements.tactical_view = values.tacticalView;
+            settings.enhancements.door_targets_breakable_only = values.doorTargetsBreakableOnly;
+            settings.enhancements.no_party_member_targets = values.noPartyMemberTargets;
             settings.enhancements.save_compatibility = values.saveCompatibility;
             settings.enhancements.barter_unit_price = values.barterUnitPrice;
             settings.enhancements.highlight_containers = values.highlightContainers;
@@ -662,6 +674,18 @@ namespace {
             Row row { Section::Combat, RowKind::Toggle, kTextTacticalView, "Tactical view", Origin::Port, kTextTacticalViewNote, "Combat button: see-through figures, tiles and where you can walk" };
             row.get = [](const Values& values) { return values.tacticalView ? 1.0f : 0.0f; };
             row.set = [](Values& values, float value) { values.tacticalView = value != 0.0f; };
+            rows.push_back(row);
+        }
+        {
+            Row row { Section::Combat, RowKind::Toggle, kTextDoorTargets, "Only doors that can break are targets", Origin::Port, kTextDoorTargetsNote, "Off: also doors that react to a hit, such as calling guards" };
+            row.get = [](const Values& values) { return values.doorTargetsBreakableOnly ? 1.0f : 0.0f; };
+            row.set = [](Values& values, float value) { values.doorTargetsBreakableOnly = value != 0.0f; };
+            rows.push_back(row);
+        }
+        {
+            Row row { Section::Combat, RowKind::Toggle, kTextPartyTargets, "Party members aren't targets", Origin::Port, kTextPartyTargetsNote, "Off: a tap can pick a party member as a target, as on the PC" };
+            row.get = [](const Values& values) { return values.noPartyMemberTargets ? 1.0f : 0.0f; };
+            row.set = [](Values& values, float value) { values.noPartyMemberTargets = value != 0.0f; };
             rows.push_back(row);
         }
         choice(Section::Combat, kTextTargetHighlight, "Target highlight", { kMessageOff, kMessageOn, kMessageTargetingOnly }, &PreferenceValues::targetHighlight);

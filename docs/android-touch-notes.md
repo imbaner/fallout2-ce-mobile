@@ -206,6 +206,43 @@ goes through mouse emulation in touchscreen (absolute) mode.
     item magnet as without the view (`touchControlsSnapToItem`); the
     enemy's body and the tile magnets stay off (critters go by tiles).
     Autotests `tactical`, `tacticalpickup`.
+- Doors as targets (2026-11-04, #23, `door_targets.cc`, `door_reaction.cc`):
+  the game's crosshair takes critters and scenery of the door type, touch
+  controls have no crosshair and a tap on a door uses it, so doors couldn't
+  be attacked at all. Mods use the type for what is meant to be hit: the
+  darts target of Fallout: Nevada, the obstacles of Sonora.
+  - A closed door is a target when the weapon in hand may change it and the
+    attack is possible now (`_combat_check_bad_shot`): outlined on the
+    player's turns (red, still: enemies' cycle; none with target highlight
+    off, whole turn otherwise, or the outline wouldn't tell anything before
+    the first tap), its tile drawn and picked in the tactical view. A tap
+    selects it as an enemy, the hit chance above it, the next one attacks.
+    It still opens by the long press menu. Without an outline a tap uses
+    the door as before.
+  - What a hit does is up to the door's script, and `damage_p_proc` can't
+    be asked: running it breaks the door. So it's read, not run
+    (`doorReactionRead`): the bytes of the file, every path, only the
+    damage type known (a condition on anything else goes both ways, random
+    and variables included). A command it doesn't know counts as a change
+    of the door, one that only writes variables, calls guards and so on as
+    a script's reaction. Answers depend on the script and the damage type
+    only: kept per script, read when first needed. No weapon: the engine
+    gives the door itself as `target_obj`, `metarule(49)` says 0.
+  - A weapon whose damage type a global script changes (`set_proto_data`
+    offset 48 in `gl*.int`, `hs_*.int`) has an unknown type: Et Tu's
+    `gl_fo1mechanics` makes the Molotov cocktail an explosion when it hits
+    scenery. What a global script does otherwise isn't seen.
+  - `[enhancements] door_targets_breakable_only` (a settings row): off -
+    doors with a script's reaction are targets too. Doors with no reaction
+    never are: a hit shows a message at most.
+    `no_party_member_targets`: off - a tap picks a party member as a
+    target, as the crosshair does.
+  - Checked against all scripts of six games (9717, original, RPU, Nevada,
+    Sonora, Resurrection, Et Tu): a prototype in Python, the same answers.
+    With RPU no door reacts to usual weapons with a change, 541 of 1388 to
+    an explosion. Autotests `doorbullet`, `dooraimed`, `doorfists`,
+    `doorscratch`, `doorfistsrpu`, `doorgrenade`, `doormenu`, `dooroutline`,
+    `doorreaction`, `doormolotov`, `darts`, `partytarget`, `targetsettings`.
 - Combat outlines with touch controls (2026-10-09,
   `combatOutlinesFollowTurn`): the game outlines critters only while the
   cursor is a crosshair; touch controls have no cursor (a move selection

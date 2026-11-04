@@ -368,6 +368,10 @@
 {513}{}{the random encounter wasn't set up}
 {514}{}{its file failed the checks}
 {515}{}{the system didn't install it}
+{516}{}{Only doors that can break are targets}
+{517}{}{Off: also doors that react to a hit, such as calling guards}
+{518}{}{Party members aren't targets}
+{519}{}{Off: a tap can pick a party member as a target, as on the PC}
 
 # The message when a party member or another critter cannot pick up an item
 # (the player's message is 905 in proto.msg).

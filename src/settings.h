@@ -325,6 +325,12 @@ struct EnhancementSettings {
     // Touch controls: the combat's tactical view button (tactical_view.h);
     // whether the view is on is [touch] tactical_view.
     bool tactical_view = true;
+    // Touch controls, what a tap picks as a target in combat. Doors only when
+    // the weapon may change them; off - also when their script reacts in any
+    // other way, guards for one (door_targets.h).
+    bool door_targets_breakable_only = true;
+    // Party members aren't picked; off - they are, as the crosshair takes them.
+    bool no_party_member_targets = true;
     // Mobile barter with a trader: each item cell shows the price of one in
     // this deal (`barterGetItemPrice`, as the dragged item shows it).
     bool barter_unit_price = true;

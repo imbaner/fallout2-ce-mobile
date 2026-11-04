@@ -10,6 +10,7 @@
 #include "animation.h"
 #include "combat.h"
 #include "critter.h"
+#include "door_targets.h"
 #include "game.h"
 #include "ground_lines.h"
 #include "map.h"
@@ -279,6 +280,20 @@ namespace {
                 outline.push_back(cornerPoint(corner));
             }
             groundLinesAddPath(outline, true, ui.dp(thick ? 2.6f : 1.6f), paletteColor(color));
+        }
+
+        // Doors that are targets, the selected one as the selected enemy.
+        for (int tile : doorTargetTiles()) {
+            if (!tileCorners3(tile, &corners)) {
+                continue;
+            }
+
+            std::vector<SDL_FPoint> outline;
+            for (const SDL_Point& corner : corners) {
+                outline.push_back(cornerPoint(corner));
+            }
+            bool selected = gAttackTarget != nullptr && gAttackTarget->tile == tile;
+            groundLinesAddPath(outline, true, ui.dp(selected ? 2.6f : 1.6f), paletteColor(objectStillOutlineColor(OUTLINE_TYPE_HOSTILE)));
         }
     }
 

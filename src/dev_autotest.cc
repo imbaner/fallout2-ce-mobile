@@ -20,6 +20,7 @@
 #include "art.h"
 #include "character_editor.h"
 #include "combat.h"
+#include "door_targets.h"
 #include "combat_ai.h"
 #include "content_config.h"
 #include "critter.h"
@@ -178,6 +179,28 @@ enum DevAutotestAction {
     DEV_AUTOTEST_ACTION_CHECK_REPLY,
     // Checks the code page of the game's texts (`widget`).
     DEV_AUTOTEST_ACTION_CHECK_CHARSET,
+    // Puts the dude `b` tiles from the door on tile `a`, with a clear line
+    // of fire, the view on him; `c` 1 - unlocks the door.
+    DEV_AUTOTEST_ACTION_MOVE_NEAR_DOOR,
+    // Taps the middle of the door on tile `a`, `b` 1 - a long press, 2 - its
+    // tile.
+    DEV_AUTOTEST_ACTION_TOUCH_TAP_DOOR,
+    // FAIL unless a door stands on tile `a` (`b` 1), stands open (`b` 2),
+    // stands in any way (`b` 3) or doesn't stand there (`b` 0).
+    DEV_AUTOTEST_ACTION_CHECK_DOOR,
+    // Attacks the door on tile `a` as the game's crosshair does, with action
+    // points for it.
+    DEV_AUTOTEST_ACTION_ATTACK_DOOR,
+    // FAIL unless the door on tile `a` is outlined as a target (`b` 1) or not
+    // (`b` 0).
+    DEV_AUTOTEST_ACTION_CHECK_DOOR_OUTLINE,
+    // Sets [enhancements] door_targets_breakable_only to `a`,
+    // no_party_member_targets to `b`.
+    DEV_AUTOTEST_ACTION_SET_TARGET_SETTINGS,
+    // FAIL unless map variable `a` is `b`.
+    DEV_AUTOTEST_ACTION_CHECK_MAP_VAR,
+    // As TALK_TO_PID, the critter with the script file `widget`.
+    DEV_AUTOTEST_ACTION_TALK_TO_SCRIPT,
     // Logs the game's windows made since the scenario started (hidden ones
     // too).
     DEV_AUTOTEST_ACTION_LOG_NEW_WINDOWS,
@@ -995,6 +1018,237 @@ static const DevAutotestStep kDevAutotestTacticalSteps[] = {
     { DEV_AUTOTEST_ACTION_CHECK_TACTICAL, 1, 1, 0, 1, "v21_shown_again" },
 };
 
+// #23: a tap on a door in combat picks it as a target when the weapon may
+// change it. The Den's locked door, a wooden one, run with
+// --dev-map=denbus1.map. Without RPU a bullet breaks it.
+static const DevAutotestStep kDevAutotestDoorBulletSteps[] = {
+    { DEV_AUTOTEST_ACTION_WAIT_MAP_LOADED, 1500, 0, 0, 60, "dr00_map" },
+    { DEV_AUTOTEST_ACTION_MOVE_NEAR_DOOR, 28302, 3, 0, 10, "dr01_near" },
+    { DEV_AUTOTEST_ACTION_SPAWN_ENEMY, 245, 14, ROTATION_SW, 1, "dr02_enemy" },
+    { DEV_AUTOTEST_ACTION_ADD_SKILL, SKILL_SMALL_GUNS, 150, 1, 1, "dr03_skill" },
+    { DEV_AUTOTEST_ACTION_EQUIP_ITEM, 17, 0, 0, 10, "dr04_armor" },
+    { DEV_AUTOTEST_ACTION_EQUIP_ITEM, 9, HAND_LEFT, 0, 20, "dr05_smg" },
+    { DEV_AUTOTEST_ACTION_START_COMBAT, 0, 0, 0, 60, "dr06_combat" },
+    { DEV_AUTOTEST_ACTION_SET_ACTION_POINTS, 30, 0, 0, 5, "dr07_ap" },
+    { DEV_AUTOTEST_ACTION_TOUCH_TAP_DOOR, 28302, 0, 0, 20, "dr08_target" },
+    { DEV_AUTOTEST_ACTION_CHECK_SELECTION, 3, 0, 0, 1, "dr09_selected" },
+    { DEV_AUTOTEST_ACTION_TOUCH_TAP_DOOR, 28302, 0, 0, 120, "dr10_shot" },
+    { DEV_AUTOTEST_ACTION_TOUCH_TAP_DOOR, 28302, 0, 0, 120, "dr11_shot" },
+    { DEV_AUTOTEST_ACTION_TOUCH_TAP_DOOR, 28302, 0, 0, 120, "dr12_shot" },
+    { DEV_AUTOTEST_ACTION_CHECK_DOOR, 28302, 0, 0, 1, "dr13_gone" },
+};
+
+// An aimed shot goes as a usual one: a door has no body parts to choose from.
+static const DevAutotestStep kDevAutotestDoorAimedSteps[] = {
+    { DEV_AUTOTEST_ACTION_WAIT_MAP_LOADED, 1500, 0, 0, 60, "da00_map" },
+    { DEV_AUTOTEST_ACTION_MOVE_NEAR_DOOR, 28302, 3, 0, 10, "da01_near" },
+    { DEV_AUTOTEST_ACTION_SPAWN_ENEMY, 245, 14, ROTATION_SW, 1, "da02_enemy" },
+    { DEV_AUTOTEST_ACTION_ADD_SKILL, SKILL_SMALL_GUNS, 150, 1, 1, "da03_skill" },
+    { DEV_AUTOTEST_ACTION_EQUIP_ITEM, 17, 0, 0, 10, "da04_armor" },
+    { DEV_AUTOTEST_ACTION_EQUIP_ITEM, 9, HAND_LEFT, 0, 20, "da05_smg" },
+    { DEV_AUTOTEST_ACTION_START_COMBAT, 0, 0, 0, 60, "da06_combat" },
+    { DEV_AUTOTEST_ACTION_SET_ACTION_POINTS, 30, 0, 0, 5, "da07_ap" },
+    { DEV_AUTOTEST_ACTION_HUD_TAP_MODE, 1, 0, 0, 20, "da08_aimed" },
+    { DEV_AUTOTEST_ACTION_LOG_HIT_MODE, 0, 0, 0, 1, "da09_mode" },
+    { DEV_AUTOTEST_ACTION_TOUCH_TAP_DOOR, 28302, 0, 0, 20, "da10_target" },
+    { DEV_AUTOTEST_ACTION_CHECK_SELECTION, 3, 0, 0, 1, "da11_selected" },
+    { DEV_AUTOTEST_ACTION_TOUCH_TAP_DOOR, 28302, 0, 0, 120, "da12_shot" },
+    { DEV_AUTOTEST_ACTION_TOUCH_TAP_DOOR, 28302, 0, 0, 120, "da13_shot" },
+    { DEV_AUTOTEST_ACTION_CHECK_DOOR, 28302, 0, 0, 1, "da14_gone" },
+};
+
+// A door that is a target still opens: the long press menu.
+static const DevAutotestStep kDevAutotestDoorMenuSteps[] = {
+    { DEV_AUTOTEST_ACTION_WAIT_MAP_LOADED, 1500, 0, 0, 60, "dm00_map" },
+    { DEV_AUTOTEST_ACTION_MOVE_NEAR_DOOR, 28302, 4, 1, 10, "dm01_near" },
+    { DEV_AUTOTEST_ACTION_SPAWN_ENEMY, 245, 14, ROTATION_SW, 1, "dm02_enemy" },
+    { DEV_AUTOTEST_ACTION_EQUIP_ITEM, 25, HAND_LEFT, 0, 20, "dm03_grenade" },
+    { DEV_AUTOTEST_ACTION_START_COMBAT, 0, 0, 0, 60, "dm04_combat" },
+    { DEV_AUTOTEST_ACTION_SET_ACTION_POINTS, 30, 0, 0, 5, "dm05_ap" },
+    { DEV_AUTOTEST_ACTION_TOUCH_TAP_DOOR, 28302, 0, 0, 20, "dm06_target" },
+    { DEV_AUTOTEST_ACTION_CHECK_SELECTION, 3, 0, 0, 1, "dm07_selected" },
+    { DEV_AUTOTEST_ACTION_TOUCH_TAP_DOOR, 28302, 1, 0, 60, "dm08_menu" },
+    { DEV_AUTOTEST_ACTION_TOUCH_TAP_RADIAL, GAME_MOUSE_ACTION_MENU_ITEM_USE, 0, 0, 240, "dm09_use" },
+    { DEV_AUTOTEST_ACTION_CHECK_DOOR, 28302, 2, 0, 1, "dm10_open" },
+};
+
+// The outline follows the weapon in hand, the tactical view picks the door by
+// its tile.
+static const DevAutotestStep kDevAutotestDoorOutlineSteps[] = {
+    { DEV_AUTOTEST_ACTION_WAIT_MAP_LOADED, 1500, 0, 0, 60, "do00_map" },
+    { DEV_AUTOTEST_ACTION_MOVE_NEAR_DOOR, 28302, 4, 0, 10, "do01_near" },
+    { DEV_AUTOTEST_ACTION_SPAWN_ENEMY, 245, 14, ROTATION_SW, 1, "do02_enemy" },
+    { DEV_AUTOTEST_ACTION_EQUIP_ITEM, 17, 0, 0, 10, "do03_armor" },
+    { DEV_AUTOTEST_ACTION_EQUIP_ITEM, 25, HAND_LEFT, 0, 20, "do04_grenade" },
+    { DEV_AUTOTEST_ACTION_START_COMBAT, 0, 0, 0, 60, "do05_combat" },
+    { DEV_AUTOTEST_ACTION_SET_ACTION_POINTS, 30, 0, 0, 30, "do06_ap" },
+    { DEV_AUTOTEST_ACTION_CHECK_DOOR_OUTLINE, 28302, 1, 0, 1, "do07_outlined" },
+    { DEV_AUTOTEST_ACTION_EQUIP_ITEM, 9, HAND_LEFT, 0, 30, "do08_smg" },
+    { DEV_AUTOTEST_ACTION_CHECK_DOOR_OUTLINE, 28302, 0, 0, 1, "do09_no_outline" },
+    { DEV_AUTOTEST_ACTION_EQUIP_ITEM, 25, HAND_LEFT, 0, 30, "do10_grenade" },
+    { DEV_AUTOTEST_ACTION_HUD_TAP, HUD_ELEMENT(TacticalView), 0, 0, 30, "do11_tactical" },
+    { DEV_AUTOTEST_ACTION_CHECK_DOOR_OUTLINE, 28302, 1, 0, 1, "do12_outlined" },
+    { DEV_AUTOTEST_ACTION_TOUCH_TAP_DOOR, 28302, 2, 0, 20, "do13_target" },
+    { DEV_AUTOTEST_ACTION_CHECK_SELECTION, 3, 0, 0, 1, "do14_selected" },
+};
+
+// A party member is a target only with the setting off.
+static const DevAutotestStep kDevAutotestPartyTargetSteps[] = {
+    { DEV_AUTOTEST_ACTION_NONE, 0, 0, 0, 30, "pt00_map" },
+    { DEV_AUTOTEST_ACTION_ADD_PARTY_MEMBER, 97, 3, ROTATION_SW, 10, "pt01_sulik", "Kcsulik.int" },
+    { DEV_AUTOTEST_ACTION_SPAWN_ENEMY, 245, 14, ROTATION_NE, 1, "pt02_enemy" },
+    { DEV_AUTOTEST_ACTION_EQUIP_ITEM, 9, HAND_LEFT, 0, 20, "pt03_smg" },
+    { DEV_AUTOTEST_ACTION_START_COMBAT, 0, 0, 0, 90, "pt04_combat" },
+    { DEV_AUTOTEST_ACTION_SET_ACTION_POINTS, 30, 0, 0, 5, "pt05_ap" },
+    { DEV_AUTOTEST_ACTION_TOUCH_TAP_CRITTER, 0, 0, 97, 20, "pt06_tap" },
+    { DEV_AUTOTEST_ACTION_CHECK_SELECTION, 2, 0, 0, 1, "pt07_use" },
+    { DEV_AUTOTEST_ACTION_SET_TARGET_SETTINGS, 1, 0, 0, 1, "pt08_setting" },
+    { DEV_AUTOTEST_ACTION_TOUCH_TAP_CRITTER, 0, 0, 97, 20, "pt09_tap" },
+    { DEV_AUTOTEST_ACTION_CHECK_SELECTION, 3, 0, 0, 1, "pt10_target" },
+    { DEV_AUTOTEST_ACTION_SET_TARGET_SETTINGS, 1, 1, 0, 1, "pt11_setting" },
+};
+
+// The two settings of what a tap picks: their rows on the settings screen.
+static const DevAutotestStep kDevAutotestTargetSettingsSteps[] = {
+    { DEV_AUTOTEST_ACTION_NONE, 0, 0, 0, 30, "ts00_map" },
+    { DEV_AUTOTEST_ACTION_BACK, 0, 0, 0, 40, "ts01_menu" },
+    { DEV_AUTOTEST_ACTION_MUI_TAP, 0, 0, 0, 30, "ts02_settings", "menu.settings" },
+    { DEV_AUTOTEST_ACTION_MUI_TAP, 0, 0, 0, 20, "ts03_combat", "prefs.sections.1" },
+    { DEV_AUTOTEST_ACTION_MUI_DRAG_BY, 0, -0.45f, 0, 40, "ts03a_rows", "prefs.rows.267" },
+    { DEV_AUTOTEST_ACTION_CHECK_WIDGET, 1, 0, 0, 1, "ts04_doors", "prefs.rows.516" },
+    { DEV_AUTOTEST_ACTION_CHECK_WIDGET, 1, 0, 0, 1, "ts05_party", "prefs.rows.518" },
+};
+
+// RPU: a bullet doesn't scratch it, the door isn't a target.
+static const DevAutotestStep kDevAutotestDoorScratchSteps[] = {
+    { DEV_AUTOTEST_ACTION_WAIT_MAP_LOADED, 1500, 0, 0, 60, "ds00_map" },
+    { DEV_AUTOTEST_ACTION_MOVE_NEAR_DOOR, 28302, 3, 0, 10, "ds01_near" },
+    { DEV_AUTOTEST_ACTION_SPAWN_ENEMY, 245, 14, ROTATION_SW, 1, "ds02_enemy" },
+    { DEV_AUTOTEST_ACTION_EQUIP_ITEM, 17, 0, 0, 10, "ds03_armor" },
+    { DEV_AUTOTEST_ACTION_EQUIP_ITEM, 9, HAND_LEFT, 0, 20, "ds04_smg" },
+    { DEV_AUTOTEST_ACTION_START_COMBAT, 0, 0, 0, 60, "ds05_combat" },
+    { DEV_AUTOTEST_ACTION_SET_ACTION_POINTS, 30, 0, 0, 5, "ds06_ap" },
+    { DEV_AUTOTEST_ACTION_TOUCH_TAP_DOOR, 28302, 0, 0, 20, "ds07_use" },
+    { DEV_AUTOTEST_ACTION_CHECK_SELECTION, 2, 0, 0, 1, "ds08_selected" },
+    { DEV_AUTOTEST_ACTION_ATTACK_DOOR, 28302, 0, 0, 120, "ds09_shot" },
+    { DEV_AUTOTEST_ACTION_ATTACK_DOOR, 28302, 0, 0, 120, "ds10_shot" },
+    { DEV_AUTOTEST_ACTION_CHECK_DOOR, 28302, 1, 0, 1, "ds11_there" },
+};
+
+// Fists next to the door: without RPU any hit breaks it.
+static const DevAutotestStep kDevAutotestDoorFistsSteps[] = {
+    { DEV_AUTOTEST_ACTION_WAIT_MAP_LOADED, 1500, 0, 0, 60, "df00_map" },
+    { DEV_AUTOTEST_ACTION_MOVE_NEAR_DOOR, 28302, 1, 0, 10, "df01_near" },
+    { DEV_AUTOTEST_ACTION_SPAWN_ENEMY, 245, 14, ROTATION_SW, 1, "df02_enemy" },
+    { DEV_AUTOTEST_ACTION_ADD_SKILL, SKILL_UNARMED, 150, 1, 1, "df03_skill" },
+    { DEV_AUTOTEST_ACTION_START_COMBAT, 0, 0, 0, 60, "df04_combat" },
+    { DEV_AUTOTEST_ACTION_SET_ACTION_POINTS, 30, 0, 0, 5, "df05_ap" },
+    { DEV_AUTOTEST_ACTION_TOUCH_TAP_DOOR, 28302, 0, 0, 20, "df06_target" },
+    { DEV_AUTOTEST_ACTION_CHECK_SELECTION, 3, 0, 0, 1, "df07_selected" },
+    { DEV_AUTOTEST_ACTION_TOUCH_TAP_DOOR, 28302, 0, 0, 120, "df08_hit" },
+    { DEV_AUTOTEST_ACTION_TOUCH_TAP_DOOR, 28302, 0, 0, 120, "df09_hit" },
+    { DEV_AUTOTEST_ACTION_CHECK_DOOR, 28302, 0, 0, 1, "df10_gone" },
+};
+
+// RPU: fists don't scratch it either, whatever the crosshair does. A miss
+// plays the door's frames as a dodge (`_action_melee`): open or not, it stands.
+static const DevAutotestStep kDevAutotestDoorFistsRpuSteps[] = {
+    { DEV_AUTOTEST_ACTION_WAIT_MAP_LOADED, 1500, 0, 0, 60, "dp00_map" },
+    { DEV_AUTOTEST_ACTION_MOVE_NEAR_DOOR, 28302, 1, 0, 10, "dp01_near" },
+    { DEV_AUTOTEST_ACTION_SPAWN_ENEMY, 245, 14, ROTATION_SW, 1, "dp02_enemy" },
+    { DEV_AUTOTEST_ACTION_ADD_SKILL, SKILL_UNARMED, 150, 1, 1, "dp03_skill" },
+    { DEV_AUTOTEST_ACTION_START_COMBAT, 0, 0, 0, 60, "dp04_combat" },
+    { DEV_AUTOTEST_ACTION_SET_ACTION_POINTS, 30, 0, 0, 5, "dp05_ap" },
+    { DEV_AUTOTEST_ACTION_TOUCH_TAP_DOOR, 28302, 0, 0, 20, "dp06_use" },
+    { DEV_AUTOTEST_ACTION_CHECK_SELECTION, 2, 0, 0, 1, "dp07_selected" },
+    { DEV_AUTOTEST_ACTION_ATTACK_DOOR, 28302, 0, 0, 120, "dp08_hit" },
+    { DEV_AUTOTEST_ACTION_ATTACK_DOOR, 28302, 0, 0, 120, "dp09_hit" },
+    { DEV_AUTOTEST_ACTION_CHECK_DOOR, 28302, 3, 0, 1, "dp10_there" },
+};
+
+// RPU, Gunther's door in NCR (--dev-map=ncr2.map): a bullet only sets a
+// variable, the door stays. A target with the setting off.
+static const DevAutotestStep kDevAutotestDoorReactionSteps[] = {
+    { DEV_AUTOTEST_ACTION_WAIT_MAP_LOADED, 1500, 0, 0, 60, "dx00_map" },
+    { DEV_AUTOTEST_ACTION_MOVE_NEAR_DOOR, 17861, 3, 0, 10, "dx01_near" },
+    { DEV_AUTOTEST_ACTION_SPAWN_ENEMY, 245, 14, ROTATION_SW, 1, "dx02_enemy" },
+    { DEV_AUTOTEST_ACTION_EQUIP_ITEM, 17, 0, 0, 10, "dx03_armor" },
+    { DEV_AUTOTEST_ACTION_EQUIP_ITEM, 9, HAND_LEFT, 0, 20, "dx04_smg" },
+    { DEV_AUTOTEST_ACTION_START_COMBAT, 0, 0, 0, 60, "dx05_combat" },
+    { DEV_AUTOTEST_ACTION_SET_ACTION_POINTS, 30, 0, 0, 30, "dx06_ap" },
+    { DEV_AUTOTEST_ACTION_CHECK_DOOR_OUTLINE, 17861, 0, 0, 1, "dx07_no_outline" },
+    { DEV_AUTOTEST_ACTION_TOUCH_TAP_DOOR, 17861, 0, 0, 20, "dx08_use" },
+    { DEV_AUTOTEST_ACTION_CHECK_SELECTION, 2, 0, 0, 1, "dx09_selected" },
+    { DEV_AUTOTEST_ACTION_SET_TARGET_SETTINGS, 0, 1, 0, 30, "dx10_setting" },
+    { DEV_AUTOTEST_ACTION_CHECK_DOOR_OUTLINE, 17861, 1, 0, 1, "dx11_outlined" },
+    { DEV_AUTOTEST_ACTION_TOUCH_TAP_DOOR, 17861, 0, 0, 20, "dx12_target" },
+    { DEV_AUTOTEST_ACTION_CHECK_SELECTION, 3, 0, 0, 1, "dx13_selected" },
+    { DEV_AUTOTEST_ACTION_SET_TARGET_SETTINGS, 1, 1, 0, 1, "dx14_setting" },
+};
+
+// Et Tu: a global script makes the Molotov cocktail an explosion when it hits
+// scenery, before that its damage type says fire. Run in Et Tu with
+// --dev-map=usedcar.map.
+static const DevAutotestStep kDevAutotestDoorMolotovSteps[] = {
+    { DEV_AUTOTEST_ACTION_WAIT_MAP_LOADED, 1500, 0, 0, 60, "dv00_map" },
+    { DEV_AUTOTEST_ACTION_MOVE_NEAR_DOOR, 21115, 4, 0, 10, "dv01_near" },
+    { DEV_AUTOTEST_ACTION_SPAWN_ENEMY, 245, 14, ROTATION_SW, 1, "dv01a_enemy" },
+    { DEV_AUTOTEST_ACTION_ADD_SKILL, SKILL_THROWING, 150, 1, 1, "dv02_skill" },
+    { DEV_AUTOTEST_ACTION_EQUIP_ITEM, 159, HAND_LEFT, 0, 20, "dv03_molotov" },
+    { DEV_AUTOTEST_ACTION_START_COMBAT, 0, 0, 0, 60, "dv04_combat" },
+    { DEV_AUTOTEST_ACTION_SET_ACTION_POINTS, 30, 0, 0, 30, "dv05_ap" },
+    { DEV_AUTOTEST_ACTION_CHECK_DOOR_OUTLINE, 21115, 1, 0, 1, "dv06_outlined" },
+    { DEV_AUTOTEST_ACTION_TOUCH_TAP_DOOR, 21115, 0, 0, 20, "dv07_target" },
+    { DEV_AUTOTEST_ACTION_CHECK_SELECTION, 3, 0, 0, 1, "dv08_selected" },
+    { DEV_AUTOTEST_ACTION_TOUCH_TAP_DOOR, 21115, 0, 0, 200, "dv09_throw" },
+    { DEV_AUTOTEST_ACTION_EQUIP_ITEM, 159, HAND_LEFT, 0, 20, "dv10_molotov" },
+    { DEV_AUTOTEST_ACTION_SET_ACTION_POINTS, 30, 0, 0, 5, "dv11_ap" },
+    { DEV_AUTOTEST_ACTION_TOUCH_TAP_DOOR, 21115, 0, 0, 200, "dv12_throw" },
+    { DEV_AUTOTEST_ACTION_CHECK_DOOR, 21115, 0, 0, 1, "dv13_gone" },
+};
+
+// RPU: an explosion breaks it (a throw can miss: three of them).
+static const DevAutotestStep kDevAutotestDoorGrenadeSteps[] = {
+    { DEV_AUTOTEST_ACTION_WAIT_MAP_LOADED, 1500, 0, 0, 60, "dg00_map" },
+    { DEV_AUTOTEST_ACTION_MOVE_NEAR_DOOR, 28302, 4, 0, 10, "dg01_near" },
+    { DEV_AUTOTEST_ACTION_SPAWN_ENEMY, 245, 14, ROTATION_SW, 1, "dg02_enemy" },
+    { DEV_AUTOTEST_ACTION_ADD_SKILL, SKILL_THROWING, 150, 1, 1, "dg03_skill" },
+    { DEV_AUTOTEST_ACTION_EQUIP_ITEM, 25, HAND_LEFT, 0, 20, "dg04_grenade" },
+    { DEV_AUTOTEST_ACTION_START_COMBAT, 0, 0, 0, 60, "dg05_combat" },
+    { DEV_AUTOTEST_ACTION_SET_ACTION_POINTS, 30, 0, 0, 5, "dg06_ap" },
+    { DEV_AUTOTEST_ACTION_TOUCH_TAP_DOOR, 28302, 0, 0, 20, "dg07_target" },
+    { DEV_AUTOTEST_ACTION_CHECK_SELECTION, 3, 0, 0, 1, "dg08_selected" },
+    { DEV_AUTOTEST_ACTION_TOUCH_TAP_DOOR, 28302, 0, 0, 200, "dg09_throw" },
+    { DEV_AUTOTEST_ACTION_EQUIP_ITEM, 25, HAND_LEFT, 0, 20, "dg10_grenade" },
+    { DEV_AUTOTEST_ACTION_SET_ACTION_POINTS, 30, 0, 0, 5, "dg11_ap" },
+    { DEV_AUTOTEST_ACTION_TOUCH_TAP_DOOR, 28302, 0, 0, 200, "dg12_throw" },
+    { DEV_AUTOTEST_ACTION_EQUIP_ITEM, 25, HAND_LEFT, 0, 20, "dg13_grenade" },
+    { DEV_AUTOTEST_ACTION_SET_ACTION_POINTS, 30, 0, 0, 5, "dg14_ap" },
+    { DEV_AUTOTEST_ACTION_TOUCH_TAP_DOOR, 28302, 0, 0, 200, "dg15_throw" },
+    { DEV_AUTOTEST_ACTION_CHECK_DOOR, 28302, 0, 0, 1, "dg16_gone" },
+};
+
+// Darts in Nevada's Vault City (--dev-map=vctycity.map): the target on the
+// wall is a door nobody can use. Its script counts the throws in map
+// variable 14.
+static const DevAutotestStep kDevAutotestDartsSteps[] = {
+    { DEV_AUTOTEST_ACTION_WAIT_MAP_LOADED, 1500, 0, 0, 60, "dt00_map" },
+    { DEV_AUTOTEST_ACTION_TALK_TO_SCRIPT, 0, 0, 0, 30, "dt01_talk", "vbcdrtsa.int" },
+    { DEV_AUTOTEST_ACTION_WAIT_TALKING, 1, 0, 0, 60, "dt02_talking" },
+    { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 40, "dt03_what" },
+    { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 1, 0, 0, 40, "dt04_try" },
+    { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 40, "dt05_ready" },
+    { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 120, "dt06_begin" },
+    { DEV_AUTOTEST_ACTION_ADD_SKILL, SKILL_THROWING, 150, 1, 1, "dt07_skill" },
+    { DEV_AUTOTEST_ACTION_EQUIP_ITEM, 112, HAND_LEFT, 0, 10, "dt08_dart" },
+    { DEV_AUTOTEST_ACTION_START_COMBAT, 0, 0, 0, 60, "dt09_combat" },
+    { DEV_AUTOTEST_ACTION_SET_ACTION_POINTS, 30, 0, 0, 5, "dt10_ap" },
+    { DEV_AUTOTEST_ACTION_TOUCH_TAP_DOOR, 20901, 0, 0, 20, "dt11_target" },
+    { DEV_AUTOTEST_ACTION_CHECK_SELECTION, 3, 0, 0, 1, "dt12_selected" },
+    { DEV_AUTOTEST_ACTION_TOUCH_TAP_DOOR, 20901, 0, 0, 150, "dt13_throw" },
+    { DEV_AUTOTEST_ACTION_CHECK_MAP_VAR, 14, 1, 0, 1, "dt14_thrown" },
+};
+
 // #25: the code page of a translation, wherever it lies (the copies of the
 // game in out/dev/testgame-cs-*, made by charset-games.sh): the texts of the
 // character screen, read by it.
@@ -1708,6 +1962,35 @@ static const DevAutotestStep kDevAutotestWebPerfSteps[] = {
     { DEV_AUTOTEST_ACTION_NONE, 0, 0, 0, 1200, "w10_after" },
     { DEV_AUTOTEST_ACTION_MARK, 0, 0, 0, 0, "w11_mark", "end" },
 };
+
+static Object* devAutotestDoorAt(int tile)
+{
+    for (Object* object = objectFindFirstAtElevation(gElevation); object != nullptr; object = objectFindNextAtElevation()) {
+        if (object->tile == tile && doorTargetIsDoor(object)) {
+            return object;
+        }
+    }
+    return nullptr;
+}
+
+// The critter with the script file [name], on any elevation.
+static Object* devAutotestFindCritterOfScript(const char* name)
+{
+    for (MapElevation elevation = ELEVATION_FIRST; elevation < ELEVATION_COUNT; elevation++) {
+        for (Object* object = objectFindFirstAtElevation(elevation); object != nullptr; object = objectFindNextAtElevation()) {
+            char fileName[COMPAT_MAX_PATH];
+            Script* script;
+            if (FrmId(object).objectType() == OBJ_TYPE_CRITTER
+                && object->sid != -1
+                && scriptGetScript(object->sid, &script) != -1
+                && scriptsGetFileName(script->index & 0xFFFFFF, fileName, sizeof(fileName)) == 0
+                && compat_stricmp(fileName, name) == 0) {
+                return object;
+            }
+        }
+    }
+    return nullptr;
+}
 
 static void devAutotestMark(const char* name)
 {
@@ -4161,6 +4444,19 @@ static const DevAutotestScenario kDevAutotestScenarios[] = {
     devAutotestScenario("pccharacter", kDevAutotestPcCharacterSteps),
     devAutotestScenario("fadecycle", kDevAutotestFadeCycleSteps),
     devAutotestScenario("tacticalpickup", kDevAutotestTacticalPickupSteps),
+    devAutotestScenario("doorbullet", kDevAutotestDoorBulletSteps),
+    devAutotestScenario("dooraimed", kDevAutotestDoorAimedSteps),
+    devAutotestScenario("doormenu", kDevAutotestDoorMenuSteps),
+    devAutotestScenario("doorscratch", kDevAutotestDoorScratchSteps),
+    devAutotestScenario("dooroutline", kDevAutotestDoorOutlineSteps),
+    devAutotestScenario("doorfists", kDevAutotestDoorFistsSteps),
+    devAutotestScenario("doorfistsrpu", kDevAutotestDoorFistsRpuSteps),
+    devAutotestScenario("doorreaction", kDevAutotestDoorReactionSteps),
+    devAutotestScenario("doormolotov", kDevAutotestDoorMolotovSteps),
+    devAutotestScenario("targetsettings", kDevAutotestTargetSettingsSteps),
+    devAutotestScenario("partytarget", kDevAutotestPartyTargetSteps),
+    devAutotestScenario("doorgrenade", kDevAutotestDoorGrenadeSteps),
+    devAutotestScenario("darts", kDevAutotestDartsSteps),
     devAutotestScenario("charsetcentral", kDevAutotestCharsetCentralSteps),
     devAutotestScenario("charsetwestern", kDevAutotestCharsetWesternSteps),
     devAutotestScenario("talkmenu", kDevAutotestTalkMenuSteps),
@@ -4884,15 +5180,19 @@ void devAutotestTick()
                 }
             }
             break;
+        case DEV_AUTOTEST_ACTION_TALK_TO_SCRIPT:
         case DEV_AUTOTEST_ACTION_TALK_TO_PID: {
             // `a` 0: the nearest critter.
             int pid = 0x01000000 | static_cast<int>(step->a);
-            Object* critter = step->a != 0 ? devAutotestFindCritterOfPid(pid) : devAutotestFindNearestCritter();
+            Object* critter = step->action == DEV_AUTOTEST_ACTION_TALK_TO_SCRIPT ? devAutotestFindCritterOfScript(step->widget)
+                : step->a != 0                                                   ? devAutotestFindCritterOfPid(pid)
+                                                                                 : devAutotestFindNearestCritter();
             if (critter != nullptr) {
                 // Next to the critter: no walk, the same start every run.
                 int tile = tileGetTileInDirection(critter->tile, ROTATION_SW, 1);
                 Rect rect;
                 objectSetLocation(gDude, tile, critter->elevation, &rect);
+                tileSetCenter(gDude->tile, TILE_SET_CENTER_REFRESH_WINDOW);
                 devAutotestLog("  talk to pid %d at tile %d from tile %d\n", pid, critter->tile, tile);
                 gDevAutotestPendingCapture = step->name;
                 gDevAutotestStep++;
@@ -4970,6 +5270,90 @@ void devAutotestTick()
         case DEV_AUTOTEST_ACTION_LOG_DIALOG:
             devAutotestLogDialog();
             break;
+        case DEV_AUTOTEST_ACTION_MOVE_NEAR_DOOR: {
+            Object* door = devAutotestDoorAt(static_cast<int>(step->a));
+            if (door == nullptr) {
+                devAutotestLog("FAIL: no door on tile %d\n", static_cast<int>(step->a));
+                break;
+            }
+
+            if (step->c == 1) {
+                objectUnlock(door);
+            }
+
+            for (int rotation = 0; rotation < ROTATION_COUNT; rotation++) {
+                int tile = tileGetTileInDirection(door->tile, static_cast<Rotation>(rotation), static_cast<int>(step->b));
+                if (_obj_blocking_at(nullptr, tile, door->elevation) == nullptr && !_combat_is_shot_blocked(gDude, tile, door->tile, door, nullptr)) {
+                    Rect rect;
+                    objectSetLocation(gDude, tile, door->elevation, &rect);
+                    tileSetCenter(gDude->tile, TILE_SET_CENTER_REFRESH_WINDOW);
+                    devAutotestLog("  dude on tile %d near the door\n", gDude->tile);
+                    break;
+                }
+            }
+            break;
+        }
+        case DEV_AUTOTEST_ACTION_TOUCH_TAP_DOOR: {
+            Object* door = devAutotestDoorAt(static_cast<int>(step->a));
+            if (door == nullptr) {
+                devAutotestLog("  no door to tap\n");
+                break;
+            }
+
+            Rect rect;
+            objectGetRect(door, &rect);
+            int x;
+            int y;
+            worldViewWorldToScreen((rect.left + rect.right) / 2, (rect.top + rect.bottom) / 2, &x, &y);
+            HitMode hitMode = HIT_MODE_PUNCH;
+            bool aiming = false;
+            interfaceGetCurrentHitMode(&hitMode, &aiming);
+            devAutotestLog("  tap the door at (%d, %d), ap %d, bad shot %d\n", x, y, gDude->data.critter.combat.ap,
+                static_cast<int>(_combat_check_bad_shot(gDude, door, hitMode, aiming)));
+            if (step->b == 2) {
+                float tileX;
+                float tileY;
+                devAutotestGetTileScreenPosition(door->tile, &tileX, &tileY);
+                x = static_cast<int>(tileX);
+                y = static_cast<int>(tileY);
+            }
+            devAutotestStartTouch(x, y, x, y, step->b == 1 ? 30 : 1, 0);
+            break;
+        }
+        case DEV_AUTOTEST_ACTION_CHECK_DOOR: {
+            Object* door = devAutotestDoorAt(static_cast<int>(step->a));
+            int state = door == nullptr ? 0 : (objectIsOpen(door) ? 2 : 1);
+            bool ok = step->b == 3 ? state != 0 : state == static_cast<int>(step->b);
+            devAutotestLog("  door on tile %d: state %d: %s\n", static_cast<int>(step->a), state, ok ? "PASS" : "FAIL");
+            break;
+        }
+        case DEV_AUTOTEST_ACTION_ATTACK_DOOR: {
+            Object* door = devAutotestDoorAt(static_cast<int>(step->a));
+            if (door != nullptr) {
+                gDude->data.critter.combat.ap = 30;
+                playerAttack(door);
+            }
+            break;
+        }
+        case DEV_AUTOTEST_ACTION_CHECK_DOOR_OUTLINE: {
+            Object* door = devAutotestDoorAt(static_cast<int>(step->a));
+            const std::vector<int>& tiles = doorTargetTiles();
+            bool outlined = door != nullptr && objectHasVisibleOutline(door) && std::find(tiles.begin(), tiles.end(), door->tile) != tiles.end();
+            devAutotestLog("  door on tile %d: outlined %d, target tiles %d: %s\n", static_cast<int>(step->a), outlined ? 1 : 0,
+                static_cast<int>(tiles.size()), outlined == (step->b != 0) ? "PASS" : "FAIL");
+            break;
+        }
+        case DEV_AUTOTEST_ACTION_SET_TARGET_SETTINGS:
+            settings.enhancements.door_targets_breakable_only = step->a != 0;
+            settings.enhancements.no_party_member_targets = step->b != 0;
+            break;
+        case DEV_AUTOTEST_ACTION_CHECK_MAP_VAR: {
+            ProgramValue value;
+            mapGetGlobalVar(static_cast<int>(step->a), value);
+            devAutotestLog("  map var %d: %d: %s\n", static_cast<int>(step->a), value.integerValue,
+                value.integerValue == static_cast<int>(step->b) ? "PASS" : "FAIL");
+            break;
+        }
         case DEV_AUTOTEST_ACTION_CHECK_CHARSET:
             devAutotestLog("  game texts: %s, expected %s: %s\n", gameCharsetName(), step->widget,
                 strcmp(gameCharsetName(), step->widget) == 0 ? "PASS" : "FAIL");
