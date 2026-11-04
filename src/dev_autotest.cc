@@ -2438,7 +2438,7 @@ static void devAutotestCheckSetSelfUse(int testUse)
     ProgramValue self = programStackPopValue(program);
     bool used = testUse != 0 || objectGetCarriedObjectByProtoId(gDude, ProtoId(kStimpakPid)) == nullptr;
     const char* who = self.pointerValue == critter ? "critter" : self.pointerValue == gDude ? "dude"
-                                                                                           : "other";
+                                                                                            : "other";
     devAutotestLog("  self_obj after the command: %s, used %d: %s\n", who, used ? 1 : 0,
         self.pointerValue == critter && used ? "PASS" : "FAIL");
 }
