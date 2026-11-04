@@ -1471,6 +1471,14 @@ static void opConditionalOperatorGreaterThan(Program* program)
     programStackPushInteger(program, result);
 }
 
+// CE: In the original an object is a plain number, here it has a type of its
+// own. An operator has to leave a result on the stack: without one the script
+// goes on with its values shifted.
+static void fatalInvalidOperands(const char* name, const ProgramValue& left, const ProgramValue& right)
+{
+    programFatalError("Invalid operands: %s does not support %s and %s.", name, left.typeDebugString(), right.typeDebugString());
+}
+
 // 0x469BC4
 static void opAdd(Program* program)
 {
@@ -1540,6 +1548,8 @@ static void opAdd(Program* program)
         case VALUE_TYPE_INT:
             programStackPushFloat(program, value[1].floatValue + (float)value[0].integerValue);
             break;
+        default:
+            fatalInvalidOperands("+", value[1], value[0]);
         }
         break;
     case VALUE_TYPE_INT:
@@ -1566,9 +1576,19 @@ static void opAdd(Program* program)
                 programStackPushFloat(program, (float)value[1].integerValue + (float)value[0].integerValue);
             }
             break;
+        case VALUE_TYPE_PTR:
+            if (value[1].integerValue != 0) {
+                fatalInvalidOperands("+", value[1], value[0]);
+            }
+            programStackPushPointer(program, value[0].pointerValue);
+            break;
+        default:
+            fatalInvalidOperands("+", value[1], value[0]);
         }
         break;
     // Sonora folks use "object + string" concatenation for debug purposes.
+    // Resurrection adds what `obj_carrying_pid_obj` finds in two places and
+    // compares the sum with 0: it's empty only when both are.
     case VALUE_TYPE_PTR:
         switch (value[0].opcode) {
         case VALUE_TYPE_STRING:
@@ -1582,7 +1602,21 @@ static void opAdd(Program* program)
 
             internal_free_safe(tempString, __FILE__, __LINE__);
             break;
+        case VALUE_TYPE_INT:
+            if (value[0].integerValue != 0) {
+                fatalInvalidOperands("+", value[1], value[0]);
+            }
+            programStackPushPointer(program, value[1].pointerValue);
+            break;
+        case VALUE_TYPE_PTR:
+            programStackPushPointer(program, value[1].pointerValue != nullptr ? value[1].pointerValue : value[0].pointerValue);
+            break;
+        default:
+            fatalInvalidOperands("+", value[1], value[0]);
         }
+        break;
+    default:
+        fatalInvalidOperands("+", value[1], value[0]);
     }
 }
 
@@ -1616,6 +1650,8 @@ static void opSubtract(Program* program)
             break;
         }
         break;
+    default:
+        fatalInvalidOperands("-", value[1], value[0]);
     }
 }
 
@@ -1649,6 +1685,8 @@ static void opMultiply(Program* program)
             break;
         }
         break;
+    default:
+        fatalInvalidOperands("*", value[1], value[0]);
     }
 }
 
@@ -1697,6 +1735,8 @@ static void opDivide(Program* program)
             programStackPushInteger(program, value[1].integerValue / value[0].integerValue);
         }
         break;
+    default:
+        fatalInvalidOperands("/", value[1], value[0]);
     }
 }
 
@@ -1714,6 +1754,7 @@ static void opModulo(Program* program)
     }
 
     if (value[1].opcode != VALUE_TYPE_INT) {
+        fatalInvalidOperands("%", value[1], value[0]);
         return;
     }
 
@@ -1991,6 +2032,7 @@ static void opBitwiseOperatorAnd(Program* program)
         }
         break;
     default:
+        fatalInvalidOperands("bwand", value[1], value[0]);
         return;
     }
 
@@ -2029,6 +2071,7 @@ static void opBitwiseOperatorOr(Program* program)
         }
         break;
     default:
+        fatalInvalidOperands("bwor", value[1], value[0]);
         return;
     }
 
@@ -2067,6 +2110,7 @@ static void opBitwiseOperatorXor(Program* program)
         }
         break;
     default:
+        fatalInvalidOperands("bwxor", value[1], value[0]);
         return;
     }
 

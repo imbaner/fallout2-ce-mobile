@@ -1594,12 +1594,19 @@ static void op_explosions_metarule(Program* program)
         break;
     case EXPL_SET_DYNAMITE_EXPLOSION_DAMAGE:
         explosiveSetDamage(ItemProtoTypeId::Dynamite, param1, param2);
+        programStackPushInteger(program, 0);
         break;
     case EXPL_SET_PLASTIC_EXPLOSION_DAMAGE:
         explosiveSetDamage(ItemProtoTypeId::PlasticExplosives, param1, param2);
+        programStackPushInteger(program, 0);
         break;
     case EXPL_SET_EXPLOSION_MAX_TARGET:
         explosionSetMaxTargets(param1);
+        programStackPushInteger(program, 0);
+        break;
+    default:
+        programPrintError("metarule2_explosions: invalid metarule %d", metarule);
+        programStackPushInteger(program, 0);
         break;
     }
 }

@@ -2867,6 +2867,7 @@ static void opCritterAttemptPlacement(Program* program)
 
     if (critter == nullptr) {
         scriptPredefinedError(program, "critter_attempt_placement", SCRIPT_ERROR_OBJECT_IS_NULL);
+        programStackPushInteger(program, -1);
         return;
     }
 
