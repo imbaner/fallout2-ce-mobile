@@ -199,6 +199,22 @@ enum DevAutotestAction {
     DEV_AUTOTEST_ACTION_SET_TARGET_SETTINGS,
     // FAIL unless map variable `a` is `b`.
     DEV_AUTOTEST_ACTION_CHECK_MAP_VAR,
+    // FAIL unless global variable `a` is `b`.
+    DEV_AUTOTEST_ACTION_CHECK_GLOBAL_VAR,
+    // Sets global variable `a` to `b`.
+    DEV_AUTOTEST_ACTION_SET_GLOBAL_VAR,
+    // Moves carried item `a` to the object with the script file `widget`, as
+    // a thief planting it does.
+    DEV_AUTOTEST_ACTION_PLANT_ITEM,
+    // FAIL unless the talk is on (`a` 1) or over (`a` 0).
+    DEV_AUTOTEST_ACTION_CHECK_TALKING,
+    // FAIL unless a talk option has the text `widget` (`a` 1) or none has it
+    // (`a` 0).
+    DEV_AUTOTEST_ACTION_CHECK_TALK_OPTION,
+    // Runs the commands of `kDevAutotestOpcodeCases`, each in a program of
+    // its own: FAIL unless it leaves one result of the right kind, or stops
+    // the script if it should.
+    DEV_AUTOTEST_ACTION_CHECK_OPCODES,
     // Puts the party on the world map at (`a`, `b`).
     DEV_AUTOTEST_ACTION_SET_WORLD_POS,
     // FAIL unless the party is on a world map `a` wide and `b` high, with `c`
@@ -1256,6 +1272,93 @@ static const DevAutotestStep kDevAutotestDartsSteps[] = {
     { DEV_AUTOTEST_ACTION_CHECK_MAP_VAR, 14, 1, 0, 1, "dt14_thrown" },
 };
 
+// Resurrection's necklace in New Hope (--dev-map=nh_vill.map, the game's first
+// map): the doctor's talk, then Oswald asks to plant the necklace of his son
+// who stole it, on Rachel or on her shelf.
+#define DEV_AUTOTEST_NEW_HOPE_DOCTOR_STEPS \
+    { DEV_AUTOTEST_ACTION_WAIT_TALKING, 600, 0, 0, 10, "nh00_doctor" }, \
+    { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh01" }, \
+    { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh02" }, \
+    { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh03" }, \
+    { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh04" }, \
+    { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh05" }, \
+    { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh06" }, \
+    { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh07" }, \
+    { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh08" }, \
+    { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh09" }, \
+    { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh10" }, \
+    { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh11" }, \
+    { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh12" }, \
+    { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 60, "nh13" }
+
+#define DEV_AUTOTEST_NEW_HOPE_OSWALD_STEPS \
+    { DEV_AUTOTEST_ACTION_TALK_TO_SCRIPT, 0, 0, 0, 30, "nh20_oswald", "nhoswald.int" }, \
+    { DEV_AUTOTEST_ACTION_WAIT_TALKING, 60, 0, 0, 10, "nh21_talking" }, \
+    { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh22_search" }, \
+    { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 60, "nh23_bye" }, \
+    { DEV_AUTOTEST_ACTION_GIVE_ITEM, kDevAutotestNecklacePid, 0, 0, 1, "nh24_found" }, \
+    { DEV_AUTOTEST_ACTION_SET_GLOBAL_VAR, 698, 1, 0, 1, "nh25_son_found" }, \
+    { DEV_AUTOTEST_ACTION_TALK_TO_SCRIPT, 0, 0, 0, 30, "nh26_oswald", "nhoswald.int" }, \
+    { DEV_AUTOTEST_ACTION_WAIT_TALKING, 60, 0, 0, 10, "nh27_talking" }, \
+    { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh28_news" }, \
+    { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh29_necklace" }, \
+    { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh30_return" }, \
+    { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh31_suggest" }, \
+    { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh32_see" }, \
+    { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 60, "nh33_bye" }
+
+// To the question if she forgot where the necklace is: "Just asking" and,
+// when it's planted, the words that have her find it.
+#define DEV_AUTOTEST_NEW_HOPE_RACHEL_STEPS \
+    { DEV_AUTOTEST_ACTION_TALK_TO_SCRIPT, 0, 0, 0, 30, "nh40_rachel", "nhrachel.int" }, \
+    { DEV_AUTOTEST_ACTION_WAIT_TALKING, 60, 0, 0, 10, "nh41_talking" }, \
+    { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh42_husband" }, \
+    { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh43_help" }, \
+    { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh44_continue" }, \
+    { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh45_forgot" }
+
+#define DEV_AUTOTEST_NEW_HOPE_FOUND_STEPS \
+    { DEV_AUTOTEST_ACTION_CHECK_TALK_OPTION, 1, 0, 0, 1, "nh50_option", "missed a spot" }, \
+    { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 1, 0, 0, 30, "nh51_missed" }, \
+    { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 30, "nh52_again" }, \
+    { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 60, "nh53_goodbye" }, \
+    { DEV_AUTOTEST_ACTION_CHECK_TALKING, 0, 0, 0, 1, "nh54_over" }, \
+    { DEV_AUTOTEST_ACTION_CHECK_GLOBAL_VAR, 709, 2, 0, 1, "nh55_done" }
+
+static constexpr int kDevAutotestNecklacePid = 542;
+
+static const DevAutotestStep kDevAutotestNecklaceRachelSteps[] = {
+    DEV_AUTOTEST_NEW_HOPE_DOCTOR_STEPS,
+    DEV_AUTOTEST_NEW_HOPE_OSWALD_STEPS,
+    { DEV_AUTOTEST_ACTION_PLANT_ITEM, kDevAutotestNecklacePid, 0, 0, 5, "nh34_plant", "nhrachel.int" },
+    DEV_AUTOTEST_NEW_HOPE_RACHEL_STEPS,
+    DEV_AUTOTEST_NEW_HOPE_FOUND_STEPS,
+};
+
+static const DevAutotestStep kDevAutotestNecklaceShelfSteps[] = {
+    DEV_AUTOTEST_NEW_HOPE_DOCTOR_STEPS,
+    DEV_AUTOTEST_NEW_HOPE_OSWALD_STEPS,
+    { DEV_AUTOTEST_ACTION_PLANT_ITEM, kDevAutotestNecklacePid, 0, 0, 5, "nh34_plant", "nhshelf.int" },
+    DEV_AUTOTEST_NEW_HOPE_RACHEL_STEPS,
+    DEV_AUTOTEST_NEW_HOPE_FOUND_STEPS,
+};
+
+// Nothing planted: no such option, and the talk ends.
+static const DevAutotestStep kDevAutotestNecklaceNoneSteps[] = {
+    DEV_AUTOTEST_NEW_HOPE_DOCTOR_STEPS,
+    DEV_AUTOTEST_NEW_HOPE_RACHEL_STEPS,
+    { DEV_AUTOTEST_ACTION_CHECK_TALK_OPTION, 0, 0, 0, 1, "nh50_no_option", "missed a spot" },
+    { DEV_AUTOTEST_ACTION_CHOOSE_OPTION, 0, 0, 0, 60, "nh51_asking" },
+    { DEV_AUTOTEST_ACTION_CHECK_TALKING, 0, 0, 0, 1, "nh52_over" },
+    { DEV_AUTOTEST_ACTION_CHECK_GLOBAL_VAR, 697, 1, 0, 1, "nh53_accepted" },
+};
+
+// Commands that take any type: each leaves a result or stops the script.
+static const DevAutotestStep kDevAutotestOpcodesSteps[] = {
+    { DEV_AUTOTEST_ACTION_NONE, 0, 0, 0, 30, "oc00_map" },
+    { DEV_AUTOTEST_ACTION_CHECK_OPCODES, 0, 0, 0, 1, "oc01_cases" },
+};
+
 // The party off the world map (a script's `set_world_map_pos`, an old save):
 // it opens with the party on the map, and it walks.
 static const DevAutotestStep kDevAutotestWorldPosOffSteps[] = {
@@ -2016,6 +2119,236 @@ static Object* devAutotestDoorAt(int tile)
 }
 
 // The critter with the script file [name], on any elevation.
+// The object of any type with the script file [name].
+static Object* devAutotestFindObjectOfScript(const char* name)
+{
+    for (MapElevation elevation = ELEVATION_FIRST; elevation < ELEVATION_COUNT; elevation++) {
+        for (Object* object = objectFindFirstAtElevation(elevation); object != nullptr; object = objectFindNextAtElevation()) {
+            char fileName[COMPAT_MAX_PATH];
+            Script* script;
+            if (object->sid != -1
+                && scriptGetScript(object->sid, &script) != -1
+                && scriptsGetFileName(script->index & 0xFFFFFF, fileName, sizeof(fileName)) == 0
+                && compat_stricmp(fileName, name) == 0) {
+                return object;
+            }
+        }
+    }
+    return nullptr;
+}
+
+// A command with its arguments: `operands` of a binary operator, one letter
+// each (O the dude, N no object, 0 and 5 numbers, F a float, S a string), or
+// the numbers `a`, `b`, `c` for `operands` nullptr. It gives the object or
+// string of the letter `result`, the number `value` for `=`, stops the script
+// for `X`.
+struct DevAutotestOpcodeCase {
+    int opcode;
+    const char* operands;
+    char result;
+    int value;
+    int a;
+    int b;
+    int c;
+};
+
+static const DevAutotestOpcodeCase kDevAutotestOpcodeCases[] = {
+    { 0x8039, "ON", 'O' },
+    { 0x8039, "NO", 'O' },
+    { 0x8039, "NN", 'N' },
+    { 0x8039, "OO", 'O' },
+    { 0x8039, "O0", 'O' },
+    { 0x8039, "0O", 'O' },
+    { 0x8039, "N0", 'N' },
+    { 0x8039, "O5", 'X' },
+    { 0x8039, "5O", 'X' },
+    { 0x8039, "FO", 'X' },
+    { 0x8039, "OF", 'X' },
+    { 0x8039, "SO", 'S' },
+    { 0x8039, "OS", 'S' },
+    { 0x8039, "55", '=', 10 },
+    { 0x803A, "O5", 'X' },
+    { 0x803A, "S5", 'X' },
+    { 0x803A, "55", '=', 0 },
+    { 0x803B, "O5", 'X' },
+    { 0x803B, "S5", 'X' },
+    { 0x803B, "55", '=', 25 },
+    { 0x803C, "O5", 'X' },
+    { 0x803C, "S5", 'X' },
+    { 0x803C, "55", '=', 1 },
+    { 0x803D, "O5", 'X' },
+    { 0x803D, "S5", 'X' },
+    { 0x803D, "55", '=', 0 },
+    { 0x8040, "O5", 'X' },
+    { 0x8040, "S5", 'X' },
+    { 0x8040, "55", '=', 5 },
+    { 0x8041, "O5", 'X' },
+    { 0x8041, "S5", 'X' },
+    { 0x8041, "55", '=', 5 },
+    { 0x8042, "O5", 'X' },
+    { 0x8042, "S5", 'X' },
+    { 0x8042, "55", '=', 0 },
+    { 0x8033, "SO", '=', 0 },
+    { 0x8033, "OS", '=', 0 },
+    { 0x8033, "FO", '=', 0 },
+    { 0x8033, "OF", '=', 0 },
+    { 0x8034, "SO", '=', 1 },
+    { 0x8034, "OS", '=', 1 },
+    { 0x8034, "FO", '=', 1 },
+    { 0x8034, "OF", '=', 1 },
+    { 0x8035, "SO", 'X' },
+    { 0x8035, "OS", 'X' },
+    { 0x8035, "FO", 'X' },
+    { 0x8035, "OF", 'X' },
+    // critter_attempt_placement(0, 1, 0)
+    { 0x80FF, nullptr, '=', -1, 0, 1, 0 },
+    // metarule2_explosions: the setters, then a metarule that doesn't exist.
+    { 0x8261, nullptr, '=', 0, 7, 10, 20 },
+    { 0x8261, nullptr, '=', 0, 8, 10, 20 },
+    { 0x8261, nullptr, '=', 0, 9, 6, 0 },
+    { 0x8261, nullptr, '=', 0, 99, 0, 0 },
+};
+
+static void devAutotestPushCode(std::vector<unsigned char>* code, int opcode)
+{
+    code->push_back(static_cast<unsigned char>(opcode >> 8));
+    code->push_back(static_cast<unsigned char>(opcode));
+}
+
+static void devAutotestPushCodeValue(std::vector<unsigned char>* code, int opcode, unsigned int value)
+{
+    devAutotestPushCode(code, opcode);
+    for (int shift = 24; shift >= 0; shift -= 8) {
+        code->push_back(static_cast<unsigned char>(value >> shift));
+    }
+}
+
+static void devAutotestPushCodeOperand(std::vector<unsigned char>* code, char operand)
+{
+    constexpr int kPushInt = 0xC001;
+    constexpr int kPushFloat = 0xA001;
+    constexpr int kPushString = 0x9001;
+    constexpr int kDudeObj = 0x80BF;
+    constexpr int kObjCarryingPidObj = 0x810D;
+
+    switch (operand) {
+    case 'O':
+        devAutotestPushCode(code, kDudeObj);
+        break;
+    case 'N':
+        // An item the dude doesn't have.
+        devAutotestPushCode(code, kDudeObj);
+        devAutotestPushCodeValue(code, kPushInt, 1);
+        devAutotestPushCode(code, kObjCarryingPidObj);
+        break;
+    case 'F': {
+        float value = 1.5f;
+        unsigned int bits;
+        memcpy(&bits, &value, sizeof(bits));
+        devAutotestPushCodeValue(code, kPushFloat, bits);
+        break;
+    }
+    case 'S':
+        devAutotestPushCodeValue(code, kPushString, 0);
+        break;
+    default:
+        devAutotestPushCodeValue(code, kPushInt, operand - '0');
+        break;
+    }
+}
+
+// The file of a script without procedures: no procedures, identifiers and
+// strings are the header, [code] comes after them.
+static bool devAutotestWriteProgram(const char* path, const std::vector<unsigned char>& code, int* codeOffset)
+{
+    std::vector<unsigned char> file(42 + 4 + 4, 0);
+    // The strings: their size and one string.
+    const char text[] = "abc";
+    for (int shift = 24; shift >= 0; shift -= 8) {
+        file.push_back(static_cast<unsigned char>(sizeof(text) >> shift));
+    }
+    file.insert(file.end(), text, text + sizeof(text));
+    *codeOffset = static_cast<int>(file.size());
+    file.insert(file.end(), code.begin(), code.end());
+
+    FILE* stream = fopen(path, "wb");
+    if (stream == nullptr) {
+        return false;
+    }
+    fwrite(file.data(), 1, file.size(), stream);
+    fclose(stream);
+    return true;
+}
+
+// The result of [testCase] as text, "" when it's right.
+static std::string devAutotestRunOpcodeCase(const DevAutotestOpcodeCase& testCase)
+{
+    constexpr int kPushInt = 0xC001;
+    constexpr int kExitProgram = 0x8010;
+
+    std::vector<unsigned char> code;
+    if (testCase.operands != nullptr) {
+        devAutotestPushCodeOperand(&code, testCase.operands[0]);
+        devAutotestPushCodeOperand(&code, testCase.operands[1]);
+    } else {
+        devAutotestPushCodeValue(&code, kPushInt, testCase.a);
+        devAutotestPushCodeValue(&code, kPushInt, testCase.b);
+        devAutotestPushCodeValue(&code, kPushInt, testCase.c);
+    }
+    devAutotestPushCode(&code, testCase.opcode);
+    devAutotestPushCode(&code, kExitProgram);
+
+    const char* fileName = "data/dev_opcode_case.int";
+    int codeOffset;
+    if (!devAutotestWriteProgram(fileName, code, &codeOffset)) {
+        return "no file";
+    }
+
+    Program* program = programCreateByPath("dev_opcode_case.int");
+    remove(fileName);
+    if (program == nullptr) {
+        return "no program";
+    }
+
+    program->instructionPointer = codeOffset;
+    programInterpret(program, -1);
+
+    char text[80] = "";
+    bool stopped = (program->flags & PROGRAM_FLAG_FATAL_ERROR) != 0;
+    if (testCase.result == 'X') {
+        if (!stopped) {
+            snprintf(text, sizeof(text), "went on with %d values", static_cast<int>(program->stackValues->size()));
+        }
+    } else if (stopped) {
+        snprintf(text, sizeof(text), "stopped");
+    } else if (program->stackValues->size() != 1) {
+        snprintf(text, sizeof(text), "%d values left", static_cast<int>(program->stackValues->size()));
+    } else {
+        const ProgramValue& value = program->stackValues->back();
+        bool right = false;
+        switch (testCase.result) {
+        case 'O':
+            right = value.opcode == VALUE_TYPE_PTR && value.pointerValue == gDude;
+            break;
+        case 'N':
+            right = value.opcode == VALUE_TYPE_PTR && value.pointerValue == nullptr;
+            break;
+        case 'S':
+            right = value.isString();
+            break;
+        default:
+            right = value.isInt() && value.integerValue == testCase.value;
+            break;
+        }
+        if (!right) {
+            snprintf(text, sizeof(text), "wrong result: %s %d", value.typeDebugString(), value.integerValue);
+        }
+    }
+
+    programFree(program);
+    return text;
+}
+
 static Object* devAutotestFindCritterOfScript(const char* name)
 {
     for (MapElevation elevation = ELEVATION_FIRST; elevation < ELEVATION_COUNT; elevation++) {
@@ -4499,6 +4832,10 @@ static const DevAutotestScenario kDevAutotestScenarios[] = {
     devAutotestScenario("partytarget", kDevAutotestPartyTargetSteps),
     devAutotestScenario("doorgrenade", kDevAutotestDoorGrenadeSteps),
     devAutotestScenario("darts", kDevAutotestDartsSteps),
+    devAutotestScenario("necklacerachel", kDevAutotestNecklaceRachelSteps),
+    devAutotestScenario("necklaceshelf", kDevAutotestNecklaceShelfSteps),
+    devAutotestScenario("necklacenone", kDevAutotestNecklaceNoneSteps),
+    devAutotestScenario("opcodes", kDevAutotestOpcodesSteps),
     devAutotestScenario("worldposoff", kDevAutotestWorldPosOffSteps),
     devAutotestScenario("worldareaoff", kDevAutotestWorldAreaOffSteps),
     devAutotestScenario("worldareamark", kDevAutotestWorldAreaMarkSteps),
@@ -5399,6 +5736,43 @@ void devAutotestTick()
                 value.integerValue == static_cast<int>(step->b) ? "PASS" : "FAIL");
             break;
         }
+        case DEV_AUTOTEST_ACTION_CHECK_GLOBAL_VAR: {
+            int value = gameGetGlobalVar(static_cast<GameGlobalVar>(static_cast<int>(step->a)));
+            devAutotestLog("  global var %d: %d: %s\n", static_cast<int>(step->a), value,
+                value == static_cast<int>(step->b) ? "PASS" : "FAIL");
+            break;
+        }
+        case DEV_AUTOTEST_ACTION_SET_GLOBAL_VAR:
+            gameSetGlobalVar(static_cast<GameGlobalVar>(static_cast<int>(step->a)), static_cast<int>(step->b));
+            break;
+        case DEV_AUTOTEST_ACTION_PLANT_ITEM: {
+            Object* item = objectGetCarriedObjectByProtoId(gDude, ProtoId(static_cast<int>(step->a)));
+            Object* target = devAutotestFindObjectOfScript(step->widget);
+            bool planted = item != nullptr && target != nullptr && itemMove(gDude, target, item, 1) == 0;
+            devAutotestLog("  planted on %s: %s\n", step->widget, planted ? "PASS" : "FAIL");
+            break;
+        }
+        case DEV_AUTOTEST_ACTION_CHECK_TALKING: {
+            bool talking = gameDialogIsTalking();
+            devAutotestLog("  talking %d: %s\n", talking ? 1 : 0, talking == (step->a != 0) ? "PASS" : "FAIL");
+            break;
+        }
+        case DEV_AUTOTEST_ACTION_CHECK_TALK_OPTION: {
+            bool found = false;
+            for (int index = 0; index < gameDialogGetOptionCount(); index++) {
+                found = found || strstr(gameDialogGetOptionText(index), step->widget) != nullptr;
+            }
+            devAutotestLog("  option \"%s\" %d: %s\n", step->widget, found ? 1 : 0, found == (step->a != 0) ? "PASS" : "FAIL");
+            break;
+        }
+        case DEV_AUTOTEST_ACTION_CHECK_OPCODES:
+            for (const DevAutotestOpcodeCase& testCase : kDevAutotestOpcodeCases) {
+                std::string wrong = devAutotestRunOpcodeCase(testCase);
+                devAutotestLog("  command %x %s %d: %s%s%s\n", testCase.opcode,
+                    testCase.operands != nullptr ? testCase.operands : "numbers", testCase.a,
+                    wrong.empty() ? "PASS" : "FAIL", wrong.empty() ? "" : " ", wrong.c_str());
+            }
+            break;
         case DEV_AUTOTEST_ACTION_SET_WORLD_POS:
             wmSetPartyWorldPos(static_cast<int>(step->a), static_cast<int>(step->b));
             break;
