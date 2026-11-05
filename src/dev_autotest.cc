@@ -669,10 +669,14 @@ enum DevAutotestAction {
     // now, 1 - the text "Report a problem" would send now. FAIL unless it
     // has [widget] (and [target]), or with a line a report can't have (only
     // what happened, its code, the build, the scripts' errors and the last
-    // events), the hero's name, a save's description (the test saves with
-    // "Zxqdesc"), a hex number or a path outside the game's folder. [a] 0
-    // without [widget]: a window with no report (an environment problem).
+    // events, where a crash happened), the hero's name, a save's description
+    // (the test saves with "Zxqdesc"), a hex number outside the crash's lines
+    // or a path outside the game's folder. [a] 0 without [widget]: a window
+    // with no report (an environment problem).
     DEV_AUTOTEST_ACTION_CHECK_REPORT,
+    // The shown report as a link keeps it `a` characters shorter: it has
+    // [widget] and no [target].
+    DEV_AUTOTEST_ACTION_CHECK_REPORT_FITTED,
     // A problem the engine knows (error_report.h): [a] - `ErrorReason`,
     // [widget] - its detail; the main loop shows it.
     DEV_AUTOTEST_ACTION_RAISE_REPORT,
@@ -3313,8 +3317,30 @@ static const DevAutotestStep kDevAutotestReportCrashSteps[] = {
     { DEV_AUTOTEST_ACTION_NONE, 0, 0, 0, 60, "c00_title" },
     { DEV_AUTOTEST_ACTION_CHECK_WIDGET, 1, 0, 0, 1, "c01_report", "report.github" },
     { DEV_AUTOTEST_ACTION_CHECK_REPORT, 0, 0, 0, 1, "c02_reason", "Code: crash", "- map NEWRGO.MAP, elevation 0" },
+    { DEV_AUTOTEST_ACTION_CHECK_REPORT, 0, 0, 0, 1, "c02b_where", "Signal: SIGSEGV SEGV_MAPERR, address 0x10", "Stack a1b2c3d4: +0x1a2b3c libc.so+0x5e0f0" },
+    { DEV_AUTOTEST_ACTION_CHECK_REPORT, 0, 0, 0, 1, "c02c_system", "Cause: null pointer dereference", "Abort: test abort" },
+    // A link too long loses the events, not where the crash happened.
+    { DEV_AUTOTEST_ACTION_CHECK_REPORT_FITTED, 50, 0, 0, 1, "c02d_fitted", "Stack a1b2c3d4:", "- map NEWRGO.MAP" },
     { DEV_AUTOTEST_ACTION_BACK, 0, 0, 0, 40, "c03_closed" },
     { DEV_AUTOTEST_ACTION_CHECK_WIDGET, 1, 0, 0, 1, "c04_main_menu", "mainmenu.load" },
+};
+
+// The same when the system kept no record of it: the report without those
+// lines.
+static const DevAutotestStep kDevAutotestReportCrashBareSteps[] = {
+    { DEV_AUTOTEST_ACTION_NONE, 0, 0, 0, 60, "c00_title" },
+    { DEV_AUTOTEST_ACTION_CHECK_REPORT, 0, 0, 0, 1, "c01_reason", "Code: crash", "- map NEWRGO.MAP, elevation 0" },
+    { DEV_AUTOTEST_ACTION_CHECK_REPORT_FITTED, 0, 0, 0, 1, "c02_no_stack", "Code: crash", "Stack" },
+    { DEV_AUTOTEST_ACTION_CHECK_REPORT_FITTED, 0, 0, 0, 1, "c03_no_signal", "Code: crash", "Signal:" },
+};
+
+// The report tells the world map and the map being entered from the map
+// left.
+static const DevAutotestStep kDevAutotestReportJourneySteps[] = {
+    { DEV_AUTOTEST_ACTION_NONE, 0, 0, 0, 30, "j00_map" },
+    { DEV_AUTOTEST_ACTION_OPEN_WORLDMAP, 0, 0, 0, 1, "j01_open" },
+    { DEV_AUTOTEST_ACTION_NONE, 0, 0, 0, 30, "j02_worldmap" },
+    { DEV_AUTOTEST_ACTION_CHECK_REPORT, 1, 0, 0, 1, "j03_events", "- entering map ", "- world map" },
 };
 
 // Replacing the game failed (the app's import screen left why): the window
@@ -5079,6 +5105,14 @@ void devAutotestSetScenario(const char* name)
         gDevAutotestSteps = kDevAutotestReportCrashSteps;
         gDevAutotestStepCount = sizeof(kDevAutotestReportCrashSteps) / sizeof(kDevAutotestReportCrashSteps[0]);
         devAutotestWriteText("running-test.txt", "# F2 Touch is running (error_report.h)\nLast events:\n- loaded slot 2\n- map NEWRGO.MAP, elevation 0\n");
+        devAutotestWriteText("exit-stack-test.txt", "Signal: SIGSEGV SEGV_MAPERR, address 0x10\nCause: null pointer dereference\nAbort: test abort\nStack a1b2c3d4: +0x1a2b3c libc.so+0x5e0f0\n");
+    } else if (strcmp(name, "reportcrashbare") == 0) {
+        gDevAutotestSteps = kDevAutotestReportCrashBareSteps;
+        gDevAutotestStepCount = sizeof(kDevAutotestReportCrashBareSteps) / sizeof(kDevAutotestReportCrashBareSteps[0]);
+        devAutotestWriteText("running-test.txt", "# F2 Touch is running (error_report.h)\nLast events:\n- loaded slot 2\n- map NEWRGO.MAP, elevation 0\n");
+    } else if (strcmp(name, "reportjourney") == 0) {
+        gDevAutotestSteps = kDevAutotestReportJourneySteps;
+        gDevAutotestStepCount = sizeof(kDevAutotestReportJourneySteps) / sizeof(kDevAutotestReportJourneySteps[0]);
     } else if (strcmp(name, "reportreplace") == 0) {
         // What the app's import screen leaves (ImportActivity.java).
         gDevAutotestSteps = kDevAutotestReportReplaceSteps;
@@ -6174,7 +6208,8 @@ void devAutotestTick()
             }
             // Only the report's own lines: what happened first, then the
             // fixed ones.
-            static const char* const kLines[] = { "Code: ", "F2 Touch ", "Script: ", "Last events:", "- " };
+            static const char* const kLines[] = { "Code: ", "F2 Touch ", "Signal: ", "Cause: ", "Abort: ", "Stack", "Script: ", "Last events:", "- " };
+            std::string offCrash;
             size_t start = 0;
             for (int index = 0; start < text.size(); index++) {
                 size_t end = text.find('\n', start);
@@ -6190,12 +6225,15 @@ void devAutotestTick()
                 if (!allowed) {
                     problems.push_back("line \"" + line + "\"");
                 }
+                if (line.compare(0, 8, "Signal: ") != 0 && line.compare(0, 5, "Stack") != 0) {
+                    offCrash += line + "\n";
+                }
                 start = end + 1;
             }
             // The game's folder is under these on the computer and the phone.
             const char* home = getenv("HOME");
             for (const char* forbidden : { "Zxqhero", "Zxqdesc", "0x", "/Users/", "/storage/", "/data/", home }) {
-                if (forbidden != nullptr && forbidden[0] != '\0' && text.find(forbidden) != std::string::npos) {
+                if (forbidden != nullptr && forbidden[0] != '\0' && offCrash.find(forbidden) != std::string::npos) {
                     problems.push_back(std::string("has \"") + forbidden + "\"");
                 }
             }
@@ -6203,6 +6241,16 @@ void devAutotestTick()
                 devAutotestLog("FAIL: report: %s\n", problem.c_str());
             }
             devAutotestLog("  report: %s\n", problems.empty() ? "PASS" : "FAIL");
+            break;
+        }
+        case DEV_AUTOTEST_ACTION_CHECK_REPORT_FITTED: {
+            std::string text = errorReportTestShownFitted(static_cast<int>(step->a));
+            bool has = text.find(step->widget) != std::string::npos;
+            bool lost = text.find(step->target) == std::string::npos;
+            devAutotestLog("  report fitted: has \"%s\" %d, without \"%s\" %d\n", step->widget, has ? 1 : 0, step->target, lost ? 1 : 0);
+            if (!has || !lost) {
+                devAutotestLog("FAIL: report fitted\n");
+            }
             break;
         }
         case DEV_AUTOTEST_ACTION_RAISE_REPORT:

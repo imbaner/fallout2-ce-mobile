@@ -21,10 +21,11 @@ namespace fallout {
 //
 // A report has a fixed set of fields only: the operation, the reason, a game
 // file's name, the app's version, the platform and its version, the game's
-// build (its mods and language); then the last understandable events (from
-// the game journal's lines, `actionLog`) and the scripts' errors of the
-// session. Never: the hero's name, saves' descriptions, paths outside the
-// game's folder, files' contents, times.
+// build (its mods and language); where a native crash happened, as the
+// system tells (the signal, the cause, the abort message, code offsets); then
+// the last understandable events (from the game journal's lines, `actionLog`)
+// and the scripts' errors of the session. Never: the hero's name, saves'
+// descriptions, paths outside the game's folder, files' contents, times.
 //
 // Call sites are one line where the engine already knows the reason; the
 // window shows where the game can wait (`errorReportShowPending`).
@@ -98,6 +99,11 @@ void errorReportScriptError(const char* script, const char* format, va_list args
 // events (20 kept in memory; the report shows the latest).
 void errorReportEvent(const char* text);
 
+// The last events go to the run's marker now, not with the next frame's turn
+// (at most every few seconds): before what may take the game down with it (a
+// map's load), for the report to tell how far it got.
+void errorReportFlush();
+
 // The game starts (after the command line): a previous run that didn't end
 // cleanly is a problem shown in the main menu, this one is marked running.
 void errorReportStart();
@@ -116,6 +122,9 @@ void errorReportFrame();
 // engine would, with [detail].
 std::string errorReportTestText(ErrorReason reason);
 std::string errorReportTestShown();
+// The text of the window showing, fitted to [less] characters less of a link
+// than it takes.
+std::string errorReportTestShownFitted(int less);
 void errorReportTestRaise(ErrorReason reason, const char* detail);
 
 } // namespace fallout

@@ -1534,6 +1534,34 @@ with "Start combat" (the A key), see the weapon group above.
   SIM card ("USB debugging (security settings)"), so touch testing on the
   device is manual.
 
+## Reading a crash report
+
+A native crash reaches the problem report from the system's record of it
+(Android 12+): `MainActivity.exitStack` takes the record of the process that
+ended (`ApplicationExitInfo.getTraceInputStream`), `TombstoneReader` keeps
+the signal, the cause, the abort message and the failed thread's frames, and
+`error_report.cc` puts them after the build's line:
+
+    Signal: SIGABRT SI_QUEUE
+    Abort: Scudo ERROR: corrupted chunk header at address
+    Stack b7370d7c: libc.so+0x5b6d4 +0x3dce40 +0x3dcce8 +0x2a56a4
+    Stack: +0x249fec +0x2e31dc
+    Last events:
+    - world map
+    - entering map DENBUS1.MAP
+
+`+0x...` are offsets in the game's library, `b7370d7c` is the start of its
+Build ID. The release strips the library, so the unstripped one of every APK
+that goes to players has to be kept right after building it:
+`out/dev/save-so.sh <apk>...`. `out/dev/symbolize-report.sh <report>` then
+turns the offsets into functions and lines.
+
+Before Android 12, or when the system kept no record, the report has no such
+lines. The last events still tell how far the game got: `running.txt` is
+written every few seconds, and at once on opening the world map and before a
+map's load (`errorReportFlush`), so "entering map X" as the last event means
+the game went down loading X.
+
 ## Game layouts the import understands (Android and web)
 
 On a computer CE reads a game where its installer left it. The phone and

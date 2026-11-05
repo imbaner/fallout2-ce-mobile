@@ -6,6 +6,7 @@
 
 #include <vector>
 
+#include "action_log.h"
 #include "animation.h"
 #include "art.h"
 #include "automap.h"
@@ -887,6 +888,10 @@ int mapLoadByName(char* fileName)
     int rc;
 
     compat_strupr(fileName);
+
+    // CE: How far the game got, if the load takes it down (error_report.h).
+    actionLog("entering map %s", fileName);
+    errorReportFlush();
 
     rc = -1;
 

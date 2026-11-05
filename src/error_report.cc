@@ -56,6 +56,8 @@ namespace {
     // screen left for the game (one "reason detail" line).
     constexpr const char* kRunningFile = "running.txt";
     constexpr const char* kTestRunningFile = "running-test.txt";
+    // What the system tells of the crash in a test.
+    constexpr const char* kTestStackFile = "exit-stack-test.txt";
     constexpr const char* kProblemFile = "problem.txt";
     constexpr Uint32 kRunningWriteMs = 5000;
 
@@ -64,6 +66,7 @@ namespace {
     constexpr size_t kScriptErrorsKept = 20;
     constexpr size_t kScriptErrorsShown = 5;
     constexpr size_t kLineLength = 120;
+    constexpr size_t kStackLinesShown = 8;
 
     // ce.msg.
     constexpr int kTextTitle = 470;
@@ -193,6 +196,8 @@ namespace {
         // The last events and scripts' errors of a run that ended
         // unexpectedly (`kRunningFile`).
         std::vector<std::string> previous;
+        // Where a native crash happened, as the system tells (`exitStack`).
+        std::vector<std::string> stack;
     };
 
     struct ScriptError {
@@ -295,13 +300,14 @@ namespace {
     }
 
     // A line of a report: printable, no hex numbers (code addresses, ids
-    // the player can't tell), not too long.
-    std::string cleanLine(const std::string& value)
+    // the player can't tell; [withHex]: the lines of where a crash happened
+    // are made of them), not too long.
+    std::string cleanLine(const std::string& value, bool withHex = false)
     {
         std::string result;
         for (size_t index = 0; index < value.size() && result.size() < kLineLength; index++) {
             unsigned char ch = static_cast<unsigned char>(value[index]);
-            if (ch == '0' && index + 2 < value.size() && (value[index + 1] == 'x' || value[index + 1] == 'X') && isxdigit(static_cast<unsigned char>(value[index + 2]))) {
+            if (!withHex && ch == '0' && index + 2 < value.size() && (value[index + 1] == 'x' || value[index + 1] == 'X') && isxdigit(static_cast<unsigned char>(value[index + 2]))) {
                 index += 2;
                 while (index + 1 < value.size() && isxdigit(static_cast<unsigned char>(value[index + 1]))) {
                     index++;
@@ -601,6 +607,7 @@ namespace {
         }
         lines.push_back(codeLine(problem));
         lines.push_back(buildLine());
+        lines.insert(lines.end(), problem.stack.begin(), problem.stack.end());
         if (!problem.previous.empty()) {
             lines.insert(lines.end(), problem.previous.begin(), problem.previous.end());
         } else {
@@ -1037,11 +1044,9 @@ namespace {
         return true;
     }
 
-    // Why the run of [process] ended, as the system tells (Android 11+):
-    // "crash", "native-crash", "anr", "low-memory", ...; "none" when it
-    // wasn't the game's failure (the phone restarted, the app was stopped or
-    // updated); empty when the system doesn't tell.
-    std::string exitReason(int process)
+    // What the activity's [method] (MainActivity.java) tells of the run of
+    // [process]; empty off Android.
+    std::string activityText(const char* method, int process)
     {
         std::string result;
 #ifdef __ANDROID__
@@ -1051,12 +1056,12 @@ namespace {
             return result;
         }
         jclass activityClass = env->GetObjectClass(activity);
-        jmethodID method = env->GetMethodID(activityClass, "exitReason", "(I)Ljava/lang/String;");
-        jstring value = method != nullptr ? static_cast<jstring>(env->CallObjectMethod(activity, method, static_cast<jint>(process))) : nullptr;
+        jmethodID methodId = env->GetMethodID(activityClass, method, "(I)Ljava/lang/String;");
+        jstring value = methodId != nullptr ? static_cast<jstring>(env->CallObjectMethod(activity, methodId, static_cast<jint>(process))) : nullptr;
         if (value != nullptr) {
             const char* chars = env->GetStringUTFChars(value, nullptr);
             if (chars != nullptr) {
-                result = cleanLine(chars);
+                result = chars;
                 env->ReleaseStringUTFChars(value, chars);
             }
             env->DeleteLocalRef(value);
@@ -1068,6 +1073,48 @@ namespace {
         env->DeleteLocalRef(activity);
 #endif
         return result;
+    }
+
+    // Why the run of [process] ended, as the system tells (Android 11+):
+    // "crash", "native-crash", "anr", "low-memory", ...; "none" when it
+    // wasn't the game's failure (the phone restarted, the app was stopped or
+    // updated); empty when the system doesn't tell.
+    std::string exitReason(int process)
+    {
+        return cleanLine(activityText("exitReason", process));
+    }
+
+    // Where the crashed run of [process] fell, as the system tells (Android
+    // 12+): the report's lines, none when it kept no record.
+    std::vector<std::string> exitStack(int process)
+    {
+        std::string text;
+        if (devAutotestIsEnabled()) {
+            FILE* stream = fopen(kTestStackFile, "rt");
+            if (stream != nullptr) {
+                char buffer[256];
+                while (fgets(buffer, sizeof(buffer), stream) != nullptr) {
+                    text += buffer;
+                }
+                fclose(stream);
+                remove(kTestStackFile);
+            }
+        } else {
+            text = activityText("exitStack", process);
+        }
+
+        std::vector<std::string> lines;
+        size_t start = 0;
+        while (start < text.size() && lines.size() < kStackLinesShown) {
+            size_t end = text.find('\n', start);
+            std::string raw = text.substr(start, end != std::string::npos ? end - start : std::string::npos);
+            std::string line = cleanLine(raw, raw.compare(0, 7, "Signal:") == 0 || raw.compare(0, 5, "Stack") == 0);
+            if (!line.empty()) {
+                lines.push_back(line);
+            }
+            start = end != std::string::npos ? end + 1 : text.size();
+        }
+        return lines;
     }
 
     // A problem the app's import screen left: "replace-game <detail>".
@@ -1231,6 +1278,13 @@ void errorReportEvent(const char* text)
     gContextChanged = gPlatformTextsDirty = true;
 }
 
+void errorReportFlush()
+{
+    if (gStarted && gRunningMarked) {
+        writeRunning();
+    }
+}
+
 void errorReportStart()
 {
     gStarted = true;
@@ -1251,6 +1305,9 @@ void errorReportStart()
         problem.reason = reason == "low-memory" ? ErrorReason::LowMemory : ErrorReason::Crash;
         problem.detail = reason;
         problem.previous = previous;
+        if (problem.reason == ErrorReason::Crash) {
+            problem.stack = exitStack(process);
+        }
         raise(problem);
     } else if (readPlatformProblem(&problem)) {
         raise(problem);
@@ -1304,6 +1361,11 @@ void errorReportFrame()
 std::string errorReportTestShown()
 {
     return gShownText;
+}
+
+std::string errorReportTestShownFitted(int less)
+{
+    return fittedText(gShownText, urlEncode(gShownText).size() - static_cast<size_t>(less));
 }
 
 void errorReportTestRaise(ErrorReason reason, const char* detail)

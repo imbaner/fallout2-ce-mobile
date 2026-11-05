@@ -296,6 +296,29 @@ public class MainActivity extends SDLActivity {
         return "";
     }
 
+    // Called from native code (error_report.cc) when the process [pid] ended
+    // with a crash: where it fell, in the report's lines (TombstoneReader);
+    // "" when the system kept no record of it (before Android 12 it never
+    // does).
+    public String exitStack(int pid) {
+        if (Build.VERSION.SDK_INT < 31) {
+            return "";
+        }
+        try {
+            ActivityManager manager = (ActivityManager) getSystemService(ACTIVITY_SERVICE);
+            List<ApplicationExitInfo> exits = manager.getHistoricalProcessExitReasons(getPackageName(), pid, 1);
+            if (exits.isEmpty() || exits.get(0).getReason() != ApplicationExitInfo.REASON_CRASH_NATIVE) {
+                return "";
+            }
+            try (InputStream record = exits.get(0).getTraceInputStream()) {
+                return record != null ? TombstoneReader.reportLines(TombstoneReader.read(record)) : "";
+            }
+        } catch (IOException | RuntimeException e) {
+            Log.w(TAG, "No crash record", e);
+        }
+        return "";
+    }
+
     // The native updater's non-blocking bridge (app_update.cc).
     public static void updateConfigure(String repository) { UpdateManager.configure(repository); }
     public static void updateCheck(boolean manual) { UpdateManager.check(manual); }

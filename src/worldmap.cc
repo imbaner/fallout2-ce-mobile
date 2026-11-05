@@ -12,6 +12,7 @@
 #include <utility>
 #include <vector>
 
+#include "action_log.h"
 #include "animation.h"
 #include "art.h"
 #include "automap.h"
@@ -27,6 +28,7 @@
 #include "dev_autotest.h"
 #include "display_monitor.h"
 #include "draw.h"
+#include "error_report.h"
 #include "game.h"
 #include "game_config.h"
 #include "game_mouse.h"
@@ -3715,6 +3717,11 @@ static int wmWorldMapMobileLoop()
 static int wmWorldMapFunc(int a1)
 {
     ScopedGameMode gm(GameMode::kWorldmap);
+
+    // CE: The world map has no events of its own: without this a report
+    // can't tell it from the map left (error_report.h).
+    actionLog("world map");
+    errorReportFlush();
 
     wmResetTrailMarkers();
 
