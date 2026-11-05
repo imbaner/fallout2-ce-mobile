@@ -1,0 +1,49 @@
+name: Verify clean build (temporary)
+
+# Temporary check: rebuilds the published 1.3.0-mobile.10 APKs on a fresh
+# GitHub runner, unsigned and with no caches, to compare their native
+# libraries with the release built on the author's Mac.
+on:
+  push:
+    branches:
+      - verify/mobile-10-clean-build
+
+permissions:
+  contents: read
+
+jobs:
+  android:
+    name: Android release, unsigned
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Build
+        run: |
+          mkdir -p out/verify
+          cd os/android
+          for abi in armeabi-v7a arm64-v8a; do
+            ./gradlew clean assembleRelease -PabiFilters=$abi
+            cp app/build/outputs/apk/release/*.apk ../../out/verify/clean-$abi.apk
+          done
+
+      - name: Hashes
+        run: |
+          cd out/verify
+          sha256sum *.apk
+          for apk in *.apk; do unzip -o -q "$apk" 'lib/*' -d "x-$apk"; done
+          find . -name '*.so' -exec sha256sum {} +
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: clean-build-mobile-10
+          path: out/verify/*.apk
+          retention-days: 3
