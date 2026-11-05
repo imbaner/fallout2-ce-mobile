@@ -29,8 +29,9 @@ jobs:
         run: |
           mkdir -p out/verify
           cd os/android
-          for abi in armeabi-v7a arm64-v8a; do
-            ./gradlew clean assembleRelease -PabiFilters=$abi
+          # arm64 first: the SDL sync check reads the arm64 native build.
+          for abi in arm64-v8a armeabi-v7a; do
+            ./gradlew assembleRelease -PabiFilters=$abi
             cp app/build/outputs/apk/release/*.apk ../../out/verify/clean-$abi.apk
           done
 
