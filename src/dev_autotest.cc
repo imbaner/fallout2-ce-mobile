@@ -3317,10 +3317,12 @@ static const DevAutotestStep kDevAutotestReportCrashSteps[] = {
     { DEV_AUTOTEST_ACTION_NONE, 0, 0, 0, 60, "c00_title" },
     { DEV_AUTOTEST_ACTION_CHECK_WIDGET, 1, 0, 0, 1, "c01_report", "report.github" },
     { DEV_AUTOTEST_ACTION_CHECK_REPORT, 0, 0, 0, 1, "c02_reason", "Code: crash", "- map NEWRGO.MAP, elevation 0" },
+    // A line ending in a letter of another alphabet keeps it.
+    { DEV_AUTOTEST_ACTION_CHECK_REPORT, 0, 0, 0, 1, "c02a_letters", "- dialog with \xd0\xba\xd0\xbb\xd0\xb8\xd0\xbd\xd1\x82\n" },
     { DEV_AUTOTEST_ACTION_CHECK_REPORT, 0, 0, 0, 1, "c02b_where", "Signal: SIGSEGV SEGV_MAPERR, address 0x10", "Stack a1b2c3d4: +0x1a2b3c libc.so+0x5e0f0" },
     { DEV_AUTOTEST_ACTION_CHECK_REPORT, 0, 0, 0, 1, "c02c_system", "Cause: null pointer dereference", "Abort: test abort" },
     // A link too long loses the events, not where the crash happened.
-    { DEV_AUTOTEST_ACTION_CHECK_REPORT_FITTED, 50, 0, 0, 1, "c02d_fitted", "Stack a1b2c3d4:", "- map NEWRGO.MAP" },
+    { DEV_AUTOTEST_ACTION_CHECK_REPORT_FITTED, 100, 0, 0, 1, "c02d_fitted", "Stack a1b2c3d4:", "- map NEWRGO.MAP" },
     { DEV_AUTOTEST_ACTION_BACK, 0, 0, 0, 40, "c03_closed" },
     { DEV_AUTOTEST_ACTION_CHECK_WIDGET, 1, 0, 0, 1, "c04_main_menu", "mainmenu.load" },
 };
@@ -5104,7 +5106,7 @@ void devAutotestSetScenario(const char* name)
         // The previous run's marker (a test's own, error_report.cc).
         gDevAutotestSteps = kDevAutotestReportCrashSteps;
         gDevAutotestStepCount = sizeof(kDevAutotestReportCrashSteps) / sizeof(kDevAutotestReportCrashSteps[0]);
-        devAutotestWriteText("running-test.txt", "# F2 Touch is running (error_report.h)\nLast events:\n- loaded slot 2\n- map NEWRGO.MAP, elevation 0\n");
+        devAutotestWriteText("running-test.txt", "# F2 Touch is running (error_report.h)\nLast events:\n- loaded slot 2\n- dialog with \xd0\xba\xd0\xbb\xd0\xb8\xd0\xbd\xd1\x82\n- map NEWRGO.MAP, elevation 0\n");
         devAutotestWriteText("exit-stack-test.txt", "Signal: SIGSEGV SEGV_MAPERR, address 0x10\nCause: null pointer dereference\nAbort: test abort\nStack a1b2c3d4: +0x1a2b3c libc.so+0x5e0f0\n");
     } else if (strcmp(name, "reportcrashbare") == 0) {
         gDevAutotestSteps = kDevAutotestReportCrashBareSteps;

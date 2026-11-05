@@ -328,11 +328,13 @@ namespace {
             result.pop_back();
         }
         // Not cut inside a character.
-        while (!result.empty() && (static_cast<unsigned char>(result.back()) & 0xC0) == 0x80) {
-            result.pop_back();
-        }
-        if (!result.empty() && (static_cast<unsigned char>(result.back()) & 0x80) != 0) {
-            result.pop_back();
+        if (result.size() >= kLineLength) {
+            while (!result.empty() && (static_cast<unsigned char>(result.back()) & 0xC0) == 0x80) {
+                result.pop_back();
+            }
+            if (!result.empty() && (static_cast<unsigned char>(result.back()) & 0x80) != 0) {
+                result.pop_back();
+            }
         }
         return result;
     }
