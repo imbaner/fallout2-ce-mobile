@@ -303,6 +303,7 @@ struct QolSettings {
     bool party_trade_from_menu = true;
     bool party_loot_and_barter = false;
     bool fast_ammo_load = true;
+    bool move_landing_marker = true;
 };
 
 // CE: Improvements of this port that Fallout 2 CE and its mods don't have:
