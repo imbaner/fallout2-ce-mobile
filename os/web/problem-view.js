@@ -22,6 +22,13 @@ export function createHangWatch() {
   };
 }
 
+// The last events in [mark], the report texts the page kept while the game
+// was in front, for the engine to tell that the page ended (src/error_report.h).
+// A mark of a build without them tells nothing.
+export function previousRunEvents(mark) {
+  try { return JSON.parse(mark)?.context; } catch { return undefined; }
+}
+
 // The engine's abort: the browser out of memory (what to do, no report) or
 // an error (its first line, without code addresses or the page's URLs).
 export function abortKind(reason) {

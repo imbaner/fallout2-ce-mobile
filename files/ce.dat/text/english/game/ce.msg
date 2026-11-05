@@ -352,6 +352,7 @@
 {491}{}{Wait}
 {492}{}{Close the game}
 {493}{}{the map %s in it didn't load: %s}
+{494}{}{Try again}
 {500}{}{its file can't be opened}
 {501}{}{its header can't be read}
 {502}{}{its data can't be read}

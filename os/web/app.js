@@ -9,7 +9,7 @@ import {startAppCache} from './app-cache.js';
 import {installHint, installedApp} from './install-hint.js';
 import {countVisit, countEvent} from './visits.js';
 import {language, webText as t} from './strings.js';
-import {abortDetail, abortKind, createHangWatch, hideProblem, showProblem} from './problem-view.js';
+import {abortDetail, abortKind, createHangWatch, hideProblem, previousRunEvents, showProblem} from './problem-view.js';
 
 const $ = id => document.getElementById(id);
 const viewport = createGameViewport($('canvas'));
@@ -108,7 +108,7 @@ function crashed(module, reason) {
   error(t('start_failed'), reason);
   runningMark.clear();
   if (!texts) return;
-  const reload = {label:t('try_again'), run:() => location.reload()};
+  const reload = {label:texts.retry, run:() => location.reload()};
   if (abortKind(reason) === 'memory') {
     showProblem($('problem'), {texts, title:texts.memoryTitle, message:texts.memory, actions:[reload]});
   } else {
@@ -171,19 +171,7 @@ async function exited(status) {
   appCache.check();
 }
 
-// The page ended while the game was in front the last time.
-function previousRun() {
-  const saved = runningMark.get();
-  runningMark.clear();
-  let texts = null;
-  try { texts = saved && JSON.parse(saved); } catch { return; }
-  if (!texts) return;
-  showProblem($('problem'), {texts, title:texts.crashTitle, message:texts.crashBefore, report:texts.crashBeforeReport,
-    actions:[{label:t('back'), run:() => hideProblem($('problem'))}]});
-}
-
 async function prepare() {
-  previousRun();
   await exchangeView.ready;
   if (typeof WebAssembly !== 'object') throw new Error(t('unsupported'));
   const response = await fetch(new URL('./build-info.json', import.meta.url), {cache:'no-store'});
@@ -222,8 +210,10 @@ async function play() {
     try {
       fullscreen = document.documentElement.requestFullscreen?.({navigationUI:'hide'}).catch(() => {});
     } catch { /* Fullscreen is optional, e.g. in an iOS Home Screen app. */ }
+    const webPreviousRun = previousRunEvents(runningMark.get());
+    runningMark.clear();
     const module = engine = await globalThis.createFallout2({
-      canvas:$('canvas'), noInitialRun:true, webMouseAsTouch:source.mouseAsTouch,
+      canvas:$('canvas'), noInitialRun:true, webMouseAsTouch:source.mouseAsTouch, webPreviousRun,
       // The engine has no version of its own (app_version.h).
       webAppVersion:document.body.dataset.version, webAppBuild:document.body.dataset.webBuild,
       SDL2, webTextInput:textInput, webViewport:viewport,webWindow:gameWindow,
@@ -320,11 +310,12 @@ for (const type of ['pointerdown', 'touchend', 'keydown']) {
   document.addEventListener(type, audio.resume, {capture:true, passive:true});
 }
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden) runningMark.clear();
+  // A mark left by the last run waits for the next game.
+  if (document.hidden && running) runningMark.clear();
   audioTiming?.resetGap();
   if (!document.hidden) audio.resume();
 });
-window.addEventListener('pagehide', () => runningMark.clear());
+window.addEventListener('pagehide', () => { if (running) runningMark.clear(); });
 window.addEventListener('pageshow', event => {
   if (event.persisted && source?.kind === 'local') { location.reload(); return; }
   audioTiming?.resetGap();

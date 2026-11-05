@@ -95,6 +95,7 @@ namespace {
     constexpr int kTextWait = 491;
     constexpr int kTextClose = 492;
     constexpr int kTextSaveMap = 493;
+    constexpr int kTextRetry = 494;
 
     struct Reason {
         ErrorReason reason;
@@ -375,6 +376,17 @@ namespace {
     // The page reads the watchdog's state and the texts from [state]
     // (`gWebState`) without calling the engine: it may be waiting or
     // stopped.
+    // The last events of a run whose page ended, when there was one (app.js):
+    // UTF-8 into [buffer]. Returns whether there was.
+    EM_JS(int, webPreviousRunJs, (char* buffer, int capacity), {
+        const text = Module['webPreviousRun'];
+        if (text === undefined) return 0;
+        const bytes = new TextEncoder().encode(text);
+        const length = Math.min(bytes.length, capacity - 1);
+        HEAPU8.set(bytes.subarray(0, length), buffer);
+        HEAPU8[buffer + length] = 0;
+        return 1;
+    });
     EM_JS(void, webPublishErrorReportJs, (int* state), {
         const at = state >> 2;
         Module['webErrorReport'] = {
@@ -925,11 +937,9 @@ namespace {
         appendJson(json, "crashTitle", utf8(text(kTextCrashTitle, "The game closed unexpectedly")));
         appendJson(json, "crash", crash + " " + verdict);
         appendJson(json, "crashReport", crash + "\nCode: crash ({reason})\n" + buildLine() + "\n" + context);
-        // The browser's page ended while the game was in front (its next
-        // start tells).
-        std::string before = utf8(text(kTextCrash, "The game closed unexpectedly the last time."));
-        appendJson(json, "crashBefore", before + " " + verdict);
-        appendJson(json, "crashBeforeReport", before + "\nCode: crash (page)\n" + buildLine() + "\n" + context);
+        // The last events, for the next start when the browser's page ends
+        // while the game is in front.
+        appendJson(json, "context", context);
         appendJson(json, "memoryTitle", utf8(text(kTextSystemClosed, "The system closed the game")));
         appendJson(json, "memory", utf8(text(kTextBrowserMemory, "The browser ran out of memory for the game. Close other tabs and open the game again.")));
         appendJson(json, "form", kFormPrefillUrl);
@@ -941,6 +951,7 @@ namespace {
         appendJson(json, "copy", utf8(text(kTextCopy, "Copy the text")));
         appendJson(json, "copied", utf8(text(kTextCopied, "Copied")));
         appendJson(json, "wait", utf8(text(kTextWait, "Wait")));
+        appendJson(json, "retry", utf8(text(kTextRetry, "Try again")));
         appendJson(json, "close", utf8(text(kTextClose, "Close the game")), true);
         json += "}";
         gPlatformTexts = json;
@@ -1084,6 +1095,18 @@ namespace {
         return cleanLine(activityText("exitReason", process));
     }
 
+    std::vector<std::string> splitLines(const std::string& text)
+    {
+        std::vector<std::string> lines;
+        size_t start = 0;
+        while (start < text.size()) {
+            size_t end = text.find('\n', start);
+            lines.push_back(text.substr(start, end != std::string::npos ? end - start : std::string::npos));
+            start = end != std::string::npos ? end + 1 : text.size();
+        }
+        return lines;
+    }
+
     // Where the crashed run of [process] fell, as the system tells (Android
     // 12+): the report's lines, none when it kept no record.
     std::vector<std::string> exitStack(int process)
@@ -1104,15 +1127,11 @@ namespace {
         }
 
         std::vector<std::string> lines;
-        size_t start = 0;
-        while (start < text.size() && lines.size() < kStackLinesShown) {
-            size_t end = text.find('\n', start);
-            std::string raw = text.substr(start, end != std::string::npos ? end - start : std::string::npos);
+        for (const std::string& raw : splitLines(text)) {
             std::string line = cleanLine(raw, raw.compare(0, 7, "Signal:") == 0 || raw.compare(0, 5, "Stack") == 0);
-            if (!line.empty()) {
+            if (!line.empty() && lines.size() < kStackLinesShown) {
                 lines.push_back(line);
             }
-            start = end != std::string::npos ? end + 1 : text.size();
         }
         return lines;
     }
@@ -1136,6 +1155,29 @@ namespace {
         problem->reason = ErrorReason::ReplaceGame;
         problem->detail = line.size() > code.size() ? line.substr(code.size() + 1) : std::string();
         return true;
+    }
+
+    // The browser's page ended while the game was in front the last time: the
+    // page keeps that run's last events and gives them at the start.
+    bool readPreviousPage(Problem* problem)
+    {
+#ifdef __EMSCRIPTEN__
+        char text[4096];
+        if (webPreviousRunJs(text, sizeof(text)) == 0) {
+            return false;
+        }
+        problem->reason = ErrorReason::Crash;
+        problem->detail = "page";
+        for (const std::string& raw : splitLines(text)) {
+            std::string line = cleanLine(raw);
+            if (!line.empty() && problem->previous.size() < kEventsShown + kScriptErrorsShown + 2) {
+                problem->previous.push_back(line);
+            }
+        }
+        return true;
+#else
+        return false;
+#endif
     }
 
     void raise(const Problem& problem)
@@ -1309,7 +1351,7 @@ void errorReportStart()
             problem.stack = exitStack(process);
         }
         raise(problem);
-    } else if (readPlatformProblem(&problem)) {
+    } else if (readPlatformProblem(&problem) || readPreviousPage(&problem)) {
         raise(problem);
     }
     writeRunning();

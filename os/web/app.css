@@ -167,6 +167,7 @@ body.playing #canvas { display: block; }
 .problem-channels, .problem-actions { display:flex; gap:8px; }
 .problem-channel { flex:1; display:flex; flex-direction:column; align-items:stretch; gap:2px; text-align:center; }
 .problem-channel small { color:var(--dim); font-size:11px; }
+.problem-panel button { margin-top:0; }
 .problem-actions button { flex:1; }
 .exchanging #rotate, .exchanging #diagnostics, .exchanging #storage-warning { display:none; }
 

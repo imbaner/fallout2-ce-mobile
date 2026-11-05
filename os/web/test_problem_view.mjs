@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {abortDetail, abortKind, createHangWatch, fittedText, HANG_MS, LOADING_HANG_MS, reportUrls, URL_LIMIT} from './problem-view.js';
+import {abortDetail, abortKind, createHangWatch, fittedText, HANG_MS, LOADING_HANG_MS, previousRunEvents, reportUrls, URL_LIMIT} from './problem-view.js';
 
 test('the hang watchdog: 20 s without new frames, 60 s while loading, not before the first frame', () => {
   const watch = createHangWatch();
@@ -40,4 +40,13 @@ test('a long report fits the links: the oldest events go first, then the last li
   const urls = reportUrls({form:'https://docs.google.com/forms/d/e/x/viewform?usp=pp_url&entry.1=', github:'https://github.com/a/b/issues/new', telegram:''}, 't', report);
   assert.ok(urls.form.length <= URL_LIMIT && urls.github.length <= URL_LIMIT);
   assert.ok(decodeURIComponent(urls.form).includes('Код: ошибка\n'));
+});
+
+test('the last run\'s events: from its mark, nothing from no mark or one of an older build', () => {
+  const events = 'Last events:\n- map ARTEMPLE.MAP, elevation 0\n- диалог\n';
+  assert.equal(previousRunEvents(JSON.stringify({context:events, hang:'x'})), events);
+  assert.equal(previousRunEvents(JSON.stringify({context:''})), '', 'a run with no events is still told');
+  assert.equal(previousRunEvents(JSON.stringify({crashBeforeReport:'x'})), undefined);
+  assert.equal(previousRunEvents(null), undefined);
+  assert.equal(previousRunEvents('{broken'), undefined);
 });
