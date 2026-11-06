@@ -8,13 +8,13 @@
 #define _BUILD_BRANCH "@BRANCH@"
 #endif
 #ifndef _BUILD_HASH
-#define _BUILD_HASH   "@HASH@"
+#define _BUILD_HASH   "438e406a"
 #endif
 #ifndef _BUILD_VER
 #define _BUILD_VER    "@LATEST_TAG@"
 #endif
 #ifndef _BUILD_DATE
-#define _BUILD_DATE   @DATE@
+#define _BUILD_DATE   "Nov 05 2026 05:45:15"
 #endif
 
 #define CI_BUILD @CI_BUILD@
