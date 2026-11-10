@@ -144,14 +144,23 @@ int _GNW95_init_mode_ex(int width, int height, int bpp)
 #ifdef __ANDROID__
     // CE: The phone's screen decides: the game's 480 lines (the original's
     // height, what the mobile UI is laid out against) and as many columns as
-    // the screen's proportions give, full screen. A config copied from a
-    // computer (a window of its size) doesn't matter.
+    // the screen's proportions give, full screen. A screen narrower than 4:3
+    // (a foldable's inner one) gets the 640 columns and the lines its
+    // proportions give: the game's picture fills it as the mobile UI does,
+    // since touches are mapped through the picture (a picture with bars put
+    // taps away from the buttons). A config copied from a computer (a window
+    // of its size) doesn't matter.
     SDL_DisplayMode displayMode;
     if (SDL_GetDesktopDisplayMode(0, &displayMode) == 0 && displayMode.w > 0 && displayMode.h > 0) {
         int longSide = std::max(displayMode.w, displayMode.h);
         int shortSide = std::min(displayMode.w, displayMode.h);
-        height = 480;
-        width = std::max(640, 480 * longSide / shortSide);
+        if (480 * longSide / shortSide >= 640) {
+            height = 480;
+            width = 480 * longSide / shortSide;
+        } else {
+            width = 640;
+            height = 640 * shortSide / longSide;
+        }
         scale = 1;
         settings.screen.resolution_x = width;
         settings.screen.resolution_y = height;
