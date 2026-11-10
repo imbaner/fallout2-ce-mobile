@@ -13,10 +13,10 @@ import android.widget.ImageView;
 
 // A game's picture in its frame, held at its right edge as the game's main
 // menu holds it (mui_main_menu.cc). As wide as the frame or wider (4:3, 16:9):
-// it fills the frame, a wider one gives up its left part. Much narrower (the
-// game's own 640x480 menu picture right of its button plates): as tall as
-// the frame, its left edge fading into the frame's black, as in the menu -
-// filling the frame would blow its middle up.
+// it fills the frame, a wider one gives up its left part. Much narrower (a
+// mod's tall picture; older cards' part of the game's own 640x480 one right
+// of its button plates): as tall as the frame, its left edge fading into the
+// frame's black, as in the menu - filling the frame would blow its middle up.
 public class CoverImageView extends ImageView {
     // Narrower than the frame by more than this: as in the menu.
     private static final float NARROW = 0.75f;

@@ -34,9 +34,11 @@ namespace fallout {
 
 namespace {
 
-    // The game's 640x480 menu picture has its button plates at the left
-    // (mui_main_menu.cc): the card shows the part right of them.
-    constexpr int kVanillaArtLeft = 215;
+    // The card's picture whole: the game's own 640x480 menu picture with its
+    // button plates too (the main menu shows only the part right of them,
+    // mui_main_menu.cc; the list holds a picture at its right edge). Older
+    // cards had that part only: card.txt says which one there is.
+    constexpr const char* kWholePicture = "picture=whole";
 
     // The mark of a start under way (MainActivity writes it, the app's
     // folder): gone once the game gets to its menu or into play.
@@ -97,9 +99,27 @@ namespace {
         return text;
     }
 
-    // The menu's picture as the menu shows it (the high resolution one,
-    // else the game's own right of its button plates), once a run: a mod
-    // added or replaced may bring another.
+#ifdef __EMSCRIPTEN__
+    // The card at [path] (card.txt) is of a whole picture.
+    bool cardOfWholePicture(const std::string& path)
+    {
+        FILE* stream = fopen(path.c_str(), "rb");
+        if (stream == nullptr) {
+            return false;
+        }
+        char line[256];
+        bool whole = false;
+        while (!whole && fgets(line, sizeof(line), stream) != nullptr) {
+            whole = strncmp(line, kWholePicture, strlen(kWholePicture)) == 0;
+        }
+        fclose(stream);
+        return whole;
+    }
+#endif
+
+    // The menu's picture whole (the high resolution one, else the game's
+    // own with its button plates), once a run: a mod added or replaced may
+    // bring another.
     void writePicture(const std::string& path)
     {
         if (gPictureWritten) {
@@ -107,32 +127,24 @@ namespace {
         }
         gPictureWritten = true;
 #ifdef __EMSCRIPTEN__
-        // Once: every write is a new version in the browser's storage.
+        // Once: every write is a new version in the browser's storage (an
+        // older card's part of the picture written again).
         saveStorage::Info info;
-        if (saveStorage::inspect(path, info) && info.exists) {
+        if (saveStorage::inspect(path, info) && info.exists && cardOfWholePicture(cardPath("card.txt"))) {
             return;
         }
 #endif
 
-        std::vector<unsigned char> rgba;
+        std::vector<unsigned char> pixels;
         int width;
         int height;
-        int left = 0;
-        if (!muiPictureRgba(InterfaceFrmId("HR_MAINMENU.FRM"), rgba, &width, &height)) {
-            if (!muiPictureRgba(FrmId(InterfaceFrameId::MainMenuBackgroundImage), rgba, &width, &height)) {
-                return;
-            }
-            left = width > kVanillaArtLeft ? kVanillaArtLeft : 0;
-        }
-
-        int cropped = width - left;
-        std::vector<unsigned char> pixels(static_cast<size_t>(cropped) * height * 4);
-        for (int y = 0; y < height; y++) {
-            memcpy(&pixels[static_cast<size_t>(y) * cropped * 4], &rgba[(static_cast<size_t>(y) * width + left) * 4], static_cast<size_t>(cropped) * 4);
+        if (!muiPictureRgba(InterfaceFrmId("HR_MAINMENU.FRM"), pixels, &width, &height)
+            && !muiPictureRgba(FrmId(InterfaceFrameId::MainMenuBackgroundImage), pixels, &width, &height)) {
+            return;
         }
 
         std::vector<unsigned char> encoded;
-        if (lodepng::encode(encoded, pixels, static_cast<unsigned>(cropped), static_cast<unsigned>(height)) != 0) {
+        if (lodepng::encode(encoded, pixels, static_cast<unsigned>(width), static_cast<unsigned>(height)) != 0) {
             return;
         }
         std::string temporary = path + ".tmp";
@@ -201,7 +213,8 @@ void gameCardWrite(const std::u32string& place)
     char version[128];
     versionGetVersion(version, sizeof(version));
     std::string text = "version=" + cardLine(version) + "\n"
-        + "place=" + cardLine(encodeUtf8(place)) + "\n";
+        + "place=" + cardLine(encodeUtf8(place)) + "\n"
+        + kWholePicture + "\n";
     if (!saveStorage::writeFile(cardPath("card.txt"), text)) {
         debugPrint("gameCardWrite: card not written\n");
     }
