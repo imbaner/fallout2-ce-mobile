@@ -21,6 +21,7 @@
 #include "sfall_config.h"
 #include "sfall_global_vars.h"
 #include "stat.h"
+#include "tile.h"
 #include "xfile.h"
 
 namespace fallout {
@@ -385,8 +386,13 @@ void heroAppearanceOnGameLoaded()
     sfall_gl_vars_fetch("HApStyle", style);
     chooseOrFallBack(race, style);
 
-    // The dude's art id into the hero's own (`objectSetFrmId`).
-    objectSetFrmId(gDude, FrmId(gDude), nullptr);
+    // The dude's art id into the hero's own (`objectSetFrmId`), drawn at
+    // once: the map is on the screen already (a save's), and a standing
+    // dude would keep the look it was drawn with until he moves (sfall
+    // refreshes the map here too).
+    Rect rect;
+    objectSetFrmId(gDude, FrmId(gDude), &rect);
+    tileWindowRefreshRect(&rect, gDude->elevation);
 }
 
 void heroAppearanceReadGcd(File* stream)

@@ -3984,7 +3984,9 @@ static const DevAutotestStep kDevAutotestRetargetLeaveSteps[] = {
 // Appearance folder, EnableHeroAppearanceMod=1 in ddraw.ini) the black dude
 // (race 1) is chosen and wears his own art from hmR01S00.dat, leather armor
 // too; saves keep the critter's art id and the choice in sfallgv.sav, a
-// .gcd file at its end; a gender change takes the default look. The unmodded
+// .gcd file at its end; a gender change takes the default look; a loaded
+// save shows the hero's art at once, not the default look until the dude
+// moves (Telegram report, 2026-11-11). The unmodded
 // copy has no Appearance folder: the mod is off and nothing changes.
 static const DevAutotestStep kDevAutotestHeroAppearanceSteps[] = {
     { DEV_AUTOTEST_ACTION_NONE, 0, 0, 0, 30, "a00_start" },
@@ -7071,8 +7073,41 @@ void devAutotestTick()
             }
             case 5: {
                 bool fromSet = artFromSet(dudeFrmId);
-                ok = heroAppearanceRace() == 1 && heroArt && fromSet && ownPixels(dudeFrmId);
-                devAutotestLog("  loaded: race %d, dude art %d (hero %d, from the set %d): %s\n", heroAppearanceRace(), dudeFrmId.frameId(), heroArt ? 1 : 0, fromSet ? 1 : 0, ok ? "PASS" : "FAIL");
+                // The map shows the hero's art already: the dude's place
+                // drawn again is what the world's buffer has (a standing
+                // dude isn't drawn again by himself; a player saw the
+                // default look until he moved).
+                worldViewEnsureRendered();
+                unsigned char* buffer = worldViewIsEnabled() ? worldViewGetBuffer() : windowGetBuffer(gIsoWindow);
+                int pitch = worldViewIsEnabled() ? worldViewGetWidth() : windowGetWidth(gIsoWindow);
+                int height = worldViewIsEnabled() ? worldViewGetHeight() : windowGetHeight(gIsoWindow);
+                Rect rect;
+                objectGetRect(gDude, &rect);
+                rect.left = std::max(rect.left, 0);
+                rect.top = std::max(rect.top, 0);
+                rect.right = std::min(rect.right, pitch - 1);
+                rect.bottom = std::min(rect.bottom, height - 1);
+                int stale = -1;
+                if (buffer != nullptr && rect.right >= rect.left && rect.bottom >= rect.top) {
+                    int width = rect.right - rect.left + 1;
+                    std::vector<unsigned char> shownPixels;
+                    for (int y = rect.top; y <= rect.bottom; y++) {
+                        shownPixels.insert(shownPixels.end(), buffer + y * pitch + rect.left, buffer + y * pitch + rect.left + width);
+                    }
+                    tileWindowRefreshRect(&rect, gDude->elevation);
+                    worldViewEnsureRendered();
+                    stale = 0;
+                    for (int y = rect.top; y <= rect.bottom; y++) {
+                        for (int x = rect.left; x <= rect.right; x++) {
+                            if (shownPixels[(y - rect.top) * width + x - rect.left] != buffer[y * pitch + x]) {
+                                stale++;
+                            }
+                        }
+                    }
+                }
+                bool shown = stale == 0;
+                ok = heroAppearanceRace() == 1 && heroArt && fromSet && ownPixels(dudeFrmId) && shown;
+                devAutotestLog("  loaded: race %d, dude art %d (hero %d, from the set %d), stale pixels on the map %d: %s\n", heroAppearanceRace(), dudeFrmId.frameId(), heroArt ? 1 : 0, fromSet ? 1 : 0, stale, ok ? "PASS" : "FAIL");
                 break;
             }
             }
