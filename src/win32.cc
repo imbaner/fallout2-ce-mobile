@@ -34,6 +34,10 @@
 #include "platform/ios/paths.h"
 #endif
 
+#ifdef __ANDROID__
+#include "platform/android/paths.h"
+#endif
+
 // explicit `atexit` group
 #include "audio_engine.h"
 
@@ -104,7 +108,8 @@ int main(int argc, char* argv[])
     SDL_SetHint(SDL_HINT_ANDROID_TRAP_BACK_BUTTON, "1");
     SDL_SetHint(SDL_HINT_MOUSE_TOUCH_EVENTS, "0");
     SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "0");
-    chdir(SDL_AndroidGetExternalStoragePath());
+    // CE: The current game's folder (the app keeps several games).
+    chdir(androidGameFolder().c_str());
 #endif
 
 #ifdef __EMSCRIPTEN__

@@ -86,6 +86,9 @@
 #include "platform/web/storage.h"
 #include <emscripten.h>
 #endif
+#ifdef __ANDROID__
+#include "platform/android/paths.h"
+#endif
 
 namespace fallout {
 
@@ -535,17 +538,17 @@ static void loadSavePersistSelectedSlot()
 static bool gLoadSaveReady = false;
 
 // CE: The port's own data on saves (save_records.h, save_compatibility.h):
-// in the app's private folder on Android (its import and export of saves
-// use it there), else next to the game ("ce-" names).
+// in the game's private folder on Android (the app's import and export of
+// saves use it there), else next to the game ("ce-" names).
 static std::string portDataPath(const char* name)
 {
 #ifdef __EMSCRIPTEN__
     return webPortDataPath(name);
 #endif
 #ifdef __ANDROID__
-    const char* internal = SDL_AndroidGetInternalStoragePath();
-    if (internal != nullptr) {
-        return std::string(internal) + "/" + name;
+    const std::string& folder = androidGameDataFolder();
+    if (!folder.empty()) {
+        return folder + "/" + name;
     }
 #endif
     return std::string("ce-") + name;

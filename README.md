@@ -24,7 +24,7 @@ On top of CE (its engine, fixes and sfall compatibility are kept and updated fro
 - **Saves.** A save list sorted by when saves were made, quick saves that never overwrite manual ones (their number is a setting), "Continue" in the main menu, saves interrupted midway are restored, optional marks for saves made with other game files or mods.
 - **Android app.** The game's files are imported from a folder or any archive (.zip, .7z, .rar, .tar...) copied from a computer, with RPU and other mods and the saves; "Replace game" for new builds and mod updates; export and import of saves; verified updates from GitHub Releases.
 - **Web app** (iPhone, iPad, Android browsers): the same engine and touch UI in the browser. Installs to the Home Screen, plays offline, keeps the game and saves in the browser's storage, updates from the site.
-- **The port's own improvements** are settings (`[enhancements]` in `fallout2.cfg`).
+- **The port's own improvements** are settings (`[enhancements]` in `fallout2.cfg`; on Android in the app's own settings file, shared by its games).
 
 The full list of changes is the git history over upstream.
 

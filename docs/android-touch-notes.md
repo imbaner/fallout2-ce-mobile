@@ -506,7 +506,8 @@ on a 360 dp phone is a 600 dp screen; `hudIsTabletScreen` decides by it too).
   lost, 3+ fingers, the game leaving the foreground or closing (so swiping
   home or closing the game right after a glitch saves it; `touchLogExit`
   from `gameExit` and SDL_QUIT). Pull with
-  `adb pull /sdcard/Android/data/io.github.imbaner.fallout2ce.debug/files/touch.log`
+  `adb pull /sdcard/Android/data/io.github.imbaner.fallout2ce.debug/files/games/1/touch.log`
+  (the game's folder, "Games' folders" below)
   and compare with `adb logcat -d -v time | grep MIUIInput` (same wall
   clock). Off in autotests except `touchlog`. Until 2026-10-01 evening it
   never ran on the phone: the touch-only default was set before the config
@@ -527,7 +528,7 @@ on a 360 dp phone is a 600 dp screen; `hudIsTabletScreen` decides by it too).
   fingers down/up (0..1 of the screen, who took them) and the camera
   (center tile, zoom, every 300 ms when it changed), so a session can be
   replayed from a save. Not while a game or a map loads.
-  Pull with `adb pull /sdcard/Android/data/io.github.imbaner.fallout2ce.debug/files/actions.log`.
+  Pull with `adb pull /sdcard/Android/data/io.github.imbaner.fallout2ce.debug/files/games/1/actions.log`.
 - The dude's look and his armor apart (2026-10-01, a player's saves, cause
   not found yet): one save with the leather armor's look and no armor worn
   (it had gone to Sulik), the next with a jacket worn and the jumpsuit's
@@ -1447,7 +1448,8 @@ every screen on the new scalable UI, visual style/textures later via theme).
 
 Improvements that Fallout 2 CE, sfall and RPU don't have: they keep the
 game's rules and data (saves, scripts and mods work the same) and only make
-playing better. Each is a setting of `[enhancements]` in fallout2.cfg
+playing better. Each is a setting of `[enhancements]` in fallout2.cfg (on
+Android in the app's `f2touch.cfg`, "Games' folders" below)
 (default on, 0 turns it off), later a tab of the settings screen. They are
 written into the engine where the game does the thing (no separate layer);
 the setting only picks the behavior there. CE's own `[qol]` section stays
@@ -1561,6 +1563,36 @@ lines. The last events still tell how far the game got: `running.txt` is
 written every few seconds, and at once on opening the world map and before a
 map's load (`errorReportFlush`), so "entering map X" as the last event means
 the game went down loading X.
+
+## Games' folders (Android)
+
+Each game is a folder of its own, laid out as on a computer, in the app's
+folder (`Games.java`):
+
+- `files/games/<id>/` (`Android/data/<app>/files`): the game's files, its
+  `fallout2.cfg`, its saves (`data/SAVEGAME`), the logs of its runs
+  (`actions.log`, `touch.log`, `perf.log`, `debug.log`). The engine works in
+  it (`androidGameFolder`, `platform/android/paths.h`, asks `MainActivity`).
+- `games/<id>/` in the app's private files: the port's records of its saves
+  (`saves.txt`, `game-composition.txt`, `game-charset.txt`,
+  `androidGameDataFolder`).
+- The app's folder itself keeps what all games share: `ce.dat` (the engine
+  loads it from there, as macOS from its bundle) and the marks of a run
+  (`running.txt`, `problem.txt`, error_report.cc), so whichever game starts
+  next sees how the last run ended.
+- `games.txt` (private, Java properties): the games and the one played.
+- The port's own settings (`[touch]`, `[world_view]`, `[enhancements]`) are
+  the same for all games: the app's private `f2touch.cfg`
+  (game_config.cc). They win over what a game's config has of them (an
+  earlier build's), which the next save of the settings removes from it;
+  the game's `fallout2.cfg` keeps the game's settings, as on a computer.
+  One game per folder (computers, the web for now) keeps them in
+  `fallout2.cfg` as before.
+- Builds before kept the one game right in the app's folder: at the first
+  start of this one it is moved into `games/1` (renamed, nothing copied) and
+  the records into its private folder, by a journal
+  (`games-move.txt`) finished at the next start if the app dies meanwhile
+  (`GamesTest`). A new install gets `games/1` empty, filled by the import.
 
 ## Game layouts the import understands (Android and web)
 

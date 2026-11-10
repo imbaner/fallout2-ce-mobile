@@ -92,6 +92,10 @@
 #include <TargetConditionals.h>
 #endif
 
+#ifdef __ANDROID__
+#include "platform/android/paths.h"
+#endif
+
 namespace fallout {
 
 #define HELP_SCREEN_WIDTH (640)
@@ -1393,6 +1397,14 @@ static void TryLoadBaseCEMod()
         if (tryLoadBaseCEModAtPath(absolutePath, &found, &openFailed)) {
             return;
         }
+    }
+#endif
+
+#ifdef __ANDROID__
+    // CE: The app's own, shared by its games (each in a folder of its own).
+    std::string appPath = androidAppFile(kBaseModPath);
+    if (tryLoadBaseCEModAtPath(appPath.c_str(), &found, &openFailed)) {
+        return;
     }
 #endif
 

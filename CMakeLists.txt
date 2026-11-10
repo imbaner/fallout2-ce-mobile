@@ -492,6 +492,13 @@ if(FALLOUT_APP_VERSION AND NOT EMSCRIPTEN)
     target_compile_definitions(${EXECUTABLE_NAME} PRIVATE FALLOUT_APP_VERSION="${FALLOUT_APP_VERSION}")
 endif()
 
+if(ANDROID)
+    target_sources(${EXECUTABLE_NAME} PUBLIC
+        "src/platform/android/paths.h"
+        "src/platform/android/paths.cc"
+    )
+endif()
+
 if(IOS)
     target_sources(${EXECUTABLE_NAME} PUBLIC
         "src/platform/ios/paths.h"

@@ -72,8 +72,9 @@ namespace {
             }
 
             std::string name = componentName(base->path);
-            // The port's own (comes with the app, not the game's).
-            if (name == "ce.dat") {
+            // The port's own (comes with the app, not the game's): next to
+            // the game, or in the app's folder (Android, macOS bundle).
+            if (name.substr(name.find_last_of('/') + 1) == "ce.dat") {
                 continue;
             }
             char kind = isGameArchive(name) ? 'G' : 'C';

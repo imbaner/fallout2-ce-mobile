@@ -16,6 +16,8 @@
 #ifdef __ANDROID__
 #include <jni.h>
 #include <unistd.h>
+
+#include "platform/android/paths.h"
 #endif
 
 #ifdef __EMSCRIPTEN__
@@ -51,15 +53,25 @@ namespace {
     // draft. Telegram may leave the draft out: the report is copied first.
     constexpr const char* kTelegramDirectUrl = "https://t.me/imbaner?direct&text=";
 
-    // In the game's folder: the run going on (its last events, for the next
-    // start when it ends unexpectedly), and a problem the app's import
-    // screen left for the game (one "reason detail" line).
+    // The run going on (its last events, for the next start when it ends
+    // unexpectedly), and a problem the app's import screen left for the game
+    // (one "reason detail" line): in the app's own folder on Android (any of
+    // its games may start next, `appFile`), else in the game's folder.
     constexpr const char* kRunningFile = "running.txt";
     constexpr const char* kTestRunningFile = "running-test.txt";
     // What the system tells of the crash in a test.
     constexpr const char* kTestStackFile = "exit-stack-test.txt";
     constexpr const char* kProblemFile = "problem.txt";
     constexpr Uint32 kRunningWriteMs = 5000;
+
+    std::string appFile(const char* name)
+    {
+#ifdef __ANDROID__
+        return androidAppFile(name);
+#else
+        return name;
+#endif
+    }
 
     constexpr size_t kEventsKept = 20;
     constexpr size_t kEventsShown = 8;
@@ -976,9 +988,10 @@ namespace {
 
     // ---- the run's marker
 
-    const char* runningFile()
+    // An automated test's own, in the folder it runs in.
+    std::string runningFile()
     {
-        return devAutotestIsEnabled() ? kTestRunningFile : kRunningFile;
+        return devAutotestIsEnabled() ? std::string(kTestRunningFile) : appFile(kRunningFile);
     }
 
     // The browser's page keeps its own (the game's files are its storage):
@@ -1006,7 +1019,7 @@ namespace {
         if (!usesRunningFile()) {
             return;
         }
-        FILE* stream = fopen(runningFile(), "wt");
+        FILE* stream = fopen(runningFile().c_str(), "wt");
         if (stream == nullptr) {
             return;
         }
@@ -1029,7 +1042,7 @@ namespace {
     void removeRunning()
     {
         if (gRunningMarked) {
-            remove(runningFile());
+            remove(runningFile().c_str());
             gRunningMarked = false;
         }
     }
@@ -1037,7 +1050,7 @@ namespace {
     // The last run's lines, or false when it ended cleanly.
     bool readRunning(std::vector<std::string>* lines, int* process)
     {
-        FILE* stream = fopen(runningFile(), "rt");
+        FILE* stream = fopen(runningFile().c_str(), "rt");
         if (stream == nullptr) {
             return false;
         }
@@ -1053,7 +1066,7 @@ namespace {
             }
         }
         fclose(stream);
-        remove(runningFile());
+        remove(runningFile().c_str());
         return true;
     }
 
@@ -1141,14 +1154,15 @@ namespace {
     // A problem the app's import screen left: "replace-game <detail>".
     bool readPlatformProblem(Problem* problem)
     {
-        FILE* stream = fopen(kProblemFile, "rt");
+        std::string path = appFile(kProblemFile);
+        FILE* stream = fopen(path.c_str(), "rt");
         if (stream == nullptr) {
             return false;
         }
         char buffer[256] = { 0 };
         bool read = fgets(buffer, sizeof(buffer), stream) != nullptr;
         fclose(stream);
-        remove(kProblemFile);
+        remove(path.c_str());
         std::string line = read ? cleanLine(buffer) : std::string();
         std::string code = line.substr(0, line.find(' '));
         if (code != reasonInfo(ErrorReason::ReplaceGame).code) {
@@ -1447,7 +1461,7 @@ extern "C" JNIEXPORT jstring JNICALL Java_com_alexbatalov_fallout2ce_MainActivit
 // The watchdog closes the game: not a crash for the next start.
 extern "C" JNIEXPORT void JNICALL Java_com_alexbatalov_fallout2ce_MainActivity_nativeClosing(JNIEnv* env, jclass clazz)
 {
-    remove(kRunningFile);
+    remove(appFile(kRunningFile).c_str());
 }
 #endif
 

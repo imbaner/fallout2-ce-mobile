@@ -58,6 +58,8 @@ public class ImportActivity extends Activity {
     private String mode;
     // Back: to the previous step, else the game (opened from it).
     private Runnable onBack;
+    // The game played (Games.java): the import goes into its folder.
+    private Games.Game game;
     // After an export: what was being done (replacing all saves), else back
     // to the game.
     private Runnable afterExport;
@@ -65,6 +67,11 @@ public class ImportActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        try {
+            game = Games.current(this);
+        } catch (IOException e) {
+            throw new IllegalStateException("games' folders: " + e.getMessage(), e);
+        }
         setContentView(R.layout.activity_import);
 
         title = findViewById(R.id.import_title);
@@ -81,7 +88,7 @@ public class ImportActivity extends Activity {
         });
 
         applyFont(findViewById(R.id.import_panel));
-        replacing = GameImport.isInstalled(getExternalFilesDir(null));
+        replacing = GameImport.isInstalled(gameFolder());
         mode = getIntent().getStringExtra(MODE);
         if (MODE_SAVES_EXPORT.equals(mode)) {
             startExport(null);
@@ -98,10 +105,15 @@ public class ImportActivity extends Activity {
     private void applyFont(View view) {
         boolean mono = false;
         try {
-            File config = GameFiles.configFile(getExternalFilesDir(null));
-            if (config.isFile()) {
-                mono = "1".equals(GameSaves.configValue(GameFiles.readText(config), "touch", "font"));
+            // The port's settings (Games.PORT_SETTINGS), else an earlier
+            // build's in the game's config (moved at the game's next save).
+            File config = Games.portSettings(this);
+            String value = config.isFile() ? GameSaves.configValue(GameFiles.readText(config), "touch", "font") : null;
+            if (value == null) {
+                config = GameFiles.configFile(gameFolder());
+                value = config.isFile() ? GameSaves.configValue(GameFiles.readText(config), "touch", "font") : null;
             }
+            mono = "1".equals(value);
         } catch (IOException ignored) {
             // An absent/unreadable first-run config uses the game's default.
         }
@@ -237,7 +249,7 @@ public class ImportActivity extends Activity {
                     });
                 openSource = source;
                 if (MODE_SAVES_IMPORT.equals(mode)) {
-                    GameSaves.Found saves = GameSaves.find(source, getExternalFilesDir(null), currentComposition(), currentCharset(), SaveComposition::compare);
+                    GameSaves.Found saves = GameSaves.find(source, gameFolder(), currentComposition(), currentCharset(), SaveComposition::compare);
                     GameImport.Source chosen = source;
                     if (saves == null) {
                         closeQuietly(source);
@@ -249,7 +261,7 @@ public class ImportActivity extends Activity {
                 }
                 found = GameImport.find(source, replacing);
                 if (found != null) {
-                    plan = GameImport.plan(found, getExternalFilesDir(null), !replacing);
+                    plan = GameImport.plan(found, gameFolder(), !replacing);
                 }
             } catch (GameImport.CancelledException e) {
                 closeQuietly(source);
@@ -314,7 +326,7 @@ public class ImportActivity extends Activity {
             GameFiles.Plan plan;
             try {
                 found = GameImport.find(source, replacing, root);
-                plan = found != null ? GameImport.plan(found, getExternalFilesDir(null), !replacing) : null;
+                plan = found != null ? GameImport.plan(found, gameFolder(), !replacing) : null;
             } catch (IOException | RuntimeException e) {
                 closeQuietly(source);
                 Log.w(TAG, "can't use " + root, e);
@@ -340,7 +352,7 @@ public class ImportActivity extends Activity {
         busy = false;
         progress.setIndeterminate(false);
 
-        File target = getExternalFilesDir(null);
+        File target = gameFolder();
         long free = target != null ? target.getUsableSpace() : 0;
 
         StringBuilder text = new StringBuilder();
@@ -409,7 +421,7 @@ public class ImportActivity extends Activity {
                     runOnUiThread(() -> showError(text));
                     return;
                 }
-                GameImport.install(source, found, plan, !replacing, getExternalFilesDir(null), new GameImport.Progress() {
+                GameImport.install(source, found, plan, !replacing, gameFolder(), new GameImport.Progress() {
                     @Override
                     public void update(long copied, long total, String path) {
                         runOnUiThread(() -> {
@@ -603,7 +615,7 @@ public class ImportActivity extends Activity {
     // What the game is made of now (written by the game, src/loadsave.cc).
     private String currentComposition() {
         try {
-            return new String(GameSaves.readAll(new File(getFilesDir(), GameSaves.COMPOSITION)), java.nio.charset.StandardCharsets.UTF_8).trim();
+            return new String(GameSaves.readAll(new File(gameDataFolder(), GameSaves.COMPOSITION)), java.nio.charset.StandardCharsets.UTF_8).trim();
         } catch (IOException e) {
             return "";
         }
@@ -612,14 +624,24 @@ public class ImportActivity extends Activity {
     // Its texts' code page (written by the game, src/loadsave.cc).
     private String currentCharset() {
         try {
-            return new String(GameSaves.readAll(new File(getFilesDir(), GameSaves.CHARSET)), java.nio.charset.StandardCharsets.UTF_8).trim();
+            return new String(GameSaves.readAll(new File(gameDataFolder(), GameSaves.CHARSET)), java.nio.charset.StandardCharsets.UTF_8).trim();
         } catch (IOException e) {
             return "";
         }
     }
 
+    // The game's folder, as on a computer.
+    private File gameFolder() {
+        return game.folder;
+    }
+
+    // The game's private folder: the port's records of its saves.
+    private File gameDataFolder() {
+        return game.data;
+    }
+
     private File recordsFile() {
-        return new File(getFilesDir(), GameSaves.RECORDS);
+        return new File(gameDataFolder(), GameSaves.RECORDS);
     }
 
     // The saves found: a summary, the list (newest first, marks of
@@ -689,7 +711,7 @@ public class ImportActivity extends Activity {
 
     // Replacing all: the saves there go - said first, exporting them offered.
     private void confirmReplaceSaves(GameImport.Source source, GameSaves.Found found) {
-        int current = GameSaves.installedSaves(getExternalFilesDir(null)).size();
+        int current = GameSaves.installedSaves(gameFolder()).size();
         if (current == 0) {
             importSaves(source, found, true);
             return;
@@ -701,7 +723,7 @@ public class ImportActivity extends Activity {
     }
 
     private void importSaves(GameImport.Source source, GameSaves.Found found, boolean replaceAll) {
-        File game = getExternalFilesDir(null);
+        File game = gameFolder();
         GameSaves.Plan plan;
         try {
             plan = GameSaves.plan(found, game, replaceAll);
@@ -752,7 +774,7 @@ public class ImportActivity extends Activity {
     // goes on after it (or back to the game).
     private void startExport(Runnable after) {
         afterExport = after;
-        if (GameSaves.installedSaves(getExternalFilesDir(null)).isEmpty()) {
+        if (GameSaves.installedSaves(gameFolder()).isEmpty()) {
             busy = true;
             onBack = null;
             show(getString(R.string.saves_export_none), null, null, null, null, null);
@@ -781,7 +803,7 @@ public class ImportActivity extends Activity {
                     if (out == null) {
                         throw new IOException("can't write " + uri);
                     }
-                    count = GameSaves.export(getExternalFilesDir(null), recordsFile(), currentComposition(), out, (done, total) -> runOnUiThread(() -> {
+                    count = GameSaves.export(gameFolder(), recordsFile(), currentComposition(), out, (done, total) -> runOnUiThread(() -> {
                         progress.setIndeterminate(false);
                         progress.setFraction(total > 0 ? (float) done / total : 0.0f);
                     }));

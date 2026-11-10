@@ -35,6 +35,8 @@ import java.util.List;
 public class MainActivity extends SDLActivity {
     private static final String TAG = "Fallout2";
     private boolean noExit = false;
+    // The game played: its folder and its private one (Games.java).
+    private Games.Game game;
     // The game's hang watchdog (error_report.h): the game runs on SDL's
     // thread, so the system's "isn't responding" never sees it stop. Looked
     // at every few seconds while the game is in front.
@@ -72,41 +74,47 @@ public class MainActivity extends SDLActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        final File externalFilesDir = getExternalFilesDir(null);
+        // The game played (Games.java: an earlier build's game moved into
+        // its folder first).
+        try {
+            game = Games.current(this);
+        } catch (IOException e) {
+            throw new IllegalStateException("games' folders: " + e.getMessage(), e);
+        }
+        final File gameFolder = game.folder;
         // A replacement of the game's files cut short (the app died while
         // moving them in): finished before the game reads them.
-        if (externalFilesDir != null && GameFiles.isCommitPending(externalFilesDir)) {
+        if (GameFiles.isCommitPending(gameFolder)) {
             try {
-                GameFiles.finish(externalFilesDir);
+                GameFiles.finish(gameFolder);
             } catch (IOException e) {
                 e.printStackTrace();
             }
         }
         // The same for an import of saves.
-        if (externalFilesDir != null && GameSaves.isCommitPending(externalFilesDir)) {
+        if (GameSaves.isCommitPending(gameFolder)) {
             try {
-                GameSaves.finish(externalFilesDir);
+                GameSaves.finish(gameFolder);
             } catch (IOException e) {
                 e.printStackTrace();
             }
         }
         // A game imported before its config's music folders were fixed on
         // import (a computer's paths: no music).
-        if (externalFilesDir != null) {
-            try {
-                GameImport.fixConfig(GameFiles.configFile(externalFilesDir));
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+        try {
+            GameImport.fixConfig(GameFiles.configFile(gameFolder));
+        } catch (IOException e) {
+            e.printStackTrace();
         }
-        installBundledFiles(externalFilesDir);
+        // The engine's data: in the app's folder, shared by its games.
+        installBundledFiles(getExternalFilesDir(null));
 
         UpdateManager.initialize(this);
         registerUpdateReceiver();
         super.onCreate(savedInstanceState);
 
         // Without the game's files (or copied in part): the import screen.
-        if (!GameImport.isInstalled(externalFilesDir)) {
+        if (!GameImport.isInstalled(gameFolder)) {
             final Intent intent = new Intent(this, ImportActivity.class);
             startActivity(intent);
 
@@ -362,6 +370,16 @@ public class MainActivity extends SDLActivity {
             }
         }
         return insets;
+    }
+
+    // Called from native code (platform/android/paths.cc): the game's folder
+    // (the engine works in it) and its private one (the records of its saves).
+    public String gameFolder() {
+        return game != null ? game.folder.getAbsolutePath() : null;
+    }
+
+    public String gameDataFolder() {
+        return game != null ? game.data.getAbsolutePath() : null;
     }
 
     // Called from native code (mui_preferences.cc, "Game files"): the app's
