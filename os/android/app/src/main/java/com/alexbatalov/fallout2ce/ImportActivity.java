@@ -92,6 +92,7 @@ public class ImportActivity extends Activity {
             throw new IllegalStateException("games' folders: " + e.getMessage(), e);
         }
         setContentView(R.layout.activity_import);
+        SafeArea.apply(getWindow(), findViewById(R.id.import_root), false, null);
 
         title = findViewById(R.id.import_title);
         message = findViewById(R.id.import_message);

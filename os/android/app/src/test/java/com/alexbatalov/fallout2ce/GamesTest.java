@@ -135,4 +135,28 @@ public class GamesTest {
         assertFalse(new File(data, "games-move.txt").exists());
         assertTrue(new File(data, "games.txt").isFile());
     }
+
+    // Each game has its own place: the test builds' one place for all games
+    // ("location") becomes each game's; a game of the open folder is found
+    // there, one of the app's in the app's folder.
+    @Test
+    public void eachGameHasItsOwnPlace() throws IOException {
+        File app = temporary.newFolder("app");
+        File media = temporary.newFolder("media");
+        File data = temporary.newFolder("data");
+        write(new File(data, "games.txt"), "current=2\ngames=1,2\nlocation=open\ngame.2.location=app\n");
+
+        Games.Game second = Games.current(app, media, data);
+        assertEquals("2", second.id);
+        assertEquals(new File(app, "games/2"), second.folder);
+
+        write(new File(data, "games.txt"), "current=1\ngames=1,2\nlocation=open\ngame.2.location=app\n");
+        Games.Game first = Games.current(app, media, data);
+        assertEquals(new File(media, "games/1"), first.folder);
+        assertTrue(first.folder.isDirectory());
+
+        // No media folder on the device: every game in the app's.
+        Games.Game none = Games.current(app, null, data);
+        assertEquals(new File(app, "games/1"), none.folder);
+    }
 }

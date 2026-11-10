@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- ButtonRow: a button's own text size before the row made it smaller. -->
+    <item name="button_row_text_size" type="id" />
+</resources>

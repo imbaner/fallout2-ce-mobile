@@ -187,12 +187,13 @@ body.playing #canvas { display: block; }
 /* The list of games (games-view.js), laid out as Android's: the window of
    the game's screens on wide screens, the whole screen on phones. */
 body.games #panel { display:none; }
-body.games #launcher { align-items:stretch; }
+body.games #launcher { align-items:stretch; padding:max(10px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left)); }
 body.games #links { display:none; }
 #games { position:relative; display:flex; flex-direction:column; width:100%; max-width:960px; height:100%; max-height:680px; margin:auto; gap:6px; }
 #games .games-page { display:flex; gap:8px; flex:1; min-height:0; }
-/* Room for the back button, shown with the details only. */
-#games .games-details { padding-right:62px; }
+/* Phones: the back button's column kept when it is hidden (the list opened
+   first, not from the game): nothing moves when it shows. */
+#games .games-page { padding-right:62px; }
 #games .games-page[hidden] { display:none; }
 #games button { margin-top:0; min-height:0; }
 .games-panel { border:1px solid var(--border); border-radius:7px; background:var(--panel); min-height:0; }
@@ -207,7 +208,7 @@ body.games #links { display:none; }
 .games-row-text { display:flex; flex-direction:column; min-width:0; }
 .games-row-name { font-size:15px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .games-row-when { font-size:12px; color:var(--dim); }
-.games-add { height:44px; font-size:15px; display:flex; align-items:center; justify-content:center; gap:10px; }
+.games-add { height:44px; font-size:15px; white-space:nowrap; display:flex; align-items:center; justify-content:center; gap:10px; }
 .games-add .plus { color:var(--accent); font-size:22px; line-height:1; }
 .games-card { flex:1; display:flex; flex-direction:column; gap:6px; padding:8px; min-width:0; }
 .games-cover { position:relative; flex:1; min-height:0; overflow:hidden; border:1px solid var(--border); border-radius:5px; background:#000; }
@@ -222,9 +223,8 @@ body.games #links { display:none; }
 .games-info p { margin:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:12px; color:#9ccb9c; }
 .games-info .games-last { font-size:13px; color:#cfffd0; }
 .games-actions { display:flex; gap:6px; height:39px; flex-shrink:0; }
-.games-actions button { flex:1; font-size:14px; }
-.games-actions button.danger { flex:0 0 104px; }
-.games-actions button.primary { flex:0 0 140px; }
+/* Widths by fitRow (games-view.js): equal while the labels fit. */
+.games-actions button { flex:1 1 0; min-width:0; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 #games button.primary { background:#3f9a4c; border-color:var(--accent); color:#041006; }
 #games button.danger { background:#1a0e0c; border-color:#8a3a30; color:#ff9a8c; }
 .games-details-left { width:min(312px, 40%); flex-shrink:0; padding:8px; display:flex; flex-direction:column; gap:4px; }
@@ -242,20 +242,29 @@ body.games #links { display:none; }
 .games-mod { margin:0; font-size:12px; padding:2px 0; }
 .games-back { position:absolute; top:0; right:0; width:52px; height:52px; display:grid; place-items:center; padding:0; }
 .games-back svg { width:28px; height:28px; fill:none; stroke:var(--accent); stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round; }
-.games-dialog { position:fixed; inset:0; z-index:10; display:flex; align-items:center; justify-content:center; padding:16px; background:rgba(0,0,0,.59); }
+/* A window over the list, as the game's (mui_update.cc). Phones: its back
+   button at the screen's top right, where the list's own is, the panel in
+   the middle of the rest; wide screens: back beside the panel (below). */
+.games-dialog { position:fixed; inset:0; z-index:10; display:flex; align-items:center; justify-content:center; padding:max(10px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left)); background:rgba(0,0,0,.59); }
+.games-dialog.with-back { padding-right:calc(max(10px, env(safe-area-inset-right)) + 62px); }
 .games-dialog[hidden] { display:none; }
 .games-dialog-row { display:flex; align-items:flex-start; gap:8px; max-width:100%; }
-.games-dialog-row .games-back { position:static; flex-shrink:0; }
+.games-dialog .games-back { position:fixed; top:max(10px, env(safe-area-inset-top)); right:max(10px, env(safe-area-inset-right)); flex-shrink:0; }
 .games-dialog-panel { flex:0 1 500px; min-width:0; padding:16px 18px; border:1px solid var(--border); border-radius:10px; background:var(--panel); }
 .games-dialog-panel h2 { margin:0; font:inherit; font-size:18px; color:var(--accent); }
 .games-dialog-panel p { margin:10px 0 0; font-size:14px; }
 .games-dialog-panel p.note { margin-top:8px; font-size:12px; color:var(--dim); }
 .games-dialog-panel input { width:100%; height:44px; margin-top:10px; padding:0 10px; border:1px solid #4c8f57; border-radius:8px; background:#14281a; color:var(--accent); font:inherit; }
 .games-dialog-buttons { display:flex; gap:8px; margin-top:14px; }
-.games-dialog-buttons button { flex:1; height:44px; }
+.games-dialog-buttons button { flex:1 1 0; min-width:0; height:44px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 @media (min-width: 1000px) and (min-height: 640px) {
   #games .games-page { padding:14px; padding-right:14px; border:1px solid var(--border); border-radius:12px; background:rgba(6,10,7,.97); margin-right:64px; }
   #games .games-back { right:0; }
+  /* Back beside the panel, the panel in the middle (the space before it as
+     wide as the button and its gap). */
+  .games-dialog, .games-dialog.with-back { padding:16px; }
+  .games-dialog .games-back { position:static; }
+  .games-dialog.with-back .games-dialog-row::before { content:''; flex:0 0 52px; }
 }
 /* Room for the back button beside the window: the window in the middle. */
 @media (min-width: 1100px) and (min-height: 640px) {

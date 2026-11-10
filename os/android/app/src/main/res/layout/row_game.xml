@@ -16,6 +16,7 @@
         android:layout_width="72dp"
         android:layout_height="45dp"
         android:background="@drawable/games_thumb"
+        android:foreground="@drawable/games_thumb_border"
         android:padding="1dp">
 
         <com.alexbatalov.fallout2ce.CoverImageView

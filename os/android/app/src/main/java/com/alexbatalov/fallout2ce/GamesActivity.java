@@ -19,6 +19,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
+import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.FrameLayout;
@@ -70,6 +71,8 @@ public class GamesActivity extends Activity {
     }
 
     private String fromGame;
+    // The game that didn't reach its menu last time: said once the list is in.
+    private String failedId;
     private String selectedId;
     private List<Games.Info> infos = new ArrayList<>();
     private final Map<String, Stats> stats = new HashMap<>();
@@ -79,6 +82,8 @@ public class GamesActivity extends Activity {
     private boolean cardLaidOut;
     private Typeface font;
     private Dialog dialog;
+    // A tap past the window's panel closes it (not while a move is under way).
+    private boolean dialogCancelable;
 
     private LinearLayout list;
     private ImageButton back;
@@ -103,7 +108,7 @@ public class GamesActivity extends Activity {
         back = findViewById(R.id.games_back);
         back.setOnClickListener(v -> onBackPressed());
         findViewById(R.id.games_add).setOnClickListener(v -> showAdd());
-        findViewById(R.id.games_folder).setOnClickListener(v -> showFolder());
+        findViewById(R.id.games_location).setOnClickListener(v -> showLocation());
         findViewById(R.id.games_play).setOnClickListener(v -> play());
         findViewById(R.id.games_delete).setOnClickListener(v -> confirmDelete());
         findViewById(R.id.games_details).setOnClickListener(v -> showDetails(true));
@@ -113,11 +118,21 @@ public class GamesActivity extends Activity {
         layoutWindow();
         UiFont.apply(findViewById(R.id.games_root), font);
         centerAddButton();
+        // Of one width while the labels fit, else by their lengths (as the
+        // game's rows of tabs).
+        ButtonRow.fit(findViewById(R.id.games_actions), dp(24));
+        ButtonRow.fit(findViewById(R.id.games_details_actions), dp(24));
+        // The pictures cut to their frames' rounded corners, the border over
+        // them (games_frame_border).
+        findViewById(R.id.games_cover).setClipToOutline(true);
+        findViewById(R.id.games_details_picture).setClipToOutline(true);
+        findViewById(R.id.games_details_left).addOnLayoutChangeListener((view, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) ->
+            view.post(this::fitDetailsPicture));
 
         String failed = getIntent().getStringExtra(FAILED);
         if (failed != null && savedInstanceState == null) {
             selectedId = failed;
-            back.post(() -> showFailed(failed));
+            failedId = failed;
         }
     }
 
@@ -148,18 +163,45 @@ public class GamesActivity extends Activity {
         super.onBackPressed();
     }
 
-    // Phones: the screen, the back button at its right edge. Tablets: one
+    // Phones: the screen, the back button's column at its right edge (kept
+    // when the button is hidden: nothing moves when it shows). Tablets: one
     // window in the middle (as the game's screens there), back beside it.
+    // Both in the screen without the camera's cutout (SafeArea).
     private void layoutWindow() {
+        SafeArea.apply(getWindow(), findViewById(R.id.games_root), false, this::placeWindow);
         View window = findViewById(R.id.games_window);
         if (!tablet) {
             window.setPaddingRelative(dp(10), dp(10), dp(72), dp(10));
             return;
         }
+        placeWindow();
+        findViewById(R.id.games_root).addOnLayoutChangeListener((view, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
+            if (right - left != oldRight - oldLeft || bottom - top != oldBottom - oldTop) {
+                view.post(this::placeWindow);
+            }
+        });
+        window.setBackgroundResource(R.drawable.import_panel);
+        window.setPadding(dp(14), dp(14), dp(14), dp(14));
 
+        // Roomier, as the save screen in a window.
+        setWidth(R.id.games_left, 384);
+        setWidth(R.id.games_details_left, 384);
+        setHeight(R.id.games_bottom, 52);
+        setHeight(R.id.games_actions, 52);
+        ((TextView) findViewById(R.id.games_add)).setTextSize(18);
+        ((TextView) findViewById(R.id.games_play)).setTextSize(18);
+        ((TextView) findViewById(R.id.games_name)).setTextSize(24);
+    }
+
+    // Tablets: the window and its back button in the screen's safe area.
+    private void placeWindow() {
+        if (!tablet) {
+            return;
+        }
         float density = getResources().getDisplayMetrics().density;
-        int screenWidth = Math.round(getResources().getDisplayMetrics().widthPixels / density);
-        int screenHeight = Math.round(getResources().getDisplayMetrics().heightPixels / density);
+        int[] area = safeArea();
+        int screenWidth = Math.round(area[0] / density);
+        int screenHeight = Math.round(area[1] / density);
         int margin = 24;
         int beside = 12 + 52;
         int width = Math.min(896, screenWidth - margin * 2 - beside);
@@ -170,40 +212,39 @@ public class GamesActivity extends Activity {
         }
         int top = (screenHeight - height) / 2;
 
+        View window = findViewById(R.id.games_window);
         FrameLayout.LayoutParams windowParams = new FrameLayout.LayoutParams(dp(width), dp(height), Gravity.TOP | Gravity.START);
         windowParams.leftMargin = dp(left);
         windowParams.topMargin = dp(top);
         window.setLayoutParams(windowParams);
-        window.setBackgroundResource(R.drawable.import_panel);
-        window.setPadding(dp(14), dp(14), dp(14), dp(14));
 
         FrameLayout.LayoutParams backParams = new FrameLayout.LayoutParams(dp(52), dp(52), Gravity.TOP | Gravity.START);
         backParams.leftMargin = dp(left + width + 12);
         backParams.topMargin = dp(top);
         back.setLayoutParams(backParams);
-
-        // Roomier, as the save screen in a window.
-        setWidth(R.id.games_left, 384);
-        setWidth(R.id.games_details_left, 384);
-        setHeight(R.id.games_bottom, 52);
-        setWidth(R.id.games_folder, 52);
-        setHeight(R.id.games_actions, 52);
-        setWidth(R.id.games_delete, 150);
-        setWidth(R.id.games_play, 170);
-        ((TextView) findViewById(R.id.games_add)).setTextSize(18);
-        ((TextView) findViewById(R.id.games_play)).setTextSize(18);
-        ((TextView) findViewById(R.id.games_name)).setTextSize(24);
     }
 
-    // "Add game": its plus beside its text, the two in the middle.
+    // The screen without its cutout (pixels): the list's root (the screen
+    // before it is laid out) less its padding.
+    private int[] safeArea() {
+        View root = findViewById(R.id.games_root);
+        boolean laidOut = root.getWidth() > 0 && root.getHeight() > 0;
+        int width = laidOut ? root.getWidth() : getResources().getDisplayMetrics().widthPixels;
+        int height = laidOut ? root.getHeight() : getResources().getDisplayMetrics().heightPixels;
+        return new int[] { width - root.getPaddingLeft() - root.getPaddingRight(), height - root.getPaddingTop() - root.getPaddingBottom() };
+    }
+
+    // "Add game": its plus beside its text, the two in the middle, on one
+    // line (the padding rounded down: the text keeps its whole width).
     private void centerAddButton() {
         Button add = findViewById(R.id.games_add);
         add.setCompoundDrawablePadding(dp(10));
+        add.setSingleLine(true);
         add.addOnLayoutChangeListener((view, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
             android.graphics.drawable.Drawable plus = add.getCompoundDrawablesRelative()[0];
             float content = add.getPaint().measureText(add.getText().toString())
                 + (plus != null ? plus.getIntrinsicWidth() + add.getCompoundDrawablePadding() : 0);
-            int padding = Math.max(0, Math.round((right - left - content) / 2.0f));
+            int padding = Math.max(0, (int) Math.floor((right - left - content) / 2.0f) - 1);
             if (padding != add.getPaddingStart()) {
                 add.setPaddingRelative(padding, 0, padding, 0);
             }
@@ -283,6 +324,11 @@ public class GamesActivity extends Activity {
                     selectedId = infos.get(0).game.id;
                 }
                 refresh();
+                // Named once the list is known.
+                if (failedId != null) {
+                    showFailed(failedId);
+                    failedId = null;
+                }
             });
             for (Games.Info info : games) {
                 Stats found = computeStats(info);
@@ -341,17 +387,7 @@ public class GamesActivity extends Activity {
     }
 
     private static long size(File file) {
-        if (file.isFile()) {
-            return file.length();
-        }
-        long total = 0;
-        File[] children = file.listFiles();
-        if (children != null) {
-            for (File child : children) {
-                total += size(child);
-            }
-        }
-        return total;
+        return FileTree.size(file);
     }
 
     private Games.Info find(String id) {
@@ -388,6 +424,7 @@ public class GamesActivity extends Activity {
             Stats found = stats.get(info.game.id);
             CoverImageView thumb = row.findViewById(R.id.game_thumb);
             thumb.setAlwaysFill(true);
+            row.findViewById(R.id.game_thumb_frame).setClipToOutline(true);
             Bitmap thumbnail = found != null ? found.thumbnail : null;
             thumb.setImageBitmap(thumbnail);
             row.findViewById(R.id.game_no_thumb).setVisibility(found != null && thumbnail == null ? View.VISIBLE : View.GONE);
@@ -493,6 +530,7 @@ public class GamesActivity extends Activity {
         ImageView picture = findViewById(R.id.games_details_picture);
         picture.setImageBitmap(found != null ? found.picture : null);
         picture.setVisibility(found != null && found.picture != null ? View.VISIBLE : View.GONE);
+        picture.post(this::fitDetailsPicture);
         ((TextView) findViewById(R.id.games_details_name)).setText(Games.displayName(this, info));
         String version = found != null ? found.card.get("version") : null;
         TextView versionView = findViewById(R.id.games_details_version);
@@ -510,6 +548,13 @@ public class GamesActivity extends Activity {
             addRow(rows, R.string.games_label_added, java.text.DateFormat.getDateInstance(java.text.DateFormat.LONG).format(new Date(info.added)));
         }
         addRow(rows, R.string.games_label_played, whenPlayed(info));
+        boolean canOpen = Games.canOpen(this);
+        if (canOpen) {
+            addRow(rows, R.string.games_label_folder, getString(info.open ? R.string.games_folder_open_short : R.string.games_folder_hidden_short));
+        }
+        Button location = findViewById(R.id.games_location);
+        location.setVisibility(canOpen ? View.VISIBLE : View.GONE);
+        location.setText(info.open ? R.string.games_folder_make_hidden : R.string.games_folder_make_open);
         if (found != null && !found.mods.isEmpty()) {
             TextView title = text(getString(R.string.games_mods_title, found.mods.size()), 13, R.color.import_accent);
             title.setPadding(0, dp(8), 0, dp(2));
@@ -519,6 +564,34 @@ public class GamesActivity extends Activity {
             }
         }
         UiFont.apply(findViewById(R.id.games_details_page), font);
+    }
+
+    // The details' picture as large as the panel leaves it beside the name
+    // and version line, its proportions kept.
+    private void fitDetailsPicture() {
+        View panel = findViewById(R.id.games_details_left);
+        ImageView picture = findViewById(R.id.games_details_picture);
+        TextView name = findViewById(R.id.games_details_name);
+        TextView version = findViewById(R.id.games_details_version);
+        int width = panel.getWidth() - panel.getPaddingLeft() - panel.getPaddingRight();
+        int height = panel.getHeight() - panel.getPaddingTop() - panel.getPaddingBottom()
+            - name.getHeight() - ((LinearLayout.LayoutParams) name.getLayoutParams()).topMargin
+            - (version.getVisibility() == View.VISIBLE ? version.getHeight() : 0);
+        android.graphics.drawable.Drawable drawable = picture.getDrawable();
+        if (width <= 0 || height <= 0 || drawable == null || drawable.getIntrinsicWidth() <= 0 || drawable.getIntrinsicHeight() <= 0) {
+            return;
+        }
+        // Up or down to the room (the frame's border inside it).
+        int border = picture.getPaddingLeft() + picture.getPaddingRight();
+        float scale = Math.min((float) (width - border) / drawable.getIntrinsicWidth(), (float) (height - border) / drawable.getIntrinsicHeight());
+        int shownWidth = Math.round(drawable.getIntrinsicWidth() * scale) + border;
+        int shownHeight = Math.round(drawable.getIntrinsicHeight() * scale) + border;
+        ViewGroup.LayoutParams params = picture.getLayoutParams();
+        if (params.width != shownWidth || params.height != shownHeight) {
+            params.width = shownWidth;
+            params.height = shownHeight;
+            picture.setLayoutParams(params);
+        }
     }
 
     private void addRow(LinearLayout rows, int label, String value) {
@@ -683,57 +756,48 @@ public class GamesActivity extends Activity {
         }
     }
 
-    // Where the games' folders are: hidden in the app, or open to other apps
-    // (file managers, Syncthing, a computer over USB).
-    private void showFolder() {
-        if (busy) {
+    // Where the chosen game's folder is: hidden in the app (the fastest
+    // storage), or open to other apps (file managers, Syncthing, a computer
+    // over USB; slower) - what each gives, and the move to the other.
+    private void showLocation() {
+        Games.Info info = find(selectedId);
+        if (busy || info == null) {
             return;
         }
-        new Thread(() -> {
-            boolean open;
-            try {
-                open = Games.isOpen(this);
-            } catch (IOException e) {
-                Log.w(TAG, "no games' folder", e);
-                return;
-            }
-            File folder = Games.openFolder(this);
-            runOnUiThread(() -> {
-                if (folder == null) {
-                    showNotice(getString(R.string.games_failed_action), null);
-                    return;
-                }
-                String message = open ? getString(R.string.games_folder_open, shownPath(folder)) : getString(R.string.games_folder_hidden);
-                showDialog(getString(R.string.games_folder_title), message, getString(R.string.games_folder_note), true, null,
-                    new Action(getString(open ? R.string.games_folder_make_hidden : R.string.games_folder_make_open), STYLE_PRIMARY, () -> moveFolder(!open)));
-            });
-        }, "games-folder").start();
+        String message = info.open ? getString(R.string.games_folder_open, shownPath(info.game.folder)) : getString(R.string.games_folder_hidden);
+        showDialog(getString(R.string.games_folder_title), message, getString(R.string.games_folder_note), true, null,
+            new Action(getString(info.open ? R.string.games_folder_make_hidden : R.string.games_folder_make_open), STYLE_PRIMARY,
+                () -> moveGame(info.game.id, !info.open)));
     }
 
-    // "Android/media/<app>/games": the path as file managers show it.
+    // "Android/media/<app>/games/<id>": the path as file managers show it.
     private static String shownPath(File folder) {
         String path = folder.getPath();
         int android = path.indexOf("/Android/");
         return android != -1 ? path.substring(android + 1) : path;
     }
 
-    // The games' folders moved (the game running closes first: its files
-    // move), with the progress.
-    private void moveFolder(boolean open) {
+    // The game's folder moved (the game closes first when it's the one
+    // running: its files move), with the progress.
+    private void moveGame(String id, boolean open) {
         busy = true;
         View view = showDialog(getString(R.string.games_folder_moving), " ", null, false, null);
-        if (dialog != null) {
-            dialog.setCancelable(false);
-        }
+        lockDialog();
         TextView progress = view.findViewById(R.id.dialog_message);
         new Thread(() -> {
             String problem = null;
-            if (!GameProcess.close(this)) {
+            boolean running = false;
+            try {
+                running = id.equals(Games.current(this).id);
+            } catch (IOException e) {
+                Log.w(TAG, "no game played", e);
+            }
+            if (running && !GameProcess.close(this)) {
                 problem = getString(R.string.games_failed_action);
             } else {
                 try {
                     long[] shown = { 0 };
-                    Games.setOpen(this, open, (done, total) -> {
+                    Games.setOpen(this, id, open, (done, total) -> {
                         long now = System.currentTimeMillis();
                         if (now - shown[0] < 100 && done < total) {
                             return;
@@ -745,15 +809,18 @@ public class GamesActivity extends Activity {
                 } catch (Games.NoSpaceException e) {
                     problem = getString(R.string.games_folder_no_space, Formatter.formatShortFileSize(this, e.needed));
                 } catch (IOException e) {
-                    Log.w(TAG, "games not moved", e);
+                    Log.w(TAG, "game not moved", e);
                     problem = getString(R.string.games_failed_action);
                 }
             }
             String shownProblem = problem;
+            boolean closed = running;
             runOnUiThread(() -> {
                 busy = false;
                 // The game the list was opened over has closed.
-                fromGame = null;
+                if (closed) {
+                    fromGame = null;
+                }
                 if (dialog != null) {
                     dialog.dismiss();
                 }
@@ -787,9 +854,9 @@ public class GamesActivity extends Activity {
         }
     }
 
-    // A window over the list: [back] beside it (closing it, as the game's
-    // windows), [input] a field with that text (renaming: the last action
-    // saves it).
+    // A window over the list: [withBack] its back button (closing it, as the
+    // game's windows, placeDialog), [input] a field with that text (renaming:
+    // the last action saves it).
     private View showDialog(String title, String message, String note, boolean withBack, String input, Action... actions) {
         if (dialog != null) {
             dialog.dismiss();
@@ -810,9 +877,16 @@ public class GamesActivity extends Activity {
         }
         Dialog shown = new Dialog(this);
         shown.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        dialogCancelable = true;
+        view.setOnClickListener(v -> {
+            if (dialogCancelable) {
+                shown.cancel();
+            }
+        });
         ImageButton backButton = view.findViewById(R.id.dialog_back);
         backButton.setVisibility(withBack ? View.VISIBLE : View.GONE);
         backButton.setOnClickListener(v -> shown.dismiss());
+        placeDialog(view, withBack);
 
         LinearLayout buttons = view.findViewById(R.id.dialog_buttons);
         String renamed = input != null ? selectedId : null;
@@ -841,18 +915,56 @@ public class GamesActivity extends Activity {
             });
             buttons.addView(button, params);
         }
+        ButtonRow.fit(buttons, dp(24));
         UiFont.apply(view, font);
 
         shown.setContentView(view);
-        shown.setCanceledOnTouchOutside(true);
         Window window = shown.getWindow();
         if (window != null) {
-            window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-            window.setDimAmount(0.59f);
+            // The dim drawn by the window itself (the system's isn't, behind
+            // a window over the whole screen).
+            window.setBackgroundDrawable(new ColorDrawable(Color.argb(150, 0, 0, 0)));
+            window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+            window.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
+            window.addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+            SafeArea.apply(window, view, true, null);
         }
         dialog = shown;
         shown.show();
         return view;
+    }
+
+    // The window's panel and back button (see dialog_games.xml), the panel as
+    // wide as there is room for, at most 500dp.
+    private void placeDialog(View view, boolean withBack) {
+        FrameLayout root = view.findViewById(R.id.dialog_root);
+        View area = view.findViewById(R.id.dialog_area);
+        ImageButton backButton = view.findViewById(R.id.dialog_back);
+        int room = safeArea()[0];
+        if (tablet) {
+            area.setPadding(dp(16), dp(16), dp(16), dp(16));
+            view.findViewById(R.id.dialog_spacer).setVisibility(withBack ? View.VISIBLE : View.GONE);
+            room -= dp(32) + (withBack ? dp(120) : 0);
+        } else {
+            area.setPaddingRelative(dp(10), dp(10), withBack ? dp(72) : dp(10), dp(10));
+            room -= dp(20) + (withBack ? dp(62) : 0);
+            if (withBack) {
+                ((ViewGroup) backButton.getParent()).removeView(backButton);
+                FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(dp(52), dp(52), Gravity.TOP | Gravity.END);
+                params.setMargins(dp(10), dp(10), dp(10), dp(10));
+                root.addView(backButton, params);
+            }
+        }
+        View panel = view.findViewById(R.id.dialog_panel);
+        panel.getLayoutParams().width = Math.min(dp(500), Math.max(room, dp(240)));
+    }
+
+    // The window up can't be closed (a move under way).
+    private void lockDialog() {
+        dialogCancelable = false;
+        if (dialog != null) {
+            dialog.setCancelable(false);
+        }
     }
 
     private void setWidth(int id, int widthDp) {

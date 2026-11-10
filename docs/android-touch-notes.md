@@ -1622,10 +1622,13 @@ folder (`Games.java`):
   (every mod) and the rare actions, Rename and Replace files (moved here from
   the settings' Game files, which keep the saves' import, export and delete).
 - The card's picture and lines come from the game (`gameCardWrite` at its
-  main menu): `card.png` (the menu's picture, the high resolution one or the
-  game's own right of its button plates, in the loaded palette - the screen's
-  is faded out then), `card.txt` (`version`, `place` of the newest save,
-  UTF-8), in the game's private folder.
+  main menu): `card.png` (the menu's picture whole, the high resolution one
+  or the game's own 640x480 with its button plates too - the menu itself
+  shows only the part right of them; in the loaded palette - the screen's is
+  faded out then), `card.txt` (`version`, `place` of the newest save,
+  `picture=whole`, UTF-8), in the game's private folder. Android writes the
+  picture at every run; the web once, again for an older card (no
+  `picture=whole`: its picture was the part right of the plates).
 - Add game: folder or archive, then the import screen into a new game's
   folder (`ImportActivity` `GAME` + `ADD` + `PICK`); named after the folder or
   archive ("(2)" for a name taken), it starts after the game running closes.
@@ -1636,13 +1639,41 @@ folder (`Games.java`):
   the list or the import, with no game in it). Delete moves the folders away
   at once and deletes them in the background.
 - The picture (`CoverImageView`) is held at its right edge as in the main
-  menu: as wide as its frame or wider, it fills it; much narrower (the game's
-  own 640x480 menu picture right of its button plates), it's as tall as the
-  frame and its left part fades into the black - filled, it would be its
-  middle blown up. The list's thumbnails always fill their cell.
-- Phones: full screen, back at the right edge. Tablets (shortest side
-  >= 500 dp): one window of at most 896x680 dp, back beside it, the picture
-  4:3 at the card's top and the lines under it.
+  menu: as wide as its frame or wider, it fills it; much narrower (a mod's
+  tall picture), it's as tall as the frame and its left part fades into the
+  black - filled, it would be its middle blown up. The list's thumbnails
+  always fill their cell. Details show it whole, as large as the panel
+  leaves it beside the name and version line.
+- Phones: full screen, back at the right edge; its column stays when the
+  button is hidden (the list opened first, not from the game), so nothing
+  moves when it shows. Tablets (shortest side >= 500 dp): one window of at
+  most 896x680 dp, back beside it, the picture 4:3 at the card's top and the
+  lines under it. Both in the screen without the camera's cutout, as the
+  game's screens (`SafeArea`: the cutout's safe insets, and the system's bars
+  where Android 15+ lays the app out under them); the import screen too.
+- Windows over the list (add, delete, rename, the games' folder) as the
+  game's update window (mui_update.cc): over the whole screen, the dim drawn
+  by the window; with a back button (add, folder) phones have it at the
+  screen's top right where the list's own is, the panel in the middle of the
+  rest, tablets beside the panel, the panel in the middle. Without one the
+  panel is in the middle of the screen. The web list does the same
+  (app.css `.games-dialog`).
+- The pictures are cut to their frames' rounded corners, the border drawn
+  over them (`clipToOutline`, `games_frame_border`).
+- A game's folder is hidden in the app (Android/data, the default) or open
+  (Android/media: file managers, Syncthing, a computer over USB), each game
+  its own (`game.<id>.location`, Details: Folder, the move copies the game,
+  names as bytes - `FileTree`, src/file_tree.cc). The open folder goes through
+  Android's media service: every open, create, remove costs a request (reads
+  of an open file don't, FUSE passthrough). A save loaded on a Redmi 15C took
+  0.95 s hidden, 6.6 s open; two engine changes made it 2.4 s (the map itself
+  as fast as hidden): an archive's file stream kept for its next entry
+  (dfile.cc `DBase.idleStreams`; CE opened it again for each of ~1600 files a
+  load reads) and misses answered from the directory cache (platform_compat.cc;
+  ~6000 lookups of patches that aren't there, ~2300 removes of working protos
+  that aren't). What stays slower open: writing the working files (data/MAPS)
+  and the saves. Moving the working files to the hidden folder was left out:
+  data/MAPS holds mods' loose maps next to them, and the save lists it by mask.
 - The list is in the system's language (Android resources), as the import
   screen; a game's menu in the game's.
 

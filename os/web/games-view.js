@@ -2,9 +2,10 @@
 // the left, the one played last first, "Add game" under them; the chosen
 // one's card at the right (its menu picture, newest save, saves, size,
 // language, mods) with Delete, Details and Play. Details: all of it, Rename
-// and Replace files. A narrow picture (the game's own 640x480 menu picture
-// right of its button plates) is as tall as the card and fades into it at
-// its left, as in the game's menu; a wide one fills it.
+// and Replace files. The picture is the game's menu picture whole (the game's
+// own 640x480 one with its button plates too); a much narrower one is as tall
+// as the card and fades into it at its left, as in the game's menu; a wide
+// one fills it.
 import {webText as t, webCount, language} from './strings.js';
 import {gameCard,displayName,renameGame,deleteGame,newGameId} from './games.js';
 
@@ -83,8 +84,8 @@ export function createGamesView({host,listed,onPlay,onAdd,onReplace,onChanged}) 
   const dialog = el('div',{class:'games-dialog',hidden:'',role:'dialog','aria-modal':'true'});
   host.replaceChildren(page,detailsPage,back,dialog);
 
-  // A picture much narrower than the card (the game's menu art right of
-  // its button plates) as tall as the card, else filling it; again on every
+  // A picture much narrower than the card (a mod's tall one) as tall as the
+  // card, else filling it; again on every
   // size of the card (rotation, window), as Android's CoverImageView.
   function fit() {
     const ready = picture.complete && picture.naturalWidth && cover.clientWidth && cover.clientHeight;
@@ -93,6 +94,36 @@ export function createGamesView({host,listed,onPlay,onAdd,onReplace,onChanged}) 
   picture.addEventListener('load',fit);
   const resized = typeof ResizeObserver === 'function' ? new ResizeObserver(fit) : null;
   resized?.observe(cover);
+  // A row of buttons as the game's rows of tabs (mui.cc muiLayoutTabRow,
+  // Android's ButtonRow): of one width while each label fits its share;
+  // otherwise each its label's width and an equal share of the rest, the
+  // labels smaller first when even their widths don't fit (to 10px); still
+  // too long, in proportion to the labels (flex-shrink by their widths).
+  function fitRow(row) {
+    const buttons = [...row.children].filter(button => !button.hidden);
+    if (!buttons.length || !row.clientWidth) return;
+    for (const button of buttons) { button.style.fontSize = ''; button.style.flex = '0 0 auto'; }
+    const gap = parseFloat(getComputedStyle(row).columnGap) || 0;
+    const room = row.clientWidth - gap * (buttons.length - 1);
+    const widths = buttons.map(button => button.getBoundingClientRect().width);
+    if (widths.every(width => width <= room / buttons.length)) {
+      for (const button of buttons) button.style.flex = '1 1 0';
+      return;
+    }
+    const total = widths.reduce((sum,width) => sum + width,0);
+    if (total > room) {
+      const around = buttons.map(button => { const style = getComputedStyle(button);
+        return ['paddingLeft','paddingRight','borderLeftWidth','borderRightWidth'].reduce((sum,key) => sum + (parseFloat(style[key]) || 0),0); });
+      const padding = around.reduce((sum,width) => sum + width,0);
+      const size = parseFloat(getComputedStyle(buttons[0]).fontSize);
+      // A little under: letters don't shrink exactly with the size.
+      const smaller = Math.max(10,Math.floor(size * (room - padding) / (total - padding) * 0.95 * 2) / 2);
+      for (const button of buttons) button.style.fontSize = smaller + 'px';
+    }
+    for (const button of buttons) button.style.flex = '1 1 auto';
+  }
+  const rowsResized = typeof ResizeObserver === 'function' ? new ResizeObserver(entries => entries.forEach(entry => fitRow(entry.target))) : null;
+  for (const row of [actions,detailsPage.querySelector('.games-actions')]) rowsResized?.observe(row);
   const game = id => listed.games.find(item => item.id === id);
   function cover_(image,card) {
     if (!card?.picture) { image.removeAttribute('src'); return; }
@@ -147,8 +178,9 @@ export function createGamesView({host,listed,onPlay,onAdd,onReplace,onChanged}) 
     details = show; page.hidden = show; detailsPage.hidden = !show; back.hidden = !show; render();
   }
 
-  // A window over the list: [withBack] its back button beside it, [input]
-  // a field with that text (its last action gets the text).
+  // A window over the list: [withBack] its back button (app.css: at the
+  // screen's corner on phones, beside the window on wide screens), [input] a
+  // field with that text (its last action gets the text).
   function showDialog(title,message,note,withBack,input,actionsList) {
     const field = input !== null ? el('input',{type:'text',maxlength:'60',value:input,'aria-label':title}) : null;
     const close = () => { dialog.hidden = true; dialog.replaceChildren(); };
@@ -157,8 +189,10 @@ export function createGamesView({host,listed,onPlay,onAdd,onReplace,onChanged}) 
       el('div',{class:'games-dialog-buttons'},actionsList.map(([label,style,run],index) => el('button',{type:'button',class:style,text:label,
         onclick:() => { close(); if (run) run(field && index === actionsList.length - 1 ? field.value : undefined); }})))]);
     dialog.replaceChildren(el('div',{class:'games-dialog-row'},[panel,withBack ? el('button',{type:'button',class:'games-back','aria-label':t('games_back'),onclick:close},[backIcon()]) : null]));
-    dialog.onclick = event => { if (event.target === dialog) close(); };
+    dialog.classList.toggle('with-back',!!withBack);
+    dialog.onclick = event => { if (!panel.contains(event.target)) close(); };
     dialog.hidden = false;
+    fitRow(panel.querySelector('.games-dialog-buttons'));
     (field || panel.querySelector('button.primary') || panel.querySelector('button'))?.focus();
   }
   const notice = text => showDialog(text,null,null,false,null,[['OK','primary',null]]);
@@ -206,6 +240,6 @@ export function createGamesView({host,listed,onPlay,onAdd,onReplace,onChanged}) 
     get selected() { return selected; },
     get busy() { return busy; },
     set busy(value) { busy = value; play.disabled = value; },
-    destroy() { resized?.disconnect(); for (const url of urls.values()) URL.revokeObjectURL(url); },
+    destroy() { resized?.disconnect(); rowsResized?.disconnect(); for (const url of urls.values()) URL.revokeObjectURL(url); },
   };
 }

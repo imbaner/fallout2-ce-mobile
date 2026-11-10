@@ -46,8 +46,7 @@
                         android:orientation="vertical" />
                 </ScrollView>
 
-                <!-- Add game, and where the games' folders are (hidden in the
-                     app or open to other apps). -->
+                <!-- Add game (where a game's folder is: its details). -->
                 <LinearLayout
                     android:id="@+id/games_bottom"
                     android:layout_width="match_parent"
@@ -68,15 +67,6 @@
                         android:textAllCaps="false"
                         android:textColor="@color/import_button_text"
                         android:textSize="15sp" />
-
-                    <ImageButton
-                        android:id="@+id/games_folder"
-                        android:layout_width="44dp"
-                        android:layout_height="match_parent"
-                        android:layout_marginStart="8dp"
-                        android:background="@drawable/import_button"
-                        android:contentDescription="@string/games_folder_title"
-                        android:src="@drawable/games_folder" />
                 </LinearLayout>
             </LinearLayout>
 
@@ -98,6 +88,7 @@
                     android:layout_height="0dp"
                     android:layout_weight="1"
                     android:background="@drawable/games_frame"
+                    android:foreground="@drawable/games_frame_border"
                     android:padding="1dp">
 
                     <com.alexbatalov.fallout2ce.CoverImageView
@@ -212,8 +203,9 @@
 
                     <Button
                         android:id="@+id/games_delete"
-                        android:layout_width="104dp"
+                        android:layout_width="0dp"
                         android:layout_height="match_parent"
+                        android:layout_weight="1"
                         android:background="@drawable/import_button_danger"
                         android:text="@string/games_delete"
                         android:textAllCaps="false"
@@ -234,8 +226,9 @@
 
                     <Button
                         android:id="@+id/games_play"
-                        android:layout_width="140dp"
+                        android:layout_width="0dp"
                         android:layout_height="match_parent"
+                        android:layout_weight="1"
                         android:layout_marginStart="6dp"
                         android:background="@drawable/import_button_primary"
                         android:text="@string/games_play"
@@ -262,12 +255,18 @@
                 android:orientation="vertical"
                 android:padding="8dp">
 
+                <!-- Whole, at its own proportions, as large as the room the
+                     name and version line leave (GamesActivity.fitDetailsPicture,
+                     up or down):
+                     a tall one (the game's own menu picture) narrower. -->
                 <ImageView
                     android:id="@+id/games_details_picture"
-                    android:layout_width="match_parent"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:layout_gravity="center_horizontal"
                     android:adjustViewBounds="true"
                     android:background="@drawable/games_frame"
+                    android:foreground="@drawable/games_frame_border"
                     android:importantForAccessibility="no"
                     android:padding="1dp"
                     android:scaleType="fitCenter" />
@@ -315,6 +314,7 @@
                 </ScrollView>
 
                 <LinearLayout
+                    android:id="@+id/games_details_actions"
                     android:layout_width="match_parent"
                     android:layout_height="39dp"
                     android:layout_marginTop="6dp"
@@ -339,6 +339,19 @@
                         android:layout_weight="1"
                         android:background="@drawable/import_button"
                         android:text="@string/games_replace"
+                        android:textAllCaps="false"
+                        android:textColor="@color/import_button_text"
+                        android:textSize="14sp" />
+
+                    <!-- Where the game's folder is: hidden in the app or open
+                         to other apps (GamesActivity.showLocation). -->
+                    <Button
+                        android:id="@+id/games_location"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_marginStart="6dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/import_button"
                         android:textAllCaps="false"
                         android:textColor="@color/import_button_text"
                         android:textSize="14sp" />

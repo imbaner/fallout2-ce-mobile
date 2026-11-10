@@ -43,9 +43,12 @@ final class Games {
     private static final String KEY_CURRENT = "current";
     private static final String KEY_GAMES = "games";
     private static final String FIRST = "1";
-    // Where the games' folders are: the app's own folder (hidden from other
-    // apps, the default), or its media folder ("open": file managers, sync
-    // apps such as Syncthing, a computer over USB see and change them).
+    // Where a game's folder is ("game.<id>.location", each game its own):
+    // the app's own folder (hidden from other apps, the fastest storage; the
+    // default), or its media folder ("open": file managers, sync apps such
+    // as Syncthing, a computer over USB see and change it; the storage
+    // between them and the app is slower). Test builds kept one place for all
+    // games under "location" alone.
     private static final String KEY_LOCATION = "location";
     private static final String OPEN = "open";
     private static final String HIDDEN = "app";
@@ -109,7 +112,7 @@ final class Games {
              FileLock ignored = lockFile.getChannel().lock()) {
             Properties registry = registry(app, data);
             String id = registry.getProperty(KEY_CURRENT, FIRST);
-            Game game = game(base(registry, app, media), data, id);
+            Game game = new Places(app, media, data, registry).game(id);
             makeFolder(game.folder);
             makeFolder(game.data);
             return game;
@@ -136,12 +139,15 @@ final class Games {
         final long added;
         // Last started, 0: never.
         final long played;
+        // In the open folder (`setOpen`).
+        final boolean open;
 
-        Info(Game game, String name, long added, long played) {
+        Info(Game game, String name, long added, long played, boolean open) {
             this.game = game;
             this.name = name;
             this.added = added;
             this.played = played;
+            this.open = open;
         }
     }
 
@@ -155,14 +161,14 @@ final class Games {
             try (RandomAccessFile lockFile = new RandomAccessFile(new File(data, LOCK), "rw");
                  FileLock ignored = lockFile.getChannel().lock()) {
                 Properties registry = registry(app, data);
-                File base = base(registry, app, mediaFolder(context));
+                Places places = new Places(app, mediaFolder(context), data, registry);
                 for (String id : ids(registry)) {
-                    Game game = game(base, data, id);
+                    Game game = places.game(id);
                     if (!GameImport.isInstalled(game.folder)) {
                         continue;
                     }
                     infos.add(new Info(game, registry.getProperty(key(id, "name"), ""),
-                        number(registry, key(id, "added")), number(registry, key(id, "played"))));
+                        number(registry, key(id, "added")), number(registry, key(id, "played")), places.isOpen(id)));
                 }
             }
         }
@@ -172,8 +178,8 @@ final class Games {
 
     // The game of [id] (its folders, made when missing).
     static Game get(Context context, String id) throws IOException {
-        return locked(context, false, (base, data, registry) -> {
-            Game game = game(base, data, id);
+        return locked(context, false, (places, data, registry) -> {
+            Game game = places.game(id);
             makeFolder(game.folder);
             makeFolder(game.data);
             return game;
@@ -182,7 +188,7 @@ final class Games {
 
     // A new game's folders, empty: the import fills them, `add` lists it.
     static Game create(Context context) throws IOException {
-        return change(context, (app, data, registry) -> {
+        return change(context, (places, data, registry) -> {
             int next = 1;
             for (String id : ids(registry)) {
                 try {
@@ -191,9 +197,8 @@ final class Games {
                     // Not a number: not one of ours to count.
                 }
             }
-            // Not over a folder an earlier attempt left.
-            while (new File(new File(app, GAMES), Integer.toString(next)).exists()
-                || new File(new File(data, GAMES), Integer.toString(next)).exists()) {
+            // Not over a folder an earlier attempt left, in either place.
+            while (places.taken(Integer.toString(next))) {
                 next++;
             }
             String id = Integer.toString(next);
@@ -201,7 +206,7 @@ final class Games {
             ids.add(id);
             registry.setProperty(KEY_GAMES, String.join(",", ids));
             registry.setProperty(key(id, "added"), Long.toString(System.currentTimeMillis()));
-            Game game = game(app, data, id);
+            Game game = places.game(id);
             makeFolder(game.folder);
             makeFolder(game.data);
             return game;
@@ -210,7 +215,7 @@ final class Games {
 
     // The game of [id] imported: named [name] and the one played.
     static void add(Context context, String id, String name) throws IOException {
-        change(context, (app, data, registry) -> {
+        change(context, (places, data, registry) -> {
             if (name != null && !name.trim().isEmpty() && registry.getProperty(key(id, "name"), "").isEmpty()) {
                 registry.setProperty(key(id, "name"), uniqueName(registry, id, name.trim()));
             }
@@ -221,7 +226,7 @@ final class Games {
 
     // The game played from now on (its start counted as played).
     static void setCurrent(Context context, String id) throws IOException {
-        change(context, (app, data, registry) -> {
+        change(context, (places, data, registry) -> {
             registry.setProperty(KEY_CURRENT, id);
             registry.setProperty(key(id, "played"), Long.toString(System.currentTimeMillis()));
             return null;
@@ -229,7 +234,7 @@ final class Games {
     }
 
     static void rename(Context context, String id, String name) throws IOException {
-        change(context, (app, data, registry) -> {
+        change(context, (places, data, registry) -> {
             String trimmed = name.trim();
             if (trimmed.isEmpty()) {
                 registry.remove(key(id, "name"));
@@ -245,15 +250,15 @@ final class Games {
     // game). The one played: the one played last of the others, else a new
     // empty one (the import's).
     static void delete(Context context, String id) throws IOException {
-        File trash = change(context, (app, data, registry) -> {
+        File[] trash = change(context, (places, data, registry) -> {
             List<String> ids = ids(registry);
             ids.remove(id);
             registry.setProperty(KEY_GAMES, String.join(",", ids));
-            for (String field : new String[] { "name", "added", "played" }) {
+            Game game = places.game(id);
+            for (String field : new String[] { "name", "added", "played", KEY_LOCATION }) {
                 registry.remove(key(id, field));
             }
-            Game game = game(app, data, id);
-            File folder = new File(new File(app, GAMES), TRASH + id + "-" + System.currentTimeMillis());
+            File folder = new File(game.folder.getParentFile(), TRASH + id + "-" + System.currentTimeMillis());
             if (game.folder.exists() && !game.folder.renameTo(folder)) {
                 throw new IOException("not moved away: " + id);
             }
@@ -266,7 +271,7 @@ final class Games {
                 long latest = -1;
                 for (String other : ids) {
                     long played = Math.max(number(registry, key(other, "played")), number(registry, key(other, "added")));
-                    if (GameImport.isInstalled(game(app, data, other).folder) && played > latest) {
+                    if (GameImport.isInstalled(places.game(other).folder) && played > latest) {
                         latest = played;
                         next = other;
                     }
@@ -279,19 +284,29 @@ final class Games {
                 }
                 registry.setProperty(KEY_CURRENT, next);
             }
-            return new File(app, GAMES);
+            return places.gamesFolders();
         });
-        emptyTrash(trash, new File(context.getFilesDir(), GAMES));
+        emptyTrash(trash);
     }
 
-    // Imports given up (folders no game was made of), and the trash.
+    // Imports given up (folders no game was made of), copies a move cut short
+    // left, and the trash (in the background).
     static void tidy(Context context) throws IOException {
-        File games = change(context, (app, data, registry) -> {
+        File[] games = change(context, (places, data, registry) -> {
             List<String> ids = ids(registry);
+            // A game's copy in the place it is not (a move cut short, or its
+            // old copy not yet away): away, deleted below. Only the games'
+            // own folders: what else is there stays.
+            for (String id : ids) {
+                File stale = places.otherFolder(id);
+                if (stale != null && stale.exists() && !moveToTrash(stale)) {
+                    Log.w(TAG, "copy left where the game is not: " + id);
+                }
+            }
             String current = registry.getProperty(KEY_CURRENT, FIRST);
             List<String> kept = new ArrayList<>();
             for (String id : ids) {
-                Game game = game(app, data, id);
+                Game game = places.game(id);
                 if (id.equals(current) || GameImport.isInstalled(game.folder)) {
                     kept.add(id);
                     continue;
@@ -299,7 +314,8 @@ final class Games {
                 registry.remove(key(id, "added"));
                 registry.remove(key(id, "name"));
                 registry.remove(key(id, "played"));
-                File away = new File(new File(app, GAMES), TRASH + id + "-" + System.currentTimeMillis());
+                registry.remove(key(id, KEY_LOCATION));
+                File away = new File(game.folder.getParentFile(), TRASH + id + "-" + System.currentTimeMillis());
                 if (game.folder.exists() && !game.folder.renameTo(away)) {
                     throw new IOException("not moved away: " + id);
                 }
@@ -309,9 +325,9 @@ final class Games {
                 }
             }
             registry.setProperty(KEY_GAMES, String.join(",", kept));
-            return new File(app, GAMES);
+            return places.gamesFolders();
         });
-        emptyTrash(games, new File(context.getFilesDir(), GAMES));
+        emptyTrash(games);
     }
 
     // The name the list shows: the player's, else the game's version line
@@ -361,12 +377,60 @@ final class Games {
     }
 
     private interface Change<T> {
-        // [base]: the folder holding "games"; [data]: the app's private one.
-        T apply(File base, File data, Properties registry) throws IOException;
+        // [places]: where each game's folders are; [data]: the app's private
+        // folder.
+        T apply(Places places, File data, Properties registry) throws IOException;
     }
 
-    // [change] of the registry under the lock, written after. [change]
-    // gets the folder holding the games' folders ("games" in it).
+    // Where each game's folder is (`KEY_LOCATION`).
+    private static final class Places {
+        final File app;
+        // Null: the device has no media folder (every game in the app's).
+        final File media;
+        final File data;
+        final Properties registry;
+
+        Places(File app, File media, File data, Properties registry) {
+            this.app = app;
+            this.media = media;
+            this.data = data;
+            this.registry = registry;
+        }
+
+        boolean isOpen(String id) {
+            return media != null && OPEN.equals(registry.getProperty(key(id, KEY_LOCATION)));
+        }
+
+        Game game(String id) {
+            return Games.game(isOpen(id) ? media : app, data, id);
+        }
+
+        // [id]'s folder in the place it is not (null: no such place).
+        File otherFolder(String id) {
+            File other = isOpen(id) ? app : media;
+            return other != null ? new File(new File(other, GAMES), id) : null;
+        }
+
+        // A folder of [id] somewhere (an earlier attempt's).
+        boolean taken(String id) {
+            return new File(new File(app, GAMES), id).exists()
+                || (media != null && new File(new File(media, GAMES), id).exists())
+                || new File(new File(data, GAMES), id).exists();
+        }
+
+        // Where games' folders are (their trash too), the private ones too.
+        File[] gamesFolders() {
+            List<File> folders = new ArrayList<>();
+            folders.add(new File(app, GAMES));
+            if (media != null) {
+                folders.add(new File(media, GAMES));
+            }
+            folders.add(new File(data, GAMES));
+            return folders.toArray(new File[0]);
+        }
+    }
+
+    // [change] of the registry under the lock, written after.
     private static <T> T change(Context context, Change<T> change) throws IOException {
         return locked(context, true, change);
     }
@@ -377,18 +441,12 @@ final class Games {
         try (RandomAccessFile lockFile = new RandomAccessFile(new File(data, LOCK), "rw");
              FileLock ignored = lockFile.getChannel().lock()) {
             Properties registry = registry(app, data);
-            T result = change.apply(base(registry, app, mediaFolder(context)), data, registry);
+            T result = change.apply(new Places(app, mediaFolder(context), data, registry), data, registry);
             if (write) {
                 write(registry, new File(data, REGISTRY));
             }
             return result;
         }
-    }
-
-    // The folder holding "games": the app's, or its media folder when the
-    // games are open (and there is one).
-    private static File base(Properties registry, File app, File media) {
-        return OPEN.equals(registry.getProperty(KEY_LOCATION)) && media != null ? media : app;
     }
 
     // The app's media folder (Android/media/<app>): the app writes it as its
@@ -398,15 +456,14 @@ final class Games {
         return folders.length > 0 ? folders[0] : null;
     }
 
-    // The games are in the open folder (`setOpen`).
-    static boolean isOpen(Context context) throws IOException {
-        return locked(context, false, (base, data, registry) -> OPEN.equals(registry.getProperty(KEY_LOCATION)) && mediaFolder(context) != null);
+    // The game of [id] is in the open folder (`setOpen`).
+    static boolean isOpen(Context context, String id) throws IOException {
+        return locked(context, false, (places, data, registry) -> places.isOpen(id));
     }
 
-    // Where the open games' folders are (or would be).
-    static File openFolder(Context context) {
-        File media = mediaFolder(context);
-        return media != null ? new File(media, GAMES) : null;
+    // The device has an open folder for games.
+    static boolean canOpen(Context context) {
+        return mediaFolder(context) != null;
     }
 
     interface Progress {
@@ -422,151 +479,90 @@ final class Games {
         }
     }
 
-    // The games' folders moved to the open folder ([open]) or back into the
-    // app's: renamed where the system lets (one storage), else copied (the
-    // free space checked first), the old copies deleted in the background
-    // once the registry says where they are. Cut short: the registry still
-    // names the old place, whatever was copied is deleted at the next move.
-    // The game must not run. Not on the main thread.
-    static void setOpen(Context context, boolean open, Progress progress) throws IOException {
+    // The game of [id]'s folder moved to the open folder ([open]) or back
+    // into the app's: renamed where the system lets (one storage), else
+    // copied (the free space checked first; names as bytes, FileTree), the
+    // old copy deleted in the background once the registry says where it is.
+    // A failure puts a renamed folder back and moves a copy away; cut short by
+    // the app's end, the registry still names the old place and `tidy` takes
+    // the copy away. The game must not run. Not on the main thread.
+    static void setOpen(Context context, String id, boolean open, Progress progress) throws IOException {
         File app = appFolder(context);
         File media = mediaFolder(context);
         File data = context.getFilesDir();
         if (open && media == null) {
             throw new IOException("no media folder");
         }
-        List<File> old = new ArrayList<>();
-        synchronized (Games.class) {
-            try (RandomAccessFile lockFile = new RandomAccessFile(new File(data, LOCK), "rw");
-                 FileLock ignored = lockFile.getChannel().lock()) {
-                Properties registry = registry(app, data);
-                File fromBase = base(registry, app, media);
-                File toBase = open ? media : app;
-                if (fromBase.equals(toBase)) {
-                    return;
-                }
-                File from = new File(fromBase, GAMES);
-                File to = new File(toBase, GAMES);
-                makeFolder(to);
-                if (open) {
-                    // Not pictures or music for the phone's gallery and players.
-                    File noMedia = new File(media, ".nomedia");
-                    if (!noMedia.exists() && !noMedia.createNewFile()) {
-                        throw new IOException("no .nomedia");
+        File[] trash = { null };
+        try {
+            synchronized (Games.class) {
+                try (RandomAccessFile lockFile = new RandomAccessFile(new File(data, LOCK), "rw");
+                     FileLock ignored = lockFile.getChannel().lock()) {
+                    Properties registry = registry(app, data);
+                    Places places = new Places(app, media, data, registry);
+                    if (places.isOpen(id) == open) {
+                        return;
                     }
-                }
-
-                List<String> ids = new ArrayList<>();
-                long total = 0;
-                for (String id : ids(registry)) {
-                    File source = new File(from, id);
-                    if (source.exists()) {
-                        ids.add(id);
-                        total += size(source);
-                    }
-                }
-
-                long all = total;
-                List<String> renamed = new ArrayList<>();
-                List<String> copied = new ArrayList<>();
-                try {
-                    long done = 0;
-                    boolean canRename = true;
-                    for (String id : ids) {
-                        File source = new File(from, id);
-                        File target = new File(to, id);
-                        if (target.exists()) {
-                            deleteTree(target);
+                    File source = places.game(id).folder;
+                    File target = new File(new File(open ? media : app, GAMES), id);
+                    makeFolder(target.getParentFile());
+                    if (open) {
+                        // Not pictures or music for the phone's gallery and players.
+                        File noMedia = new File(media, ".nomedia");
+                        if (!noMedia.exists() && !noMedia.createNewFile()) {
+                            throw new IOException("no .nomedia");
                         }
-                        long size = size(source);
-                        if (canRename && source.renameTo(target)) {
-                            renamed.add(id);
-                        } else {
-                            if (canRename) {
-                                canRename = false;
-                                long left = all - done;
-                                long needed = left + 64L * 1024 * 1024;
-                                if (to.getUsableSpace() < needed) {
-                                    throw new NoSpaceException(needed - to.getUsableSpace());
-                                }
-                            }
-                            long before = done;
-                            copyTree(source, target, new long[] { 0 }, copiedNow -> progress.update(before + copiedNow, all));
-                            copied.add(id);
+                    }
+                    // A copy of a move cut short: away, deleted in the background.
+                    if (target.exists()) {
+                        if (!moveToTrash(target)) {
+                            throw new IOException("old copy stays: " + id);
                         }
-                        done += size;
-                        progress.update(done, all);
+                        trash[0] = target.getParentFile();
                     }
-                } catch (IOException | RuntimeException e) {
-                    // As it was: the renamed ones back, the copies away.
-                    for (String id : renamed) {
-                        //noinspection ResultOfMethodCallIgnored
-                        new File(to, id).renameTo(new File(from, id));
-                    }
-                    for (String id : copied) {
-                        deleteTree(new File(to, id));
-                    }
-                    throw e;
-                }
 
-                registry.setProperty(KEY_LOCATION, open ? OPEN : HIDDEN);
-                write(registry, new File(data, REGISTRY));
-                for (String id : copied) {
-                    File away = new File(from, TRASH + id + "-" + System.currentTimeMillis());
-                    if (new File(from, id).renameTo(away)) {
-                        old.add(from);
+                    boolean copied = false;
+                    if (source.exists() && !source.renameTo(target)) {
+                        long total = size(source);
+                        long needed = total + 64L * 1024 * 1024;
+                        if (target.getParentFile().getUsableSpace() < needed) {
+                            throw new NoSpaceException(needed - target.getParentFile().getUsableSpace());
+                        }
+                        try {
+                            FileTree.copy(source, target, copiedNow -> progress.update(copiedNow, total));
+                        } catch (IOException | RuntimeException e) {
+                            // As it was: the copy away, deleted in the background.
+                            moveToTrash(target);
+                            trash[0] = target.getParentFile();
+                            throw e;
+                        }
+                        copied = true;
+                        progress.update(total, total);
+                    }
+
+                    registry.setProperty(key(id, KEY_LOCATION), open ? OPEN : HIDDEN);
+                    write(registry, new File(data, REGISTRY));
+                    if (copied && moveToTrash(source)) {
+                        trash[0] = source.getParentFile();
                     }
                 }
             }
-        }
-        if (!old.isEmpty()) {
-            emptyTrash(old.get(0));
+        } finally {
+            if (trash[0] != null) {
+                emptyTrash(trash[0]);
+            }
         }
     }
 
-    private interface Copied {
-        void update(long copied);
-    }
-
-    private static void copyTree(File source, File target, long[] copied, Copied progress) throws IOException {
-        if (source.isDirectory()) {
-            makeFolder(target);
-            File[] children = source.listFiles();
-            if (children == null) {
-                throw new IOException("not listed: " + source.getName());
-            }
-            for (File child : children) {
-                copyTree(child, new File(target, child.getName()), copied, progress);
-            }
-            return;
-        }
-        byte[] buffer = new byte[1 << 20];
-        try (InputStream in = new FileInputStream(source); FileOutputStream out = new FileOutputStream(target)) {
-            int read;
-            while ((read = in.read(buffer)) > 0) {
-                out.write(buffer, 0, read);
-                copied[0] += read;
-                progress.update(copied[0]);
-            }
-            out.getFD().sync();
-        }
-        if (target.length() != source.length()) {
-            throw new IOException("not copied whole: " + source.getName());
-        }
+    // [folder] renamed away in its own folder (`TRASH`): gone at once for
+    // the games, deleted later (`emptyTrash`).
+    private static boolean moveToTrash(File folder) {
+        File away = new File(folder.getParentFile(), TRASH + folder.getName() + "-" + System.currentTimeMillis());
+        return folder.renameTo(away);
     }
 
     static long size(File file) {
-        if (file.isFile()) {
-            return file.length();
-        }
-        long total = 0;
-        File[] children = file.listFiles();
-        if (children != null) {
-            for (File child : children) {
-                total += size(child);
-            }
-        }
-        return total;
+        return FileTree.size(file);
     }
 
     private static Properties registry(File app, File data) throws IOException {
@@ -574,6 +570,17 @@ final class Games {
         File journal = new File(data, JOURNAL);
         if (registry == null || journal.isFile()) {
             registry = moveOldGame(app, data, journal, registry);
+        }
+        // Test builds' one place for all games: each game's own (kept when
+        // the registry is written next).
+        String all = registry.getProperty(KEY_LOCATION);
+        if (all != null) {
+            for (String id : ids(registry)) {
+                if (registry.getProperty(key(id, KEY_LOCATION)) == null) {
+                    registry.setProperty(key(id, KEY_LOCATION), all);
+                }
+            }
+            registry.remove(KEY_LOCATION);
         }
         return registry;
     }
@@ -647,14 +654,9 @@ final class Games {
     }
 
     private static void deleteTree(File file) {
-        File[] children = file.isDirectory() ? file.listFiles() : null;
-        if (children != null) {
-            for (File child : children) {
-                deleteTree(child);
-            }
+        if (!FileTree.delete(file)) {
+            Log.w(TAG, "not all deleted: " + file.getName());
         }
-        //noinspection ResultOfMethodCallIgnored
-        file.delete();
     }
 
     // The app's folder of an earlier build as the first game: everything but

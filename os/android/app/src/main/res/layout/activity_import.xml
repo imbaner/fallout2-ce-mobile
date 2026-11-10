@@ -4,6 +4,7 @@
      between them scrolls: weighted, it gives way when the panel would be
      taller than the screen. -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/import_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/import_background">

@@ -111,18 +111,21 @@
     <string name="games_label_language">Language</string>
     <string name="games_label_added">Added</string>
     <string name="games_label_played">Started</string>
+    <string name="games_label_folder">Folder</string>
     <string name="games_mods_title">Mods · %d</string>
     <string name="games_failed_title">«%s» didn\'t start</string>
     <string name="games_failed_text">Last time the game stopped before its main menu. Choose a game, or try it again with Play.</string>
     <string name="games_ok">OK</string>
     <string name="games_failed_action">Something went wrong. Try again.</string>
-    <string name="games_folder_title">Games\' folder</string>
-    <string name="games_folder_hidden">Now: inside the app. Other apps don\'t see the games\' files.</string>
-    <string name="games_folder_open">Now: an open folder, %s. File managers, sync apps such as Syncthing and a computer over USB see and change the games\' files (saves are in each game\'s data/SAVEGAME).</string>
-    <string name="games_folder_note">Either way the folder goes when the app is uninstalled. Moving may copy the games: then it needs as much free space as they take.</string>
+    <string name="games_folder_title">Game\'s folder</string>
+    <string name="games_folder_hidden">Now: hidden in the app. Only the app sees the game\'s files, and reading and writing them is the fastest.\n\nAn open folder (Android/media) lets file managers, sync apps such as Syncthing and a computer over USB see and change the game\'s files, but loading and moving between places get slower: several times on slow storage.</string>
+    <string name="games_folder_open">Now: open, %s. File managers, sync apps such as Syncthing and a computer over USB see and change the game\'s files (saves are in data/SAVEGAME), but loading and moving between places are slower: several times on slow storage.\n\nHidden in the app, only the app sees the files, and reading and writing them is the fastest.</string>
+    <string name="games_folder_note">Both folders go when the app is uninstalled; a game whose open folder is deleted from outside is gone. Moving copies the game: it needs as much free space as the game takes.</string>
     <string name="games_folder_make_open">Make it open</string>
     <string name="games_folder_make_hidden">Hide it in the app</string>
-    <string name="games_folder_moving">Moving the games…</string>
+    <string name="games_folder_hidden_short">Hidden</string>
+    <string name="games_folder_open_short">Open</string>
+    <string name="games_folder_moving">Moving the game…</string>
     <string name="games_folder_progress">%1$s of %2$s</string>
     <string name="games_folder_no_space">Not enough free space: %s more is needed.</string>
 </resources>
