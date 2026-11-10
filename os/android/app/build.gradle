@@ -13,7 +13,8 @@ def nativeBuildDirNames = [debug: 'Debug', release: 'Release', phone: 'Release']
 // plugin upgrade leaves the old one) has its own hash directory: all of them
 // are checked.
 def findFetchedSdlJavaBindingsDirs = { String variantName ->
-    String variantCap = nativeBuildDirNames.get(variantName, variantName.capitalize())
+    // CI may pick the native build type (-PnativeBuildType=Release).
+    String variantCap = project.findProperty('nativeBuildType') ?: nativeBuildDirNames.get(variantName, variantName.capitalize())
     File intermediatesVariantDir = file("build/intermediates/cxx/${variantCap}")
     if (!intermediatesVariantDir.isDirectory()) {
         throw new GradleException("SDL sync check failed: missing active CXX intermediates under ${intermediatesVariantDir}. Run externalNativeBuild${variantName.capitalize()} first.")
@@ -113,6 +114,10 @@ android {
             cmake {
                 arguments '-DANDROID_STL=c++_static', '-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON',
                     "-DFALLOUT_APP_VERSION=${appVersion}"
+                // CI can optimize native code while keeping debug signing and app ID.
+                if (project.hasProperty('nativeBuildType')) {
+                    arguments "-DCMAKE_BUILD_TYPE=${project.property('nativeBuildType')}"
+                }
                 // Override with -PabiFilters=arm64-v8a for faster local builds.
                 if (project.hasProperty('abiFilters')) {
                     abiFilters(*project.property('abiFilters').split(','))
