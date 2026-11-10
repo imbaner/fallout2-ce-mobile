@@ -201,7 +201,14 @@ static bool compat_prepare_native_path(char* nativePath, const char* path)
     if (compatResolvePath(nativePath)) {
         return false;
     }
-    return SDL_strcasestr(nativePath, "savegame") == nullptr;
+    // (SDL_strcasestr is too new for the SDL some builds link.)
+    static const char kSaves[] = "savegame";
+    for (const char* at = nativePath; *at != '\0'; at++) {
+        if (SDL_strncasecmp(at, kSaves, sizeof(kSaves) - 1) == 0) {
+            return false;
+        }
+    }
+    return true;
 }
 
 int compat_stricmp(const char* string1, const char* string2)
