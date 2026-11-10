@@ -46,19 +46,38 @@
                         android:orientation="vertical" />
                 </ScrollView>
 
-                <Button
-                    android:id="@+id/games_add"
+                <!-- Add game, and where the games' folders are (hidden in the
+                     app or open to other apps). -->
+                <LinearLayout
+                    android:id="@+id/games_bottom"
                     android:layout_width="match_parent"
                     android:layout_height="44dp"
                     android:layout_marginTop="8dp"
-                    android:background="@drawable/import_button"
-                    android:drawableStart="@drawable/games_plus"
-                    android:paddingStart="96dp"
-                    android:paddingEnd="96dp"
-                    android:text="@string/games_add"
-                    android:textAllCaps="false"
-                    android:textColor="@color/import_button_text"
-                    android:textSize="15sp" />
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/games_add"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:background="@drawable/import_button"
+                        android:drawableStart="@drawable/games_plus"
+                        android:paddingStart="40dp"
+                        android:paddingEnd="40dp"
+                        android:text="@string/games_add"
+                        android:textAllCaps="false"
+                        android:textColor="@color/import_button_text"
+                        android:textSize="15sp" />
+
+                    <ImageButton
+                        android:id="@+id/games_folder"
+                        android:layout_width="44dp"
+                        android:layout_height="match_parent"
+                        android:layout_marginStart="8dp"
+                        android:background="@drawable/import_button"
+                        android:contentDescription="@string/games_folder_title"
+                        android:src="@drawable/games_folder" />
+                </LinearLayout>
             </LinearLayout>
 
             <LinearLayout

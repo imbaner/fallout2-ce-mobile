@@ -103,6 +103,7 @@ public class GamesActivity extends Activity {
         back = findViewById(R.id.games_back);
         back.setOnClickListener(v -> onBackPressed());
         findViewById(R.id.games_add).setOnClickListener(v -> showAdd());
+        findViewById(R.id.games_folder).setOnClickListener(v -> showFolder());
         findViewById(R.id.games_play).setOnClickListener(v -> play());
         findViewById(R.id.games_delete).setOnClickListener(v -> confirmDelete());
         findViewById(R.id.games_details).setOnClickListener(v -> showDetails(true));
@@ -111,6 +112,7 @@ public class GamesActivity extends Activity {
 
         layoutWindow();
         UiFont.apply(findViewById(R.id.games_root), font);
+        centerAddButton();
 
         String failed = getIntent().getStringExtra(FAILED);
         if (failed != null && savedInstanceState == null) {
@@ -183,15 +185,29 @@ public class GamesActivity extends Activity {
         // Roomier, as the save screen in a window.
         setWidth(R.id.games_left, 384);
         setWidth(R.id.games_details_left, 384);
-        setHeight(R.id.games_add, 52);
+        setHeight(R.id.games_bottom, 52);
+        setWidth(R.id.games_folder, 52);
         setHeight(R.id.games_actions, 52);
         setWidth(R.id.games_delete, 150);
         setWidth(R.id.games_play, 170);
         ((TextView) findViewById(R.id.games_add)).setTextSize(18);
-        // The plus beside its text, in the middle of the wider button.
-        findViewById(R.id.games_add).setPaddingRelative(dp(120), 0, dp(120), 0);
         ((TextView) findViewById(R.id.games_play)).setTextSize(18);
         ((TextView) findViewById(R.id.games_name)).setTextSize(24);
+    }
+
+    // "Add game": its plus beside its text, the two in the middle.
+    private void centerAddButton() {
+        Button add = findViewById(R.id.games_add);
+        add.setCompoundDrawablePadding(dp(10));
+        add.addOnLayoutChangeListener((view, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
+            android.graphics.drawable.Drawable plus = add.getCompoundDrawablesRelative()[0];
+            float content = add.getPaint().measureText(add.getText().toString())
+                + (plus != null ? plus.getIntrinsicWidth() + add.getCompoundDrawablePadding() : 0);
+            int padding = Math.max(0, Math.round((right - left - content) / 2.0f));
+            if (padding != add.getPaddingStart()) {
+                add.setPaddingRelative(padding, 0, padding, 0);
+            }
+        });
     }
 
     // The card's picture and lines: on phones the lines over the picture
@@ -667,6 +683,88 @@ public class GamesActivity extends Activity {
         }
     }
 
+    // Where the games' folders are: hidden in the app, or open to other apps
+    // (file managers, Syncthing, a computer over USB).
+    private void showFolder() {
+        if (busy) {
+            return;
+        }
+        new Thread(() -> {
+            boolean open;
+            try {
+                open = Games.isOpen(this);
+            } catch (IOException e) {
+                Log.w(TAG, "no games' folder", e);
+                return;
+            }
+            File folder = Games.openFolder(this);
+            runOnUiThread(() -> {
+                if (folder == null) {
+                    showNotice(getString(R.string.games_failed_action), null);
+                    return;
+                }
+                String message = open ? getString(R.string.games_folder_open, shownPath(folder)) : getString(R.string.games_folder_hidden);
+                showDialog(getString(R.string.games_folder_title), message, getString(R.string.games_folder_note), true, null,
+                    new Action(getString(open ? R.string.games_folder_make_hidden : R.string.games_folder_make_open), STYLE_PRIMARY, () -> moveFolder(!open)));
+            });
+        }, "games-folder").start();
+    }
+
+    // "Android/media/<app>/games": the path as file managers show it.
+    private static String shownPath(File folder) {
+        String path = folder.getPath();
+        int android = path.indexOf("/Android/");
+        return android != -1 ? path.substring(android + 1) : path;
+    }
+
+    // The games' folders moved (the game running closes first: its files
+    // move), with the progress.
+    private void moveFolder(boolean open) {
+        busy = true;
+        View view = showDialog(getString(R.string.games_folder_moving), " ", null, false, null);
+        if (dialog != null) {
+            dialog.setCancelable(false);
+        }
+        TextView progress = view.findViewById(R.id.dialog_message);
+        new Thread(() -> {
+            String problem = null;
+            if (!GameProcess.close(this)) {
+                problem = getString(R.string.games_failed_action);
+            } else {
+                try {
+                    long[] shown = { 0 };
+                    Games.setOpen(this, open, (done, total) -> {
+                        long now = System.currentTimeMillis();
+                        if (now - shown[0] < 100 && done < total) {
+                            return;
+                        }
+                        shown[0] = now;
+                        runOnUiThread(() -> progress.setText(getString(R.string.games_folder_progress,
+                            Formatter.formatShortFileSize(this, done), Formatter.formatShortFileSize(this, total))));
+                    });
+                } catch (Games.NoSpaceException e) {
+                    problem = getString(R.string.games_folder_no_space, Formatter.formatShortFileSize(this, e.needed));
+                } catch (IOException e) {
+                    Log.w(TAG, "games not moved", e);
+                    problem = getString(R.string.games_failed_action);
+                }
+            }
+            String shownProblem = problem;
+            runOnUiThread(() -> {
+                busy = false;
+                // The game the list was opened over has closed.
+                fromGame = null;
+                if (dialog != null) {
+                    dialog.dismiss();
+                }
+                if (shownProblem != null) {
+                    showNotice(shownProblem, null);
+                }
+                reload();
+            });
+        }, "games-move").start();
+    }
+
     private void showFailed(String id) {
         Games.Info info = find(id);
         String name = info != null ? Games.displayName(this, info) : getString(R.string.games_unnamed, id);
@@ -692,7 +790,7 @@ public class GamesActivity extends Activity {
     // A window over the list: [back] beside it (closing it, as the game's
     // windows), [input] a field with that text (renaming: the last action
     // saves it).
-    private void showDialog(String title, String message, String note, boolean withBack, String input, Action... actions) {
+    private View showDialog(String title, String message, String note, boolean withBack, String input, Action... actions) {
         if (dialog != null) {
             dialog.dismiss();
         }
@@ -754,6 +852,7 @@ public class GamesActivity extends Activity {
         }
         dialog = shown;
         shown.show();
+        return view;
     }
 
     private void setWidth(int id, int widthDp) {

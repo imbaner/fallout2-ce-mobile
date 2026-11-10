@@ -1580,7 +1580,20 @@ folder (`Games.java`):
   loads it from there, as macOS from its bundle) and the marks of a run
   (`running.txt`, `problem.txt`, error_report.cc), so whichever game starts
   next sees how the last run ended.
-- `games.txt` (private, Java properties): the games and the one played.
+- `games.txt` (private, Java properties): the games, the one played, and
+  where their folders are (`location`).
+- The games' folders can be open (the list's folder button, `Games.setOpen`):
+  `Android/media/<app>/games/<id>/` instead, the app's media folder - the app
+  writes it as its own (no permission), file managers and sync apps with
+  access to all files (Syncthing) and a computer over USB see and change it
+  (`Android/data` is closed to them since Android 11). A `.nomedia` keeps the
+  games out of the gallery and players. It also goes with the app. Moving is
+  a rename where the system lets, else (the two are separate mounts on
+  Android 11+) a copy, its space checked first; the registry names the new
+  place only once all is there, then the old copies are deleted in the
+  background; a move cut short leaves the old place in use. The game closes
+  first. The app's own files (`ce.dat`, the run marks) and the games' private
+  records stay where they are.
 - The port's own settings (`[touch]`, `[world_view]`, `[enhancements]`) are
   the same for all games: the app's private `f2touch.cfg`
   (game_config.cc). They win over what a game's config has of them (an

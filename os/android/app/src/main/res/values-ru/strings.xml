@@ -114,4 +114,13 @@
     <string name="games_failed_text">В прошлый раз игра остановилась, не дойдя до главного меню. Выберите игру или попробуйте снова кнопкой «Играть».</string>
     <string name="games_ok">Понятно</string>
     <string name="games_failed_action">Не получилось. Попробуйте ещё раз.</string>
+    <string name="games_folder_title">Папка игр</string>
+    <string name="games_folder_hidden">Сейчас: внутри приложения. Другие приложения файлов игр не видят.</string>
+    <string name="games_folder_open">Сейчас: открытая папка %s. Файлы игр видят и меняют файловые менеджеры, приложения синхронизации вроде Syncthing и компьютер по USB (сейвы — в data/SAVEGAME каждой игры).</string>
+    <string name="games_folder_note">В обоих случаях папка удаляется вместе с приложением. Перенос может копировать игры — тогда нужно столько свободного места, сколько они занимают.</string>
+    <string name="games_folder_make_open">Сделать открытой</string>
+    <string name="games_folder_make_hidden">Спрятать в приложение</string>
+    <string name="games_folder_moving">Переношу игры…</string>
+    <string name="games_folder_progress">%1$s из %2$s</string>
+    <string name="games_folder_no_space">Не хватает свободного места: нужно ещё %s.</string>
 </resources>

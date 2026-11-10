@@ -116,4 +116,13 @@
     <string name="games_failed_text">Last time the game stopped before its main menu. Choose a game, or try it again with Play.</string>
     <string name="games_ok">OK</string>
     <string name="games_failed_action">Something went wrong. Try again.</string>
+    <string name="games_folder_title">Games\' folder</string>
+    <string name="games_folder_hidden">Now: inside the app. Other apps don\'t see the games\' files.</string>
+    <string name="games_folder_open">Now: an open folder, %s. File managers, sync apps such as Syncthing and a computer over USB see and change the games\' files (saves are in each game\'s data/SAVEGAME).</string>
+    <string name="games_folder_note">Either way the folder goes when the app is uninstalled. Moving may copy the games: then it needs as much free space as they take.</string>
+    <string name="games_folder_make_open">Make it open</string>
+    <string name="games_folder_make_hidden">Hide it in the app</string>
+    <string name="games_folder_moving">Moving the games…</string>
+    <string name="games_folder_progress">%1$s of %2$s</string>
+    <string name="games_folder_no_space">Not enough free space: %s more is needed.</string>
 </resources>
