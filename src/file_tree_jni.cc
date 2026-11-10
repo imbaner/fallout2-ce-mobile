@@ -68,8 +68,7 @@ JNIEXPORT void JNICALL Java_com_alexbatalov_fallout2ce_FileTree_nativeCopy(JNIEn
             return true;
         }
         env->CallVoidMethod(progress, update, static_cast<jlong>(done));
-        return !env->ExceptionCheck();
-    }, &error);
+        return !env->ExceptionCheck(); }, &error);
     if (!copied) {
         throwIo(env, error.message());
     }
