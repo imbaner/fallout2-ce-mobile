@@ -138,6 +138,8 @@ set(FALLOUT_ENGINE_SOURCES
     "src/file_utils.h"
     "src/font_manager.cc"
     "src/font_manager.h"
+    "src/game_card.cc"
+    "src/game_card.h"
     "src/game_config.cc"
     "src/game_config.h"
     "src/game_config_migration.cc"

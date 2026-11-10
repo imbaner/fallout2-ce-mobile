@@ -424,6 +424,10 @@
 {518}{}{Спутники не цели}
 {519}{}{Выкл.: тап может выбрать спутника целью, как на PC}
 
+# The main menu's button to the app's list of games (game_card.h), after
+# the game's name.
+{520}{}{Сменить игру}
+
 # The message when a party member or another critter cannot pick up an item
 # (the player's message is 905 in proto.msg).
 {1000}{}{%s не может подобрать предмет.}

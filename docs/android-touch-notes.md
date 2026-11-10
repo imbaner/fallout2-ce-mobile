@@ -1594,6 +1594,45 @@ folder (`Games.java`):
   (`games-move.txt`) finished at the next start if the app dies meanwhile
   (`GamesTest`). A new install gets `games/1` empty, filled by the import.
 
+### The list of games (`GamesActivity`)
+
+- Opened from the main menu's button at the bottom right ("<game> · Change
+  game", `game_card.h`; the game's copyright and version are no longer under
+  the menu's buttons), over the game (paused behind: back and Play on it
+  return to it), or at the start instead of a game whose last start never got
+  to its menu (`starting.txt` in the app's folder: MainActivity writes it, the
+  engine removes it at the menu or in play) - with a note saying so. A first
+  start without a game is the import screen, as before.
+- Left: the games, the one started last first (`Games.list`), "Add game"
+  under them. Right: the chosen one's card - its picture, its newest save,
+  saves, size, language, mods - with Delete, Details, Play. Details: all of it
+  (every mod) and the rare actions, Rename and Replace files (moved here from
+  the settings' Game files, which keep the saves' import, export and delete).
+- The card's picture and lines come from the game (`gameCardWrite` at its
+  main menu): `card.png` (the menu's picture, the high resolution one or the
+  game's own right of its button plates, in the loaded palette - the screen's
+  is faded out then), `card.txt` (`version`, `place` of the newest save,
+  UTF-8), in the game's private folder.
+- Add game: folder or archive, then the import screen into a new game's
+  folder (`ImportActivity` `GAME` + `ADD` + `PICK`); named after the folder or
+  archive ("(2)" for a name taken), it starts after the game running closes.
+  An import given up leaves nothing (`Games.tidy`).
+- Another game starts after the one running closes (`GameProcess.close`: a
+  broadcast MainActivity ends on, as on Exit; after 4 s with no answer the
+  process is stopped - the app's process stays after sending the player to
+  the list or the import, with no game in it). Delete moves the folders away
+  at once and deletes them in the background.
+- The picture (`CoverImageView`) is held at its right edge as in the main
+  menu: as wide as its frame or wider, it fills it; much narrower (the game's
+  own 640x480 menu picture right of its button plates), it's as tall as the
+  frame and its left part fades into the black - filled, it would be its
+  middle blown up. The list's thumbnails always fill their cell.
+- Phones: full screen, back at the right edge. Tablets (shortest side
+  >= 500 dp): one window of at most 896x680 dp, back beside it, the picture
+  4:3 at the card's top and the lines under it.
+- The list is in the system's language (Android resources), as the import
+  screen; a game's menu in the game's.
+
 ## Game layouts the import understands (Android and web)
 
 On a computer CE reads a game where its installer left it. The phone and

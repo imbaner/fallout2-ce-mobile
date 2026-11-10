@@ -20,6 +20,7 @@
 #include "endgame.h"
 #include "error_report.h"
 #include "game.h"
+#include "game_card.h"
 #include "game_commands.h"
 #include "game_mouse.h"
 #include "game_movie.h"
@@ -507,6 +508,9 @@ static void mainLoop()
     }
 
     _main_game_paused = 0;
+
+    // CE: In play: not a game that fails at its start (game_card.h).
+    gameCardStarted();
 
     scriptsEnable();
 

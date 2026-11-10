@@ -1122,6 +1122,37 @@ SDL_Texture* muiPictureTexture(const FrmId& frmId, int* width, int* height)
     return entry.texture;
 }
 
+bool muiPictureRgba(const FrmId& frmId, std::vector<unsigned char>& rgba, int* width, int* height)
+{
+    *width = 0;
+    *height = 0;
+
+    FrmImage image;
+    if (!image.lock(frmId)) {
+        return false;
+    }
+    int artWidth = image.getWidth();
+    int artHeight = image.getHeight();
+    unsigned char* data = image.getData();
+    if (data == nullptr || artWidth <= 0 || artHeight <= 0) {
+        return false;
+    }
+
+    // The game's palette as loaded (the screen's may be faded out: the
+    // menu fades in). Opaque: the transparent color is the black around it.
+    rgba.resize(static_cast<size_t>(artWidth) * artHeight * 4);
+    for (size_t index = 0; index < static_cast<size_t>(artWidth) * artHeight; index++) {
+        unsigned char color = data[index];
+        rgba[index * 4] = color != 0 ? static_cast<unsigned char>(_cmap[color * 3] << 2) : 0;
+        rgba[index * 4 + 1] = color != 0 ? static_cast<unsigned char>(_cmap[color * 3 + 1] << 2) : 0;
+        rgba[index * 4 + 2] = color != 0 ? static_cast<unsigned char>(_cmap[color * 3 + 2] << 2) : 0;
+        rgba[index * 4 + 3] = 255;
+    }
+    *width = artWidth;
+    *height = artHeight;
+    return true;
+}
+
 SDL_Texture* muiLineArtTexture(const FrmId& frmId, int* width, int* height)
 {
     if (gRenderer == nullptr) {

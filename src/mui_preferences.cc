@@ -18,6 +18,7 @@
 #include "error_report.h"
 #include "fps_limiter.h"
 #include "game.h"
+#include "game_card.h"
 #include "game_sound.h"
 #include "input.h"
 #include "kb.h"
@@ -1255,7 +1256,15 @@ namespace {
             { FilesAction::ExportSaves, "prefs.files.export", kTextExportSaves, "Export saves", kTextExportSavesNote, "All saves in one archive", kTextExportButton, "Export" },
             { FilesAction::DeleteSaves, "prefs.files.delete", kTextDeleteSaves, "Delete all saves", kTextDeleteSavesNote, "Export them first if they may be needed", kTextDeleteButton, "Delete" },
         };
-        constexpr int kActionCount = sizeof(kActions) / sizeof(kActions[0]);
+        // Where the app keeps a list of games, replacing a game's files is
+        // done there (the game closed): its "Replace files" (game_card.h).
+        std::vector<const Action*> shown;
+        for (const Action& action : kActions) {
+            if (action.action != FilesAction::ReplaceGame || gameCardName().empty()) {
+                shown.push_back(&action);
+            }
+        }
+        int kActionCount = static_cast<int>(shown.size());
 
         // As the settings' rows (buildRows, buildRow).
         float rowHeight = ui.dp(50.0f);
@@ -1271,7 +1280,8 @@ namespace {
         muiDrawTextAligned(muiDecodeGameText(installed), { rect.x + ui.dp(4.0f), y + ui.dp(8.0f), rect.w, headerHeight - ui.dp(8.0f) }, ui.dp(12.0f), theme.textDim, MuiAlign::Start, MuiAlign::Center);
         y += headerHeight;
 
-        for (const Action& action : kActions) {
+        for (const Action* shownAction : shown) {
+            const Action& action = *shownAction;
             MuiRect row = { rect.x, y, rect.w, rowHeight };
             y += rowHeight;
             muiFillRect({ row.x, row.bottom() - ui.dp(1.0f), row.w, ui.dp(1.0f) }, kRowLine);

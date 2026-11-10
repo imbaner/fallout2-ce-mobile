@@ -374,6 +374,10 @@
 {518}{}{Party members aren't targets}
 {519}{}{Off: a tap can pick a party member as a target, as on the PC}
 
+# The main menu's button to the app's list of games (game_card.h), after
+# the game's name.
+{520}{}{Change game}
+
 # The message when a party member or another critter cannot pick up an item
 # (the player's message is 905 in proto.msg).
 {1000}{}{%s cannot pick up the item.}

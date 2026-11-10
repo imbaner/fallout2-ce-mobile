@@ -1,10 +1,8 @@
 package com.alexbatalov.fallout2ce;
 
 import android.app.Activity;
-import android.app.ActivityManager;
 import android.content.Intent;
 import android.database.Cursor;
-import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.OpenableColumns;
@@ -38,6 +36,14 @@ public class ImportActivity extends Activity {
     static final String MODE = "mode";
     static final String MODE_SAVES_IMPORT = "saves_import";
     static final String MODE_SAVES_EXPORT = "saves_export";
+    // Opened from the list of games (GamesActivity): the game of this id
+    // (a new one: ADD), the system's picker of PICK (PICK_FOLDER or
+    // PICK_ARCHIVE) opened at once; back returns to the list.
+    static final String GAME = "game";
+    static final String ADD = "add";
+    static final String PICK = "pick";
+    static final String PICK_FOLDER = "folder";
+    static final String PICK_ARCHIVE = "archive";
 
     private TextView title;
     private TextView message;
@@ -58,8 +64,18 @@ public class ImportActivity extends Activity {
     private String mode;
     // Back: to the previous step, else the game (opened from it).
     private Runnable onBack;
-    // The game played (Games.java): the import goes into its folder.
+    // The game played (Games.java), or the list's: the import goes into its
+    // folder.
     private Games.Game game;
+    // Opened from the list of games: back and done return to it.
+    private boolean fromList;
+    // A new game of the list (its folder empty until the copy).
+    private boolean adding;
+    // The picker was opened at once (the list's "Add game"): given up, back
+    // to the list.
+    private boolean picking;
+    // The chosen folder's or archive's name: the new game's name.
+    private String sourceName;
     // After an export: what was being done (replacing all saves), else back
     // to the game.
     private Runnable afterExport;
@@ -67,8 +83,11 @@ public class ImportActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        String id = getIntent().getStringExtra(GAME);
+        fromList = id != null;
+        adding = getIntent().getBooleanExtra(ADD, false);
         try {
-            game = Games.current(this);
+            game = fromList ? Games.get(this, id) : Games.current(this);
         } catch (IOException e) {
             throw new IllegalStateException("games' folders: " + e.getMessage(), e);
         }
@@ -94,6 +113,14 @@ public class ImportActivity extends Activity {
             startExport(null);
         } else {
             showWelcome();
+            String pick = savedInstanceState == null ? getIntent().getStringExtra(PICK) : null;
+            if (PICK_FOLDER.equals(pick)) {
+                picking = true;
+                chooseFolder();
+            } else if (PICK_ARCHIVE.equals(pick)) {
+                picking = true;
+                chooseArchive();
+            }
         }
     }
 
@@ -101,40 +128,8 @@ public class ImportActivity extends Activity {
         return MODE_SAVES_IMPORT.equals(mode) || MODE_SAVES_EXPORT.equals(mode);
     }
 
-    // Match TouchSettings: Classic by default, PT Mono when the player chose it.
     private void applyFont(View view) {
-        boolean mono = false;
-        try {
-            // The port's settings (Games.PORT_SETTINGS), else an earlier
-            // build's in the game's config (moved at the game's next save).
-            File config = Games.portSettings(this);
-            String value = config.isFile() ? GameSaves.configValue(GameFiles.readText(config), "touch", "font") : null;
-            if (value == null) {
-                config = GameFiles.configFile(gameFolder());
-                value = config.isFile() ? GameSaves.configValue(GameFiles.readText(config), "touch", "font") : null;
-            }
-            mono = "1".equals(value);
-        } catch (IOException ignored) {
-            // An absent/unreadable first-run config uses the game's default.
-        }
-        Typeface font;
-        try {
-            font = Typeface.createFromAsset(getAssets(), "ce.dat/fonts/" + (mono ? "PTM55FT.ttf" : "FalloutClassicDialog.ttf"));
-        } catch (RuntimeException e) {
-            font = Typeface.MONOSPACE;
-        }
-        applyFont(view, font);
-    }
-
-    private void applyFont(View view, Typeface font) {
-        if (view instanceof TextView) {
-            ((TextView) view).setTypeface(font);
-        } else if (view instanceof ViewGroup) {
-            ViewGroup group = (ViewGroup) view;
-            for (int index = 0; index < group.getChildCount(); index++) {
-                applyFont(group.getChildAt(index), font);
-            }
-        }
+        UiFont.apply(view, UiFont.typeface(this, gameFolder()));
     }
 
     private void show(String messageText, String detailsText, String primaryText, View.OnClickListener onPrimary,
@@ -142,7 +137,7 @@ public class ImportActivity extends Activity {
         title.setText(savesMode() ? R.string.saves_title : R.string.import_title);
         // Opened from the game (not the first install): back to it, but not
         // while copying (its own cancel).
-        backToGame.setVisibility((replacing || savesMode()) && !busy ? View.VISIBLE : View.GONE);
+        backToGame.setVisibility((replacing || savesMode() || fromList) && !busy ? View.VISIBLE : View.GONE);
         message.setText(messageText);
         details.setText(detailsText);
         details.setVisibility(detailsText != null ? View.VISIBLE : View.GONE);
@@ -210,8 +205,13 @@ public class ImportActivity extends Activity {
         }
 
         Uri uri = resultCode == Activity.RESULT_OK && resultData != null ? resultData.getData() : null;
+        boolean picked = picking;
+        picking = false;
         if (uri != null) {
             look(requestCode == REQUEST_FOLDER, uri);
+        } else if (picked) {
+            // The list's "Add game" given up in the picker.
+            finish();
         }
     }
 
@@ -227,6 +227,7 @@ public class ImportActivity extends Activity {
 
         new Thread(() -> {
             String name = folder ? null : displayName(uri);
+            sourceName = folder ? treeName(uri) : withoutExtension(name);
             long[] lastUpdate = { 0 };
             GameImport.Source source = null;
             GameImport.Found found;
@@ -416,7 +417,7 @@ public class ImportActivity extends Activity {
 
         new Thread(() -> {
             try {
-                if (replacing && !waitForGameToClose()) {
+                if (replacing && !(fromList ? closeIfPlayed() : GameProcess.waitForExit(this))) {
                     String text = getString(R.string.import_game_running);
                     runOnUiThread(() -> showError(text));
                     return;
@@ -453,37 +454,79 @@ public class ImportActivity extends Activity {
             }
 
             writeProblem(null);
+            if (fromList) {
+                String name = found.root.isEmpty() ? sourceName : baseName(folderName(found.root));
+                try {
+                    if (adding) {
+                        Games.add(this, game.id, name);
+                    } else {
+                        Games.forgetPicture(game);
+                    }
+                    // Another game may run (the list opened over it).
+                    GameProcess.close(this);
+                    Games.setCurrent(this, game.id);
+                } catch (IOException e) {
+                    Log.w(TAG, "game not listed", e);
+                }
+                runOnUiThread(this::playNow);
+                return;
+            }
             runOnUiThread(this::startGame);
         }).start();
     }
 
-    private void startGame() {
+    // The list's game imported or its files replaced: it starts now.
+    private void playNow() {
         startActivity(new Intent(this, MainActivity.class));
-        finish();
+        finishAffinity();
     }
 
-    // The game (the app's main process) closes itself when "Replace game" is
-    // chosen in it; its files are replaced only once it has.
-    private boolean waitForGameToClose() {
-        ActivityManager manager = (ActivityManager) getSystemService(ACTIVITY_SERVICE);
-        for (int attempt = 0; attempt < 150; attempt++) {
-            boolean running = false;
-            List<ActivityManager.RunningAppProcessInfo> processes = manager.getRunningAppProcesses();
-            if (processes != null) {
-                for (ActivityManager.RunningAppProcessInfo process : processes) {
-                    running |= process.processName.equals(getPackageName());
-                }
-            }
-            if (!running) {
+    // The game of the list, when it's the one played and running: closed
+    // first (its files change). Not on the main thread.
+    private boolean closeIfPlayed() {
+        try {
+            if (!game.id.equals(Games.current(this).id)) {
                 return true;
             }
-            try {
-                Thread.sleep(100);
-            } catch (InterruptedException e) {
-                return false;
+        } catch (IOException e) {
+            return false;
+        }
+        return GameProcess.close(this);
+    }
+
+    // The chosen folder's own name ("primary:Games/Fallout 2" -> "Fallout 2").
+    private static String treeName(Uri uri) {
+        try {
+            String id = android.provider.DocumentsContract.getTreeDocumentId(uri);
+            int colon = id.lastIndexOf(':');
+            String path = colon != -1 ? id.substring(colon + 1) : id;
+            return baseName(folderName(path));
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    private static String withoutExtension(String name) {
+        if (name == null) {
+            return null;
+        }
+        String lower = name.toLowerCase(Locale.ROOT);
+        for (String extension : new String[] { ".tar.gz", ".tar.xz", ".zip", ".7z", ".rar", ".tgz", ".txz", ".tar" }) {
+            if (lower.endsWith(extension)) {
+                return name.substring(0, name.length() - extension.length());
             }
         }
-        return false;
+        return name;
+    }
+
+    private void startGame() {
+        // Opened from the list of games: back to it.
+        if (fromList) {
+            finish();
+            return;
+        }
+        startActivity(new Intent(this, MainActivity.class));
+        finish();
     }
 
     // The phone's storage filled up while copying.
@@ -837,7 +880,7 @@ public class ImportActivity extends Activity {
     }
 
     // "russian" of the game's config in the phone's language ("русский").
-    private static String languageName(String language) {
+    static String languageName(String language) {
         String code;
         switch (language.toLowerCase(Locale.ROOT)) {
         case "english":

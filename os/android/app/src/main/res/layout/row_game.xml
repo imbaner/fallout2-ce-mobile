@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A game of the list (GamesActivity): its picture, name, when it was
+     played; "Running" for the game the list was opened from. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="53dp"
+    android:layout_marginBottom="3dp"
+    android:background="@drawable/games_row"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingStart="4dp"
+    android:paddingEnd="8dp">
+
+    <FrameLayout
+        android:id="@+id/game_thumb_frame"
+        android:layout_width="72dp"
+        android:layout_height="45dp"
+        android:background="@drawable/games_thumb"
+        android:padding="1dp">
+
+        <com.alexbatalov.fallout2ce.CoverImageView
+            android:id="@+id/game_thumb"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:importantForAccessibility="no"
+            android:scaleType="matrix" />
+
+        <ImageView
+            android:id="@+id/game_no_thumb"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:layout_gravity="center"
+            android:importantForAccessibility="no"
+            android:src="@drawable/games_picture"
+            android:visibility="gone" />
+    </FrameLayout>
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="10dp"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/game_name"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:singleLine="true"
+            android:textColor="@color/import_text"
+            android:textSize="15sp" />
+
+        <TextView
+            android:id="@+id/game_when"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:singleLine="true"
+            android:textColor="@color/import_text_dim"
+            android:textSize="12sp" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/game_badge"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="6dp"
+        android:background="@drawable/games_badge"
+        android:paddingStart="5dp"
+        android:paddingTop="1dp"
+        android:paddingEnd="5dp"
+        android:paddingBottom="1dp"
+        android:text="@string/games_running"
+        android:textColor="@color/import_accent"
+        android:textSize="10sp"
+        android:visibility="gone" />
+</LinearLayout>

@@ -119,6 +119,15 @@
             android:screenOrientation="landscape"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden">
         </activity>
+
+        <!-- The list of games (Games.java): in the import screen's process,
+             so another game starts after the one played closes. -->
+        <activity android:name=".GamesActivity"
+            android:process=":import"
+            android:theme="@style/AppTheme"
+            android:screenOrientation="landscape"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden">
+        </activity>
     </application>
 
 </manifest>

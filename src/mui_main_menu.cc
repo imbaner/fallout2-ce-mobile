@@ -10,6 +10,7 @@
 #include "art.h"
 #include "fps_limiter.h"
 #include "game.h"
+#include "game_card.h"
 #include "input.h"
 #include "loadsave.h"
 #include "mainmenu.h"
@@ -19,7 +20,6 @@
 #include "platform_compat.h"
 #include "settings.h"
 #include "svga.h"
-#include "version.h"
 
 #include <SDL.h>
 
@@ -40,9 +40,7 @@ namespace {
     constexpr int kTextNewGame = 290;
     constexpr int kTextIntro = 291;
     constexpr int kTextCredits = 292;
-
-    // Copyright in MISC.MSG.
-    constexpr int kMessageCopyright = 20;
+    constexpr int kTextChangeGame = 520;
 
     // The game's 640x480 menu picture (used only when the high resolution
     // one is missing) has its button plates drawn at the left: the part
@@ -76,8 +74,8 @@ namespace {
         std::u32string continuePlace;
 
         void buildButtons(MuiContext& ui, const MuiRect& column);
-        void buildFooter(MuiContext& ui, const MuiRect& rect);
         void buildLinks(MuiContext& ui, const MuiRect& safe);
+        void buildGame(MuiContext& ui, const MuiRect& safe);
     };
 
     MainMenuScreen::MainMenuScreen()
@@ -85,25 +83,34 @@ namespace {
         modal = true;
         hasSaves = lsgMobileNewestSlot() != -1;
 
-        if (settings.enhancements.main_menu_continue) {
-            continueSlot = lsgMobileNewestSlot();
-            MobileSaveSlotInfo info;
-            if (continueSlot != -1 && lsgMobileGetSlotInfo(continueSlot, &info)) {
-                // Map names aren't loaded before a game starts.
-                MessageList names;
-                if (messageListInit(&names)) {
-                    char path[COMPAT_MAX_PATH];
-                    snprintf(path, sizeof(path), "%smap.msg", gGameMsgPath);
-                    if (messageListLoad(&names, path)) {
-                        continuePlace = muiPlaceText(info.map, info.elevation, &names);
-                    }
-                    messageListFree(&names);
+        // Where the newest save is: on Continue, and on the game's card in
+        // the app's list of games (game_card.h).
+        int newest = lsgMobileNewestSlot();
+        std::u32string place;
+        MobileSaveSlotInfo info;
+        if (newest != -1 && lsgMobileGetSlotInfo(newest, &info)) {
+            // Map names aren't loaded before a game starts.
+            MessageList names;
+            if (messageListInit(&names)) {
+                char path[COMPAT_MAX_PATH];
+                snprintf(path, sizeof(path), "%smap.msg", gGameMsgPath);
+                if (messageListLoad(&names, path)) {
+                    place = muiPlaceText(info.map, info.elevation, &names);
                 }
-                if (continuePlace.empty()) {
-                    continuePlace = muiDecodeGameText(info.characterName);
-                }
+                messageListFree(&names);
+            }
+            if (place.empty()) {
+                place = muiDecodeGameText(info.characterName);
             }
         }
+
+        if (settings.enhancements.main_menu_continue) {
+            continueSlot = newest;
+            continuePlace = place;
+        }
+
+        gameCardWrite(place);
+        gameCardStarted();
     }
 
     void MainMenuScreen::build(MuiContext& ui)
@@ -124,6 +131,7 @@ namespace {
         muiSetLayerAlpha(alpha);
         buildButtons(ui, column);
         buildLinks(ui, safe);
+        buildGame(ui, safe);
         muiSetLayerAlpha(layer);
     }
 
@@ -134,20 +142,19 @@ namespace {
         float buttonHeight = ui.dp(44.0f);
         float continueHeight = continueSlot != -1 ? ui.dp(56.0f) : 0.0f;
         float smallHeight = ui.dp(38.0f);
-        float footerHeight = ui.dp(30.0f);
 
         // Center the actions that are actually visible, including the
         // update row only once a release is available.
         bool update = appUpdateHasRelease();
         float height = (continueSlot != -1 ? continueHeight + gap : 0.0f) + (buttonHeight + gap) * (hasSaves ? 3.0f : 2.0f) + smallHeight
             + (update ? buttonHeight + gap : 0.0f);
-        float scale = std::min(1.0f, std::max(column.h - footerHeight, 0.0f) / height);
+        float scale = std::min(1.0f, std::max(column.h, 0.0f) / height);
         buttonHeight *= scale;
         continueHeight *= scale;
         smallHeight *= scale;
         gap *= scale;
         height *= scale;
-        float y = column.y + std::max((column.h - footerHeight - height) / 2.0f, 0.0f);
+        float y = column.y + std::max((column.h - height) / 2.0f, 0.0f);
 
         if (continueSlot != -1) {
             MuiRect rect = { column.x, y, column.w, continueHeight };
@@ -210,8 +217,6 @@ namespace {
                 choice = small[index].choice;
             }
         }
-
-        buildFooter(ui, { column.x, column.bottom() - footerHeight, column.w * 2.0f, footerHeight });
     }
 
     // The port author's pages at the top right, over the picture: small, as
@@ -248,25 +253,43 @@ namespace {
         muiDrawTextAligned(muiDecodeGameText(muiText(463, "Port by imbaner")), caption, ui.dp(11.0f), theme.textDim, MuiAlign::End, MuiAlign::Center);
     }
 
-    // The game's copyright and version, as its menu shows them.
-    void MainMenuScreen::buildFooter(MuiContext& ui, const MuiRect& rect)
+    // The game played, at the bottom right (the port's pages are at the top
+    // right): one button to the app's list of games, where there is one
+    // (game_card.h). The game's copyright and version are in that list.
+    void MainMenuScreen::buildGame(MuiContext& ui, const MuiRect& safe)
     {
-        const MuiTheme& theme = muiTheme();
-        // Longer than the game's VERSION_MAX: a mod's own version string
-        // ("FALLOUT: NEVADA (EXPANSION VERSION)") whole.
-        char version[128];
-        versionGetVersion(version, sizeof(version));
-
-        std::u32string text;
-        MessageListItem item;
-        item.num = kMessageCopyright;
-        if (messageListGetItem(&gMiscMessageList, &item)) {
-            text = muiDecodeGameText(item.text) + U"  ·  ";
+        const std::string& name = gameCardName();
+        if (name.empty()) {
+            return;
         }
-        text += muiDecodeGameText(version);
 
-        float size = muiFitTextSize(text, rect.w, ui.dp(10.0f), ui.dp(8.0f));
-        muiDrawTextAligned(text, rect, size, theme.textDim, MuiAlign::Start, MuiAlign::End);
+        const MuiTheme& theme = muiTheme();
+        std::u32string game = muiDecodeUtf8(name.c_str());
+        std::u32string separator = U"  \u00B7  ";
+        std::u32string action = muiDecodeGameText(muiText(kTextChangeGame, "Change game"));
+        float margin = ui.dp(16.0f);
+        float padding = ui.dp(14.0f);
+        float height = ui.dp(38.0f);
+        float maxWidth = safe.w * 0.5f;
+        float size = muiFitTextSize(game + separator + action, maxWidth - padding * 2.0f, ui.dp(13.0f), ui.dp(10.0f));
+        float gameWidth = muiTextWidth(game, size);
+        float separatorWidth = muiTextWidth(separator, size);
+        float actionWidth = muiTextWidth(action, size);
+        float width = gameWidth + separatorWidth + actionWidth + padding * 2.0f;
+        MuiRect rect = { safe.right() - margin - width, safe.bottom() - margin - height, width, height };
+
+        bool pressed = false;
+        if (ui.touchable("mainmenu.games", rect, &pressed)) {
+            gameCardOpenGames();
+        }
+        muiFillRoundRect(rect, ui.dp(theme.radius), pressed ? theme.buttonPressed : theme.panel.withAlpha(235));
+        muiStrokeRoundRect(rect, ui.dp(theme.radius), ui.dp(1.0f), pressed ? theme.accent : theme.panelBorder);
+        float x = rect.x + padding;
+        muiDrawTextAligned(game, { x, rect.y, gameWidth, rect.h }, size, theme.buttonText, MuiAlign::Start, MuiAlign::Center);
+        x += gameWidth;
+        muiDrawTextAligned(separator, { x, rect.y, separatorWidth, rect.h }, size, theme.textDim, MuiAlign::Start, MuiAlign::Center);
+        x += separatorWidth;
+        muiDrawTextAligned(action, { x, rect.y, actionWidth, rect.h }, size, theme.accent, MuiAlign::Start, MuiAlign::Center);
     }
 
     MainMenuScreen* gMainMenuScreen = nullptr;

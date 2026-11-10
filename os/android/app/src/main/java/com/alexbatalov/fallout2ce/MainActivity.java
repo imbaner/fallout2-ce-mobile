@@ -65,6 +65,19 @@ public class MainActivity extends SDLActivity {
             watchHandler.postDelayed(this, WATCH_INTERVAL_MS);
         }
     };
+    // The list of games or the import screen closes the game (GameProcess):
+    // as on Exit, the marks of the run removed.
+    private final BroadcastReceiver closeReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            try {
+                nativeClosing();
+            } catch (UnsatisfiedLinkError ignored) {
+                // The game didn't start.
+            }
+            finish();
+        }
+    };
     private final BroadcastReceiver updateReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -113,22 +126,61 @@ public class MainActivity extends SDLActivity {
         registerUpdateReceiver();
         super.onCreate(savedInstanceState);
 
-        // Without the game's files (or copied in part): the import screen.
-        if (!GameImport.isInstalled(gameFolder)) {
-            final Intent intent = new Intent(this, ImportActivity.class);
-            startActivity(intent);
-
+        // Not this game: the list of games (the game failed at its last
+        // start, or isn't there while others are), or the import screen
+        // (no game at all, or copied in part).
+        Intent other = otherScreen(gameFolder);
+        if (other != null) {
+            startActivity(other);
             noExit = true;
             finish();
+            return;
         }
+
+        // Played now (the list of games: the one played last first).
+        try {
+            Games.setCurrent(this, game.id);
+        } catch (IOException e) {
+            Log.w(TAG, "start not counted", e);
+        }
+
+        // A start under way until the game's menu (game_card.cc removes it).
+        File starting = Games.startingMark(this);
+        try (OutputStream out = new FileOutputStream(starting)) {
+            out.write((game.id + "\n").getBytes(StandardCharsets.UTF_8));
+        } catch (IOException e) {
+            Log.w(TAG, "start not marked", e);
+        }
+    }
+
+    // Where to go instead of the game, null: the game.
+    private Intent otherScreen(File gameFolder) {
+        boolean failed = Games.startingMark(this).isFile();
+        boolean installed = GameImport.isInstalled(gameFolder);
+        if (failed || !installed) {
+            try {
+                if (!Games.list(this).isEmpty()) {
+                    return new Intent(this, GamesActivity.class).putExtra(GamesActivity.FAILED, failed && installed ? game.id : null);
+                }
+            } catch (IOException e) {
+                Log.w(TAG, "no list of games", e);
+            }
+        }
+        return installed ? null : new Intent(this, ImportActivity.class);
     }
 
     @SuppressLint("UnspecifiedRegisterReceiverFlag") // Signature permission on all APIs, private flag on 33+.
     private void registerUpdateReceiver() {
         IntentFilter filter = new IntentFilter(UpdateManager.INSTALL_ACTION);
-        String permission = getPackageName() + ".UPDATE_INSTALL";
-        if (Build.VERSION.SDK_INT >= 33) registerReceiver(updateReceiver, filter, permission, null, RECEIVER_NOT_EXPORTED);
-        else registerReceiver(updateReceiver, filter, permission, null);
+        IntentFilter close = new IntentFilter(GameProcess.closeAction(this));
+        String permission = GameProcess.permission(this);
+        if (Build.VERSION.SDK_INT >= 33) {
+            registerReceiver(updateReceiver, filter, permission, null, RECEIVER_NOT_EXPORTED);
+            registerReceiver(closeReceiver, close, permission, null, RECEIVER_NOT_EXPORTED);
+        } else {
+            registerReceiver(updateReceiver, filter, permission, null);
+            registerReceiver(closeReceiver, close, permission, null);
+        }
     }
 
     // The engine's own data (ce.dat, a folder in the app's assets, see
@@ -209,6 +261,7 @@ public class MainActivity extends SDLActivity {
     @Override
     protected void onDestroy() {
         unregisterReceiver(updateReceiver);
+        unregisterReceiver(closeReceiver);
         super.onDestroy();
 
         if (!noExit) {
@@ -380,6 +433,30 @@ public class MainActivity extends SDLActivity {
 
     public String gameDataFolder() {
         return game != null ? game.data.getAbsolutePath() : null;
+    }
+
+    // Called from native code (game_card.cc): the game's name in the list
+    // of games (the main menu's button to it).
+    public String gameName() {
+        if (game == null) {
+            return null;
+        }
+        try {
+            for (Games.Info info : Games.list(this)) {
+                if (info.game.id.equals(game.id)) {
+                    return Games.displayName(this, info);
+                }
+            }
+        } catch (IOException e) {
+            Log.w(TAG, "no list of games", e);
+        }
+        return getString(R.string.games_unnamed, game.id);
+    }
+
+    // Called from native code (game_card.cc, the main menu): the list of
+    // games over the game (paused behind; back returns to it).
+    public void openGames() {
+        runOnUiThread(() -> startActivity(new Intent(this, GamesActivity.class).putExtra(GamesActivity.FROM_GAME, game.id)));
     }
 
     // Called from native code (mui_preferences.cc, "Game files"): the app's

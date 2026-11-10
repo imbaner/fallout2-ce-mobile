@@ -14,4 +14,12 @@
     <color name="import_button_text">#CFFFD0</color>
     <color name="import_button_primary">#3F9A4C</color>
     <color name="import_button_primary_text">#041006</color>
+    <color name="import_danger">#1A0E0C</color>
+    <color name="import_danger_pressed">#3A1A16</color>
+    <color name="import_danger_border">#8A3A30</color>
+    <color name="import_danger_text">#FF9A8C</color>
+    <color name="games_selected">#16301D</color>
+    <color name="games_thumb_border">#2B5233</color>
+    <color name="games_cover_text">#CFFFD0</color>
+    <color name="games_cover_text_dim">#9CCB9C</color>
 </resources>

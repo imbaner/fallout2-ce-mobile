@@ -130,6 +130,9 @@ SDL_Texture* muiArtTexture(const FrmId& frmId, int frame, int* width, int* heigh
 // Painted picture (portraits, menu art) as `muiArtTexture` (first frame),
 // smooth scaling: it's shown much larger than drawn.
 SDL_Texture* muiPictureTexture(const FrmId& frmId, int* width, int* height);
+// The same picture's pixels (RGBA, opaque) in the current palette, for a
+// file of it (game_card.h).
+bool muiPictureRgba(const FrmId& frmId, std::vector<unsigned char>& rgba, int* width, int* height);
 // Line drawing (skilldex pictures: dark ink on paper) as a white texture of
 // the ink only, drawn tinted with `muiDrawTexture`; smooth scaling.
 SDL_Texture* muiLineArtTexture(const FrmId& frmId, int* width, int* height);

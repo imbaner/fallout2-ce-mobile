@@ -74,4 +74,46 @@
     <string name="saves_exported">Done, saves exported: %d.</string>
     <string name="import_removed_from">Removed from: %s</string>
     <string name="import_back_to_game">Back to the game</string>
+    <!-- The list of games (GamesActivity). -->
+    <string name="games_add">Add game</string>
+    <string name="games_delete">Delete</string>
+    <string name="games_details">Details</string>
+    <string name="games_play">Play</string>
+    <string name="games_back">Back</string>
+    <string name="games_running">Running</string>
+    <string name="games_unnamed">Game %s</string>
+    <string name="games_played_today">Today, %s</string>
+    <string name="games_played_yesterday">Yesterday, %s</string>
+    <string name="games_never_played">Not started yet</string>
+    <string name="games_picture_later">The picture appears after the first start</string>
+    <string name="games_last_save">Last save: %s</string>
+    <string name="games_no_saves">No saves yet</string>
+    <plurals name="games_saves">
+        <item quantity="one">%d save</item>
+        <item quantity="other">%d saves</item>
+    </plurals>
+    <string name="games_mods_none">Mods: none</string>
+    <string name="games_mods_one">Mods: %s</string>
+    <string name="games_mods_more">Mods: %1$s and %2$d more</string>
+    <string name="games_add_text">Choose the folder or archive (.zip, .7z, .rar) of a game: Fallout 2, a mod for it, or a game of its own on its engine, such as Sonora or Nevada. Its saves come with it.</string>
+    <string name="games_add_note">You need your own copy of the game. Each game is a folder of its own on the device.</string>
+    <string name="games_delete_title">Delete «%s»?</string>
+    <string name="games_delete_text">The game\'s files (%1$s) and %2$s will be deleted from the device. They can\'t be brought back.</string>
+    <string name="games_delete_note">You can export the saves as one archive first.</string>
+    <string name="games_export_saves">Export saves</string>
+    <string name="games_cancel">Cancel</string>
+    <string name="games_rename">Rename</string>
+    <string name="games_rename_title">Name of the game</string>
+    <string name="games_save">Save</string>
+    <string name="games_replace">Replace files</string>
+    <string name="games_label_saves">Saves</string>
+    <string name="games_label_size">Size</string>
+    <string name="games_label_language">Language</string>
+    <string name="games_label_added">Added</string>
+    <string name="games_label_played">Started</string>
+    <string name="games_mods_title">Mods · %d</string>
+    <string name="games_failed_title">«%s» didn\'t start</string>
+    <string name="games_failed_text">Last time the game stopped before its main menu. Choose a game, or try it again with Play.</string>
+    <string name="games_ok">OK</string>
+    <string name="games_failed_action">Something went wrong. Try again.</string>
 </resources>

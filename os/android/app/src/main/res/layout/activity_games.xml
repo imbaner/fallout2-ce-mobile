@@ -1,0 +1,343 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The list of games (GamesActivity): the games at the left (the one played
+     last first, "Add game" under them), the chosen one's card at the right;
+     its details on a page of their own. Laid out as the game's save screen;
+     on tablets one window in the middle (GamesActivity.layoutWindow). -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/games_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/import_background">
+
+    <FrameLayout
+        android:id="@+id/games_window"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_gravity="center"
+        android:padding="10dp">
+
+        <!-- The list and the card. -->
+        <LinearLayout
+            android:id="@+id/games_page"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="horizontal">
+
+            <LinearLayout
+                android:id="@+id/games_left"
+                android:layout_width="312dp"
+                android:layout_height="match_parent"
+                android:orientation="vertical">
+
+                <ScrollView
+                    android:id="@+id/games_scroll"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/import_panel"
+                    android:fadeScrollbars="false"
+                    android:padding="6dp"
+                    android:scrollbarStyle="outsideOverlay">
+
+                    <LinearLayout
+                        android:id="@+id/games_list"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical" />
+                </ScrollView>
+
+                <Button
+                    android:id="@+id/games_add"
+                    android:layout_width="match_parent"
+                    android:layout_height="44dp"
+                    android:layout_marginTop="8dp"
+                    android:background="@drawable/import_button"
+                    android:drawableStart="@drawable/games_plus"
+                    android:paddingStart="96dp"
+                    android:paddingEnd="96dp"
+                    android:text="@string/games_add"
+                    android:textAllCaps="false"
+                    android:textColor="@color/import_button_text"
+                    android:textSize="15sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/games_card"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:background="@drawable/import_panel"
+                android:orientation="vertical"
+                android:padding="8dp">
+
+                <!-- The game's picture with its name and lines over it (phones);
+                     on tablets the picture alone, 4:3, the rest under it. -->
+                <FrameLayout
+                    android:id="@+id/games_cover"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/games_frame"
+                    android:padding="1dp">
+
+                    <com.alexbatalov.fallout2ce.CoverImageView
+                        android:id="@+id/games_picture"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:importantForAccessibility="no"
+                        android:scaleType="matrix" />
+
+                    <LinearLayout
+                        android:id="@+id/games_no_picture"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:gravity="center"
+                        android:orientation="vertical"
+                        android:visibility="gone">
+
+                        <ImageView
+                            android:layout_width="40dp"
+                            android:layout_height="40dp"
+                            android:importantForAccessibility="no"
+                            android:src="@drawable/games_picture" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:text="@string/games_picture_later"
+                            android:textColor="@color/import_text_dim"
+                            android:textSize="12sp" />
+                    </LinearLayout>
+
+                    <View
+                        android:id="@+id/games_shade_top"
+                        android:layout_width="match_parent"
+                        android:layout_height="64dp"
+                        android:layout_gravity="top"
+                        android:background="@drawable/games_shade_top" />
+
+                    <View
+                        android:id="@+id/games_shade_bottom"
+                        android:layout_width="match_parent"
+                        android:layout_height="130dp"
+                        android:layout_gravity="bottom"
+                        android:background="@drawable/games_shade_bottom" />
+                </FrameLayout>
+
+                <TextView
+                    android:id="@+id/games_name"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:maxLines="2"
+                    android:shadowColor="#000000"
+                    android:shadowRadius="4"
+                    android:textColor="@color/import_accent"
+                    android:textSize="20sp" />
+
+                <LinearLayout
+                    android:id="@+id/games_info"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/games_last"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:ellipsize="end"
+                        android:shadowColor="#000000"
+                        android:shadowRadius="3"
+                        android:singleLine="true"
+                        android:textColor="@color/games_cover_text"
+                        android:textSize="13sp" />
+
+                    <TextView
+                        android:id="@+id/games_stats"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:ellipsize="end"
+                        android:shadowColor="#000000"
+                        android:shadowRadius="3"
+                        android:singleLine="true"
+                        android:textColor="@color/games_cover_text_dim"
+                        android:textSize="12sp" />
+
+                    <TextView
+                        android:id="@+id/games_mods"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:ellipsize="end"
+                        android:shadowColor="#000000"
+                        android:shadowRadius="3"
+                        android:singleLine="true"
+                        android:textColor="@color/games_cover_text_dim"
+                        android:textSize="12sp" />
+                </LinearLayout>
+
+                <View
+                    android:id="@+id/games_spare"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="0"
+                    android:visibility="gone" />
+
+                <LinearLayout
+                    android:id="@+id/games_actions"
+                    android:layout_width="match_parent"
+                    android:layout_height="39dp"
+                    android:layout_marginTop="6dp"
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/games_delete"
+                        android:layout_width="104dp"
+                        android:layout_height="match_parent"
+                        android:background="@drawable/import_button_danger"
+                        android:text="@string/games_delete"
+                        android:textAllCaps="false"
+                        android:textColor="@color/import_danger_text"
+                        android:textSize="14sp" />
+
+                    <Button
+                        android:id="@+id/games_details"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_marginStart="6dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/import_button"
+                        android:text="@string/games_details"
+                        android:textAllCaps="false"
+                        android:textColor="@color/import_button_text"
+                        android:textSize="14sp" />
+
+                    <Button
+                        android:id="@+id/games_play"
+                        android:layout_width="140dp"
+                        android:layout_height="match_parent"
+                        android:layout_marginStart="6dp"
+                        android:background="@drawable/import_button_primary"
+                        android:text="@string/games_play"
+                        android:textAllCaps="false"
+                        android:textColor="@color/import_button_primary_text"
+                        android:textSize="15sp" />
+                </LinearLayout>
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- The chosen game's details: all it has, the rare actions. -->
+        <LinearLayout
+            android:id="@+id/games_details_page"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="horizontal"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:id="@+id/games_details_left"
+                android:layout_width="312dp"
+                android:layout_height="match_parent"
+                android:background="@drawable/import_panel"
+                android:orientation="vertical"
+                android:padding="8dp">
+
+                <ImageView
+                    android:id="@+id/games_details_picture"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:adjustViewBounds="true"
+                    android:background="@drawable/games_frame"
+                    android:importantForAccessibility="no"
+                    android:padding="1dp"
+                    android:scaleType="fitCenter" />
+
+                <TextView
+                    android:id="@+id/games_details_name"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:textColor="@color/import_accent"
+                    android:textSize="18sp" />
+
+                <TextView
+                    android:id="@+id/games_details_version"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/import_text_dim"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:background="@drawable/import_panel"
+                android:orientation="vertical"
+                android:paddingStart="12dp"
+                android:paddingTop="8dp"
+                android:paddingEnd="12dp"
+                android:paddingBottom="8dp">
+
+                <ScrollView
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:fadeScrollbars="false"
+                    android:scrollbarStyle="outsideOverlay">
+
+                    <LinearLayout
+                        android:id="@+id/games_details_info"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical" />
+                </ScrollView>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="39dp"
+                    android:layout_marginTop="6dp"
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/games_rename"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:background="@drawable/import_button"
+                        android:text="@string/games_rename"
+                        android:textAllCaps="false"
+                        android:textColor="@color/import_button_text"
+                        android:textSize="14sp" />
+
+                    <Button
+                        android:id="@+id/games_replace"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_marginStart="6dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/import_button"
+                        android:text="@string/games_replace"
+                        android:textAllCaps="false"
+                        android:textColor="@color/import_button_text"
+                        android:textSize="14sp" />
+                </LinearLayout>
+            </LinearLayout>
+        </LinearLayout>
+    </FrameLayout>
+
+    <!-- Back: to the game (opened from it), or from the details. The game's
+         back button, at the top right; beside the window on tablets. -->
+    <ImageButton
+        android:id="@+id/games_back"
+        android:layout_width="52dp"
+        android:layout_height="52dp"
+        android:layout_gravity="top|end"
+        android:layout_margin="10dp"
+        android:background="@drawable/import_button"
+        android:contentDescription="@string/games_back"
+        android:src="@drawable/import_back"
+        android:visibility="gone" />
+</FrameLayout>
