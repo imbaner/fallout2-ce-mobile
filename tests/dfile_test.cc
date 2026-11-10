@@ -162,8 +162,20 @@ int main()
     char piece[64];
     CHECK(dfileRead(piece, 1, sizeof(piece), plain) == sizeof(piece));
     CHECK(memcmp(piece, entries[0].data.data() + 60000, sizeof(piece)) == 0);
-    // Back to the start. (A second seek elsewhere in a plain entry goes wrong
-    // in CE itself: dfileSeek moves the stream, not `position`.)
+    // Seeks one after another in a plain entry (dfileSeek once moved the
+    // stream, not `position`: the second went wrong), back and forth, from
+    // the current position and the end; tell; a read stops at the end.
+    CHECK(dfileSeek(plain, 10, SEEK_SET) == 0);
+    CHECK(dfileTell(plain) == 10);
+    CHECK(dfileRead(piece, 1, sizeof(piece), plain) == sizeof(piece));
+    CHECK(memcmp(piece, entries[0].data.data() + 10, sizeof(piece)) == 0);
+    CHECK(dfileSeek(plain, 1000, SEEK_CUR) == 0);
+    CHECK(dfileTell(plain) == 10 + 64 + 1000);
+    CHECK(dfileRead(piece, 1, sizeof(piece), plain) == sizeof(piece));
+    CHECK(memcmp(piece, entries[0].data.data() + 1074, sizeof(piece)) == 0);
+    CHECK(dfileSeek(plain, -100, SEEK_END) == 0);
+    std::string tail = readAll(plain);
+    CHECK(tail == entries[0].data.substr(entries[0].data.size() - 100));
     CHECK(dfileSeek(plain, 0, SEEK_SET) == 0);
     CHECK(dfileRead(piece, 1, sizeof(piece), plain) == sizeof(piece));
     CHECK(memcmp(piece, entries[0].data.data(), sizeof(piece)) == 0);
