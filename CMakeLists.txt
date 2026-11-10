@@ -935,4 +935,7 @@ if(UNIX AND NOT ANDROID AND NOT IOS AND NOT CMAKE_SYSTEM_NAME MATCHES "Emscripte
     target_link_libraries(platform_compat_test ${ZLIB_LIBRARIES} ${SDL2_LIBRARIES})
     ce_add_test(dfile_test "src/dfile.cc" "src/platform_compat.cc")
     target_link_libraries(dfile_test fpattern_windows::fpattern_windows ${ZLIB_LIBRARIES} ${SDL2_LIBRARIES})
+    ce_add_test(sfall_global_vars_test "src/sfall_global_vars.cc")
+    target_compile_options(sfall_global_vars_test PRIVATE -fsanitize=alignment -fno-sanitize-recover=alignment)
+    target_link_options(sfall_global_vars_test PRIVATE -fsanitize=alignment)
 endif()
