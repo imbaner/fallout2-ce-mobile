@@ -526,15 +526,9 @@ final class GameFiles {
         }
     }
 
+    // Names as bytes (FileTree): a name Java can't read doesn't stop it.
     static void deleteRecursively(File file) {
-        File[] children = file.listFiles();
-        if (children != null) {
-            for (File child : children) {
-                deleteRecursively(child);
-            }
-        }
-        //noinspection ResultOfMethodCallIgnored
-        file.delete();
+        FileTree.delete(file);
     }
 
     // The new game's config with the player's settings of the old one:

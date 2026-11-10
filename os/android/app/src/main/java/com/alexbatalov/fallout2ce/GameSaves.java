@@ -984,15 +984,7 @@ final class GameSaves {
     }
 
     private static long sizeOf(File file) {
-        File[] children = file.listFiles();
-        if (children == null) {
-            return file.length();
-        }
-        long size = 0;
-        for (File child : children) {
-            size += sizeOf(child);
-        }
-        return size;
+        return FileTree.size(file);
     }
 
     private static String baseName(String path) {

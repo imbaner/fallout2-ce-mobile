@@ -647,7 +647,8 @@ if(FALLOUT_VENDORED AND (NOT IOS) AND (NOT WIN32) AND (NOT CMAKE_SYSTEM_NAME MAT
     set_target_properties(import_archive PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
     if(ANDROID)
-        add_library(fallout2-import SHARED "src/import_archive_jni.cc" "src/save_composition.cc")
+        add_library(fallout2-import SHARED "src/import_archive_jni.cc" "src/save_composition.cc"
+            "src/file_tree.cc" "src/file_tree_jni.cc")
         target_link_libraries(fallout2-import PRIVATE import_archive)
         # Only the JNI functions (JNIEXPORT) are needed from outside.
         set_target_properties(fallout2-import PROPERTIES
@@ -929,6 +930,7 @@ if(UNIX AND NOT ANDROID AND NOT IOS AND NOT CMAKE_SYSTEM_NAME MATCHES "Emscripte
 
     ce_add_test(save_catalog_test "src/save_catalog.cc" "src/save_records.cc" "src/save_storage.cc")
     ce_add_test(sound_tempo_test "src/sound_tempo.cc")
+    ce_add_test(file_tree_test "src/file_tree.cc")
     ce_add_test(platform_compat_test "src/platform_compat.cc")
     target_link_libraries(platform_compat_test ${ZLIB_LIBRARIES} ${SDL2_LIBRARIES})
     ce_add_test(dfile_test "src/dfile.cc" "src/platform_compat.cc")
