@@ -50,6 +50,8 @@ static ZipSignature dbaseCheckZipSignature(FILE* stream);
 static bool dfileDecompressInit(z_streamp stream, DBaseFormat format, unsigned char* buffer);
 static bool dbaseParseZip(DBase* dbase, FILE* stream, int& errorFlags);
 static DFile* dfileOpenInternal(DBase* dbase, const char* filename, const char* mode, DFile* dfile);
+static FILE* dbaseTakeStream(DBase* dbase);
+static void dbaseReturnStream(DBase* dbase, FILE* stream);
 static int dfileReadCharInternal(DFile* stream);
 static bool dfileReadCompressed(DFile* stream, void* ptr, size_t size);
 static void dfileUngetCompressed(DFile* stream, int ch);
@@ -217,6 +219,10 @@ bool dbaseClose(DBase* dbase)
         curr = next;
     }
 
+    while (dbase->idleStreamsLength > 0) {
+        fclose(dbase->idleStreams[--dbase->idleStreamsLength]);
+    }
+
     if (dbase->entries != nullptr) {
         for (int index = 0; index < dbase->entriesLength; index++) {
             DBaseEntry* entry = &(dbase->entries[index]);
@@ -309,7 +315,7 @@ int dfileClose(DFile* stream)
     }
 
     if (stream->stream != nullptr) {
-        fclose(stream->stream);
+        dbaseReturnStream(stream->dbase, stream->stream);
     }
 
     // Loop thru open file handles and find previous to remove current handle
@@ -958,7 +964,7 @@ static DFile* dfileOpenInternal(DBase* dbase, const char* filePath, const char* 
         }
 
         if (dfile->stream != nullptr) {
-            fclose(dfile->stream);
+            dbaseReturnStream(dbase, dfile->stream);
             dfile->stream = nullptr;
         }
 
@@ -969,8 +975,8 @@ static DFile* dfileOpenInternal(DBase* dbase, const char* filePath, const char* 
 
     dfile->entry = entry;
 
-    // Open stream to .DAT file.
-    dfile->stream = compat_fopen(dbase->path, "rb");
+    // Open stream to .DAT file (CE: one an entry closed earlier left).
+    dfile->stream = dbaseTakeStream(dbase);
     if (dfile->stream == nullptr) {
         goto err;
     }
@@ -1028,6 +1034,28 @@ err:
     }
 
     return nullptr;
+}
+
+// CE: A stream of [dbase]'s file: one a closed entry left (its position is
+// set by the caller, `fseek`), else opened.
+static FILE* dbaseTakeStream(DBase* dbase)
+{
+    if (dbase->idleStreamsLength > 0) {
+        return dbase->idleStreams[--dbase->idleStreamsLength];
+    }
+    return compat_fopen(dbase->path, "rb");
+}
+
+// CE: [stream] of [dbase]'s file no entry reads any more: kept for the next
+// one (a few), else closed.
+static void dbaseReturnStream(DBase* dbase, FILE* stream)
+{
+    if (dbase->idleStreamsLength < DBASE_IDLE_STREAMS) {
+        clearerr(stream);
+        dbase->idleStreams[dbase->idleStreamsLength++] = stream;
+    } else {
+        fclose(stream);
+    }
 }
 
 // 0x4E5F9C dfile_fgetc_helper

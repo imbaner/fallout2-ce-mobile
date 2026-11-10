@@ -929,4 +929,8 @@ if(UNIX AND NOT ANDROID AND NOT IOS AND NOT CMAKE_SYSTEM_NAME MATCHES "Emscripte
 
     ce_add_test(save_catalog_test "src/save_catalog.cc" "src/save_records.cc" "src/save_storage.cc")
     ce_add_test(sound_tempo_test "src/sound_tempo.cc")
+    ce_add_test(platform_compat_test "src/platform_compat.cc")
+    target_link_libraries(platform_compat_test ${ZLIB_LIBRARIES} ${SDL2_LIBRARIES})
+    ce_add_test(dfile_test "src/dfile.cc" "src/platform_compat.cc")
+    target_link_libraries(dfile_test fpattern_windows::fpattern_windows ${ZLIB_LIBRARIES} ${SDL2_LIBRARIES})
 endif()

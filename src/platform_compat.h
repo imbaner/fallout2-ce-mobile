@@ -32,6 +32,12 @@ void compat_makepath(char* path, const char* drive, const char* dir, const char*
 long compat_tell(int fileHandle);
 long compat_filelength(int fd);
 // Invalidate case-insensitive lookups after native save-directory transactions.
+// CE: The cache also answers misses (a name its directory's listing hasn't,
+// a directory found missing) without asking the storage - everywhere but
+// under SAVEGAME, which the save catalog changes with its own calls: a file
+// the game reads through these functions is made through them too (or the
+// cache is cleared after). A file put in the game's folder from outside while
+// it runs is seen after it starts again.
 void compatDirectoryEntryCacheClear();
 int compat_mkdir(const char* path);
 int compat_mkdir_recursive(const char* path);

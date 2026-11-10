@@ -9,6 +9,11 @@
 // POSIX / Win32 calls (the macOS 10.13 target has no std::filesystem).
 // Links are never followed: a link is reported as neither a directory nor a
 // regular file and removed as a link.
+//
+// Past the engine's file layer (platform_compat.cc): its cache of directories
+// doesn't see these changes. It answers misses from that cache everywhere but
+// under SAVEGAME, so what these calls write the engine reads through its
+// layer only there (or after `compatDirectoryEntryCacheClear`).
 namespace fallout::saveStorage {
 
 struct Info {

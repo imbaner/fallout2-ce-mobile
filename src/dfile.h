@@ -23,6 +23,9 @@ enum DBaseErrorFlags : int {
     DBASE_ERROR_UNSUPPORTED_METHOD = 1 << 6,
 };
 
+// CE: The most streams of an archive's file kept open for its entries.
+#define DBASE_IDLE_STREAMS 4
+
 typedef struct DBase DBase;
 typedef struct DBaseEntry DBaseEntry;
 typedef struct DFile DFile;
@@ -46,6 +49,13 @@ typedef struct DBase {
 
     // The head of linked list of open file handles.
     DFile* dfileHead;
+
+    // CE: Streams of the archive's file its closed entries left open, for the
+    // next ones (`dfileOpen`): opening the file again costs a request to the
+    // storage for every entry read, slow where it isn't local (Android's
+    // shared storage).
+    FILE* idleStreams[DBASE_IDLE_STREAMS];
+    int idleStreamsLength;
 } DBase;
 
 typedef struct DBaseEntry {

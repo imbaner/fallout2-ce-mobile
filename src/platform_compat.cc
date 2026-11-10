@@ -1,9 +1,11 @@
 #include "platform_compat.h"
 
+#include <errno.h>
 #include <string.h>
 
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 
 #ifdef _WIN32
 #include <direct.h>
@@ -49,6 +51,9 @@ typedef struct CompatDirectoryCacheEntry {
 
 static constexpr size_t kCompatDirectoryEntryCacheMaxSize = 1024;
 static std::unordered_map<std::string, CompatDirectoryCacheEntry> compatDirectoryEntryCache;
+// CE: Directories found missing (a game's data/art, data/proto... when all of
+// it is in its archives): not looked for again until one is made here.
+static std::unordered_set<std::string> compatMissingDirectories;
 
 static std::string compatLowercase(std::string value)
 {
@@ -61,6 +66,28 @@ static std::string compatLowercase(std::string value)
 void compatDirectoryEntryCacheClear()
 {
     compatDirectoryEntryCache.clear();
+    compatMissingDirectories.clear();
+}
+
+// CE: [path] from the root: the cache's keys (the engine changes the working
+// directory for a while to make one, xfile.cc `xbaseMakeDirectory`).
+static std::string compatAbsolutePath(const std::string& path)
+{
+    if (!path.empty() && path[0] == '/') {
+        return path;
+    }
+    char workingDirectory[COMPAT_MAX_PATH];
+    if (getcwd(workingDirectory, sizeof(workingDirectory)) == nullptr) {
+        return path;
+    }
+    std::string absolute = workingDirectory;
+    if (path.empty() || path == ".") {
+        return absolute;
+    }
+    if (absolute.empty() || absolute.back() != '/') {
+        absolute += '/';
+    }
+    return absolute + (path.compare(0, 2, "./") == 0 ? path.substr(2) : path);
 }
 
 static const CompatDirectoryCacheEntry* compatDirectoryEntryCacheGet(const std::string& directoryPath)
@@ -69,9 +96,18 @@ static const CompatDirectoryCacheEntry* compatDirectoryEntryCacheGet(const std::
     if (existing != compatDirectoryEntryCache.end()) {
         return &(existing->second);
     }
+    if (compatMissingDirectories.count(directoryPath) != 0) {
+        return nullptr;
+    }
 
     DIR* dir = opendir(directoryPath.c_str());
     if (dir == nullptr) {
+        if (errno == ENOENT || errno == ENOTDIR) {
+            if (compatMissingDirectories.size() >= kCompatDirectoryEntryCacheMaxSize) {
+                compatMissingDirectories.clear();
+            }
+            compatMissingDirectories.insert(directoryPath);
+        }
         return nullptr;
     }
 
@@ -100,7 +136,7 @@ static const CompatDirectoryCacheEntry* compatDirectoryEntryCacheGet(const std::
 // time made the next path re-list every directory from the root.
 static void compatDirectoryEntryCacheUpdate(const char* nativePath, bool exists)
 {
-    std::string path(nativePath);
+    std::string path = compatAbsolutePath(nativePath);
     while (path.size() > 1 && path.back() == '/') {
         path.pop_back();
     }
@@ -117,6 +153,17 @@ static void compatDirectoryEntryCacheUpdate(const char* nativePath, bool exists)
 
     if (!exists) {
         compatDirectoryEntryCache.erase(path);
+    } else if (!compatMissingDirectories.empty()) {
+        // It and the directories above it are there now.
+        std::string made = path;
+        while (!made.empty()) {
+            compatMissingDirectories.erase(made);
+            size_t above = made.find_last_of('/');
+            if (above == std::string::npos || above == 0) {
+                break;
+            }
+            made.resize(above);
+        }
     }
 
     auto directory = compatDirectoryEntryCache.find(parent);
@@ -140,12 +187,21 @@ static void compatDirectoryEntryCacheUpdate(const char*, bool)
 }
 #endif
 
-static void compat_prepare_native_path(char* nativePath, const char* path)
+static bool compatResolvePath(char* path);
+
+// [path] made native and resolved (`compat_resolve_path`). True: it is known
+// not to be there, the storage needn't be asked (a miss costs a request where
+// it isn't local: Android's shared storage). Not so under SAVEGAME: the save
+// catalog changes it with its own calls (save_storage.cc).
+static bool compat_prepare_native_path(char* nativePath, const char* path)
 {
     strncpy(nativePath, path, COMPAT_MAX_PATH - 1);
     nativePath[COMPAT_MAX_PATH - 1] = '\0';
     compat_windows_path_to_native(nativePath);
-    compat_resolve_path(nativePath);
+    if (compatResolvePath(nativePath)) {
+        return false;
+    }
+    return SDL_strcasestr(nativePath, "savegame") == nullptr;
 }
 
 int compat_stricmp(const char* string1, const char* string2)
@@ -366,7 +422,9 @@ int compat_mkdir_recursive(const char* path)
 bool compat_is_dir(const char* path)
 {
     char nativePath[COMPAT_MAX_PATH];
-    compat_prepare_native_path(nativePath, path);
+    if (compat_prepare_native_path(nativePath, path)) {
+        return false;
+    }
 
 #ifdef _WIN32
     struct _stat info;
@@ -386,7 +444,9 @@ bool compat_is_dir(const char* path)
 bool compat_file_exists(const char* filePath)
 {
     char nativePath[COMPAT_MAX_PATH];
-    compat_prepare_native_path(nativePath, filePath);
+    if (compat_prepare_native_path(nativePath, filePath)) {
+        return false;
+    }
 
 #ifdef _WIN32
     struct _stat info;
@@ -417,7 +477,10 @@ unsigned int compat_timeGetTime()
 FILE* compat_fopen(const char* path, const char* mode)
 {
     char nativePath[COMPAT_MAX_PATH];
-    compat_prepare_native_path(nativePath, path);
+    if (compat_prepare_native_path(nativePath, path) && !compatFileModeMayWrite(mode)) {
+        errno = ENOENT;
+        return nullptr;
+    }
 
     FILE* stream = fopen(nativePath, mode);
     if (compatFileModeMayWrite(mode) && stream != nullptr) {
@@ -429,7 +492,10 @@ FILE* compat_fopen(const char* path, const char* mode)
 gzFile compat_gzopen(const char* path, const char* mode)
 {
     char nativePath[COMPAT_MAX_PATH];
-    compat_prepare_native_path(nativePath, path);
+    if (compat_prepare_native_path(nativePath, path) && !compatFileModeMayWrite(mode)) {
+        errno = ENOENT;
+        return nullptr;
+    }
 
     gzFile stream = gzopen(nativePath, mode);
     if (compatFileModeMayWrite(mode) && stream != nullptr) {
@@ -471,7 +537,10 @@ char* compat_gzgets(gzFile stream, char* buffer, int maxCount)
 int compat_remove(const char* path)
 {
     char nativePath[COMPAT_MAX_PATH];
-    compat_prepare_native_path(nativePath, path);
+    if (compat_prepare_native_path(nativePath, path)) {
+        errno = ENOENT;
+        return -1;
+    }
     int rc = remove(nativePath);
     if (rc == 0) {
         compatDirectoryEntryCacheUpdate(nativePath, false);
@@ -510,14 +579,26 @@ void compat_windows_path_to_native(char* path)
 
 void compat_resolve_path(char* path)
 {
+    compatResolvePath(path);
+}
+
 #ifndef _WIN32
+// CE: [path]'s components in their directories' case. False: one of them is
+// known not to be there (its directory's listing hasn't it, or that
+// directory is missing) - the path isn't (nothing outside these functions
+// changes the game's directories while it runs, except the saves').
+static bool compatResolvePath(char* path)
+{
     char* pch = path;
+    // Keys from the root: a relative path from the working directory.
+    std::string base;
     std::string directoryPath;
     if (pch[0] == '/') {
         directoryPath = "/";
         pch++;
     } else {
-        directoryPath = ".";
+        base = compatAbsolutePath(".");
+        directoryPath = base;
     }
 
     while (true) {
@@ -539,13 +620,13 @@ void compat_resolve_path(char* path)
 
         const CompatDirectoryCacheEntry* directoryCacheEntry = compatDirectoryEntryCacheGet(directoryPath);
         if (directoryCacheEntry == nullptr) {
-            break;
+            return compatMissingDirectories.count(directoryPath) == 0;
         }
 
         std::string component(pch, length);
         auto cacheEntry = directoryCacheEntry->entries.find(compatLowercase(component));
         if (cacheEntry == directoryCacheEntry->entries.end()) {
-            break;
+            return false;
         }
 
         strncpy(pch, cacheEntry->second.c_str(), length);
@@ -555,18 +636,27 @@ void compat_resolve_path(char* path)
         }
 
         *sep = '\0';
-        directoryPath = path;
+        directoryPath = base.empty() ? std::string(path) : base + "/" + path;
         *sep = '/';
 
         pch = sep + 1;
     }
-#endif
+    return true;
 }
+#else
+static bool compatResolvePath(char*)
+{
+    return true;
+}
+#endif
 
 int compat_access(const char* path, int mode)
 {
     char nativePath[COMPAT_MAX_PATH];
-    compat_prepare_native_path(nativePath, path);
+    if (compat_prepare_native_path(nativePath, path)) {
+        errno = ENOENT;
+        return -1;
+    }
     return access(nativePath, mode);
 }
 
