@@ -168,7 +168,7 @@ namespace {
         // Item columns: player's, offer 1, request 1, trader's as many as
         // the player's - as many as keep the cells nearest every screen's
         // size. A list is its cells with gaps between them and around.
-        tall = muiIsTallContent(ui, content);
+        tall = muiIsTallContent(ui);
         float cellGap = ui.dp(tall ? 5.0f : 4.0f);
         float groupGap = ui.dp(tall ? 10.0f : 8.0f);
         auto cellFor = [&](int sideColumns) {

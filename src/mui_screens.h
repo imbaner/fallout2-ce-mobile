@@ -63,10 +63,10 @@ MuiScreenFrame muiScreenFrame(MuiContext& ui, MuiColor background, bool overTitl
 // The same layout, nothing drawn (`tappedOutside` not set).
 MuiScreenFrame muiScreenFrameLayout(MuiContext& ui);
 
-// Room for the screens' tall layouts (the tablet windows' mockups, 7"
-// tablets too) - in windows only; smaller areas and screens covering the
-// screen (phones) keep the compact ones.
-bool muiIsTallContent(MuiContext& ui, const MuiRect& content);
+// The screens' tall layouts (the tablet's, one part over another) rather
+// than the phone's (side by side): by the screen's room and shape
+// (`muiScreenPlan`), in a window or not.
+bool muiIsTallContent(MuiContext& ui);
 
 // Tab column outside [rect] at its top right (screens with a card of their
 // own size, the elevator).

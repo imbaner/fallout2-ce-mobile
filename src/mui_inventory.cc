@@ -317,7 +317,7 @@ namespace {
         }
 
         float gap = ui.dp(8.0f);
-        tall = muiIsTallContent(ui, content);
+        tall = muiIsTallContent(ui);
         if (tall) {
             // Items on the left; the character, armor and hands over the
             // summary on the right.

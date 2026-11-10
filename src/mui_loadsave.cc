@@ -412,7 +412,7 @@ namespace {
 
         // List at the left (under the save / load switch in game), details
         // up to the top at the right.
-        tall = muiIsTallContent(ui, content);
+        tall = muiIsTallContent(ui);
         float gap = ui.dp(tall ? 12.0f : 8.0f);
         float switchHeight = ui.dp(tall ? 48.0f : 38.0f);
         float listWidth = content.w * 0.44f - gap / 2.0f;

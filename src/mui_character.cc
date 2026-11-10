@@ -398,7 +398,7 @@ namespace {
             back();
         }
 
-        tall = muiIsTallContent(ui, content);
+        tall = muiIsTallContent(ui);
         float gap = ui.dp(tall ? 10.0f : 8.0f);
         float headerHeight = ui.dp(tall ? 44.0f : 32.0f);
         buildHeader(ui, { content.x, content.y, content.w, headerHeight });

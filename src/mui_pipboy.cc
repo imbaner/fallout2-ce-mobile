@@ -283,7 +283,7 @@ namespace {
 
         MuiRect content = frame.content;
         MuiRect tabs = frame.tabs;
-        tall = muiIsTallContent(ui, content);
+        tall = muiIsTallContent(ui);
 
         // While resting only the stop button takes touches.
         bool interactive = ui.isInteractive;

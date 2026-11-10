@@ -12,6 +12,7 @@
 #include "combat_defs.h"
 #include "mainmenu.h"
 #include "mui_draw.h"
+#include "mui_screen_plan.h"
 #include "obj_types.h"
 #include "touch.h"
 
@@ -38,21 +39,15 @@ constexpr bool muiIsEnabled() { return true; }
 bool muiIsEnabled();
 #endif
 
-// `[touch] windows`: game screens as windows on tablets (by the screen's
-// size), never, always.
-constexpr int kMuiWindowsAuto = 0;
-constexpr int kMuiWindowsNever = 1;
-constexpr int kMuiWindowsAlways = 2;
-
-// `[touch] layout`: game screens' layouts by the room (the roomy ones in
-// windows where they fit), the phone's, the roomy ones.
-constexpr int kMuiLayoutAuto = 0;
-constexpr int kMuiLayoutPhone = 1;
-constexpr int kMuiLayoutTablet = 2;
-
 // Game screens open as windows over the world instead of covering the
-// screen (`[touch] windows`).
+// screen (`muiScreenPlan`).
 bool muiUsesWindows();
+
+// How game screens show at the UI size [interfaceScale] (1 - 100%) with
+// [windows] and [layout] (`[touch]` settings) on this screen.
+MuiScreenPlan muiScreenPlanFor(float interfaceScale, int windows, int layout);
+// The same at the current settings.
+MuiScreenPlan muiCurrentScreenPlan();
 
 struct MuiTheme {
     MuiColor dim;
@@ -244,8 +239,11 @@ public:
     // before `dim` and after each screen's build.
     void drawScrollMarks();
 
-    // Internal state, filled by mui.cc.
+    // Internal state, filled by mui.cc. [pixelsPerDp]: the UI size's
+    // ([basePixelsPerDp]) for each screen; a game screen's window may draw
+    // smaller (`muiScreenFrameLayout`).
     float pixelsPerDp = 1.0f;
+    float basePixelsPerDp = 1.0f;
     MuiRect screen;
     MuiRect safe;
     bool isInteractive = false;

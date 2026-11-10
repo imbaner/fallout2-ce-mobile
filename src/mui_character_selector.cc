@@ -302,7 +302,7 @@ namespace {
         // Tablet windows (the window's mockup): the characters' tabs over the
         // whole width, the picture and the story at the left, one column of
         // stats with the buttons under it at the right.
-        tall = muiIsTallContent(ui, content);
+        tall = muiIsTallContent(ui);
         if (tall) {
             float tallGap = ui.dp(12.0f);
             MuiRect tabRect = { content.x, content.y, content.w, ui.dp(44.0f) };

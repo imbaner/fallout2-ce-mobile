@@ -27,18 +27,19 @@ namespace fallout {
 namespace {
 
     // Tab column of game screens, dp.
-    constexpr float kTabColumnWidthDp = 52.0f;
+    constexpr float kTabColumnWidthDp = screen_plan::kTabColumnWidthDp;
 
     // Game screen windows (`muiScreenFrame`), dp: the largest window (the
     // size the screens' tablet layouts are made for), the least margin to
-    // the screen's edges, the gap to the tab column outside, the strip
-    // past the tabs where a tap doesn't close the window (the tabs have no
-    // frame; the window's padding keeps its own buttons off its edge).
-    constexpr float kWindowWidthDp = 896.0f;
-    constexpr float kWindowHeightDp = 680.0f;
-    constexpr float kWindowPaddingDp = 14.0f;
-    constexpr float kWindowMarginDp = 24.0f;
-    constexpr float kWindowTabsGapDp = 12.0f;
+    // the screen's edges, the gap to the tab column outside (all of
+    // `muiScreenPlan`), the strip past the tabs where a tap doesn't close
+    // the window (the tabs have no frame; the window's padding keeps its
+    // own buttons off its edge).
+    constexpr float kWindowWidthDp = screen_plan::kWindowWidthDp;
+    constexpr float kWindowHeightDp = screen_plan::kWindowHeightDp;
+    constexpr float kWindowPaddingDp = screen_plan::kWindowPaddingDp;
+    constexpr float kWindowMarginDp = screen_plan::kWindowMarginDp;
+    constexpr float kWindowTabsGapDp = screen_plan::kWindowTabsGapDp;
     constexpr float kWindowRadiusDp = 12.0f;
     constexpr float kWindowTabsSlopDp = 8.0f;
     constexpr Uint8 kWindowAlpha = 247;
@@ -52,10 +53,6 @@ namespace {
     unsigned int gWindowShownTime = 0;
     unsigned int gWindowOpenTime = 0;
     bool gWindowContinued = false;
-
-    // Content area the screens' tall layouts need, dp.
-    constexpr float kTallMinWidthDp = 680.0f;
-    constexpr float kTallMinHeightDp = 440.0f;
 
     // Talk in windows: the left column (the speaker picture over the reply
     // or the party member's panel) at most, the party member's hands' item
@@ -234,7 +231,7 @@ namespace {
         // below it, the answers (review, party member settings) at the
         // right. Tablet windows (their mockups): a wider column, the picture
         // about 1.2 times the game's.
-        bool tall = muiIsTallContent(ui, content);
+        bool tall = muiIsTallContent(ui);
         MuiRect left;
         float headHeight;
         if (tall) {
@@ -901,26 +898,33 @@ namespace {
 
 void muiDialogLayout(MuiContext& ui, MuiRect* content, MuiRect* tabs)
 {
-    MuiRect safe = ui.safeRect().inset(ui.dp(10.0f));
+    MuiRect safe = ui.safeRect().inset(ui.dp(screen_plan::kScreenMarginDp));
     float width = ui.dp(kTabColumnWidthDp);
     *tabs = { safe.right() - width, safe.y, width, safe.h };
-    *content = { safe.x, safe.y, tabs->x - ui.dp(10.0f) - safe.x, safe.h };
+    *content = { safe.x, safe.y, tabs->x - ui.dp(screen_plan::kScreenTabsGapDp) - safe.x, safe.h };
 }
 
 MuiScreenFrame muiScreenFrameLayout(MuiContext& ui)
 {
+    // Window or the whole screen, the layouts, the size (`muiScreenPlan`):
+    // the frame and all inside it in the plan's dp. The same for every game
+    // screen: tabs between them keep their size.
+    MuiScreenPlan plan = muiCurrentScreenPlan();
+    ui.pixelsPerDp = ui.basePixelsPerDp * plan.scale;
+
     MuiScreenFrame frame;
-    if (!muiUsesWindows()) {
+    if (!plan.windowed) {
         frame.window = ui.screenRect();
         muiDialogLayout(ui, &frame.content, &frame.tabs);
         return frame;
     }
 
+    MuiRect safe = ui.safeRect();
+
     // The window: at most the size the screens are laid out for, the
     // screen's margins and the tab column outside it kept. In the UI's dp
     // like everything inside: a UI size works as a screen of that many dp
     // (at 100% a 10" tablet shows the windows' mockups as they are).
-    MuiRect safe = ui.safeRect();
     float margin = ui.dp(kWindowMarginDp);
     float tabsWidth = ui.dp(kTabColumnWidthDp);
     float tabsGap = ui.dp(kWindowTabsGapDp);
@@ -938,19 +942,9 @@ MuiScreenFrame muiScreenFrameLayout(MuiContext& ui)
     return frame;
 }
 
-bool muiIsTallContent(MuiContext& ui, const MuiRect& content)
+bool muiIsTallContent(MuiContext& ui)
 {
-    switch (settings.touch.layout) {
-    case kMuiLayoutPhone:
-        return false;
-    case kMuiLayoutTablet:
-        // Even where they don't fit: the player sees it and chooses again.
-        return true;
-    default:
-        // Only windows: screens covering the screen keep the phone's
-        // layouts.
-        return muiUsesWindows() && content.w >= ui.dp(kTallMinWidthDp) && content.h >= ui.dp(kTallMinHeightDp);
-    }
+    return muiCurrentScreenPlan().tablet;
 }
 
 MuiScreenFrame muiScreenFrame(MuiContext& ui, MuiColor background, bool overTitle)

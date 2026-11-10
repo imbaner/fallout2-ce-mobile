@@ -312,18 +312,34 @@ bool muiIsEnabled()
 
 bool muiUsesWindows()
 {
-    if (!muiIsEnabled()) {
-        return false;
+    return muiIsEnabled() && muiCurrentScreenPlan().windowed;
+}
+
+MuiScreenPlan muiScreenPlanFor(float interfaceScale, int windows, int layout)
+{
+    // The safe area of the last frame (before the first one, the screen).
+    float width = gSafeRect.w;
+    float height = gSafeRect.h;
+    if (!gSafeRectValid) {
+        int outputWidth = 0;
+        int outputHeight = 0;
+        if (gSdlRenderer == nullptr || SDL_GetRendererOutputSize(gSdlRenderer, &outputWidth, &outputHeight) != 0) {
+            return MuiScreenPlan();
+        }
+        width = static_cast<float>(outputWidth);
+        height = static_cast<float>(outputHeight);
     }
 
-    switch (settings.touch.windows) {
-    case kMuiWindowsNever:
-        return false;
-    case kMuiWindowsAlways:
-        return true;
-    default:
-        return hudIsTabletScreen();
+    float pixelsPerDp = hudGetScreenDensity() * interfaceScale;
+    if (pixelsPerDp <= 0.0f) {
+        return MuiScreenPlan();
     }
+    return muiScreenPlan(width / pixelsPerDp, height / pixelsPerDp, windows, layout);
+}
+
+MuiScreenPlan muiCurrentScreenPlan()
+{
+    return muiScreenPlanFor(hudGetInterfaceScale(), settings.touch.windows, settings.touch.layout);
 }
 
 const MuiTheme& muiTheme()
@@ -1168,6 +1184,7 @@ void muiRender(SDL_Renderer* renderer)
 
     MuiContext context;
     context.pixelsPerDp = gPixelsPerDp;
+    context.basePixelsPerDp = gPixelsPerDp;
     context.screen = { 0.0f, 0.0f, static_cast<float>(gOutputWidth), static_cast<float>(gOutputHeight) };
     context.safe = gSafeRect;
     context.now = now;
@@ -1187,6 +1204,7 @@ void muiRender(SDL_Renderer* renderer)
             continue;
         }
         context.current = screen;
+        context.pixelsPerDp = gPixelsPerDp;
         context.isInteractive = screen == top && screen->closeTime == 0;
         // A window fading in or out as a whole.
         if (screen->animated) {
@@ -1199,6 +1217,7 @@ void muiRender(SDL_Renderer* renderer)
 
     // Over every screen, not touchable.
     context.current = nullptr;
+    context.pixelsPerDp = gPixelsPerDp;
     context.isInteractive = false;
     muiNotifyRender(context);
 

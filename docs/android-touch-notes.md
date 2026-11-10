@@ -810,11 +810,27 @@ every screen on the new scalable UI, visual style/textures later via theme).
   `MuiTheme` (placeholder terminal-green).
 - `muiRunModal` runs input+render for synchronous game flows; Esc/Android
   back -> `MuiScreen::back`.
+- One rule for any screen's proportions (`muiScreenPlan`,
+  src/mui_screen_plan.cc, test tests/mui_screen_plan_test.cc): in the UI's
+  dp, a layout fits an area when it does so at least 90% of the UI size
+  (the frame and everything in it then draw that much smaller, the same
+  for every game screen so tabs keep their size); the phone's layouts
+  (side by side, made for ~2:1, need 540x300 dp) and the tablet's (one
+  part over another, ~1.45:1, 680x440). 1) A window where the tablet's
+  fit one: there is room to spare and the window shows the most (tablets,
+  a phone at a small UI size, a foldable's inner screen at ~95%). 2) Else
+  the whole screen, in the layouts whose shape the area is closer to among
+  those fitting (phones keep the phone's; a square screen without room
+  for a window gets the tablet's); none fitting, the one needing the least
+  shrinking (down to 75%), the player may change the UI size. The
+  "Game screens" and "Screen layouts" rows other than Auto decide their
+  part. Before 2026-11-11 windows went by the screen's size (520x820 dp)
+  and the tablet's layouts by a window's 680x440 only: a foldable's inner
+  screen with its camera's cutout fell 37 dp short and got the phone's
+  layouts in a window.
 - Windows (`muiUsesWindows`, `[touch] windows`, the "Game screens" row:
-  0 Auto - where a window with the tall layouts fits: the screen 520x820 dp
-  or more in the UI's dp (7" and bigger at 100%, a phone at a small UI
-  size); 1 Full screen; 2 Windows - phones too): game screens laid out by
-  `muiScreenFrame` open
+  0 Auto - by the rule above; 1 Full screen; 2 Windows - phones too): game
+  screens laid out by `muiScreenFrame` open
   as a window over the world dimmed as under the game menu (`dim`), at most
   896x680 dp (with everything else in the UI's dp: at 100% a 10" tablet
   shows the windows' mockups as they are), at least 24 dp from the edges,
@@ -834,12 +850,10 @@ every screen on the new scalable UI, visual style/textures later via theme).
   (`muiScreenFrame(..., overTitle)`, `muiDrawTitleArt`; the menu itself is
   closed under them). Creation and talk take no tap outside (Back would
   cancel the character; talk has none).
-  Screens pick their layout by the content area, not the device
-  (`muiIsTallContent`, `[touch] layout`, the "Screen layouts" row: 0 Auto
-  - windows of 680x440 dp and more, every tablet's, screens covering the
-  screen keep the phone's layouts; 1 Phone - never; 2 Tablet - always,
-  even where they don't fit, the player's choice; any of them with any
-  frame): the roomy sizes of the windows' mockups (bigger rows, buttons,
+  Screens pick their layout by the rule above, not the device
+  (`muiIsTallContent`, `[touch] layout`, the "Screen layouts" row: 0 Auto;
+  1 Phone - never; 2 Tablet - always, made to fit as far as they can, the
+  player's choice; any of them with any frame): the roomy sizes of the windows' mockups (bigger rows, buttons,
   text; settings' sections 56 dp, save rows with thumbnails, character's
   stats tab as SPECIAL rows over conditions and derived stats in two
   columns, talk's speaker and reply in a wider left column (460 dp, the

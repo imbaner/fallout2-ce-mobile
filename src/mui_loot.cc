@@ -134,7 +134,7 @@ namespace {
         lists[SIDE_LEFT] = muiInventoryItems(view.leftOwner, filters[SIDE_LEFT]);
         lists[SIDE_RIGHT] = muiInventoryItems(view.rightOwner, filters[SIDE_RIGHT]);
 
-        tall = muiIsTallContent(ui, content);
+        tall = muiIsTallContent(ui);
         float gap = ui.dp(12.0f);
         float sideWidth = (content.w - gap) / 2.0f;
         float headerHeight = ui.dp(tall ? 36.0f : 30.0f);

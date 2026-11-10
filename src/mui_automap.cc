@@ -106,7 +106,7 @@ namespace {
 
         // Header: where (the game's names), details and motion sensor at the
         // right. Tablet windows: the roomy sizes.
-        tall = muiIsTallContent(ui, content);
+        tall = muiIsTallContent(ui);
         float headerHeight = ui.dp(tall ? 44.0f : 32.0f);
         MuiRect header = { content.x, content.y, content.w, headerHeight };
         float size = ui.dp(tall ? 16.0f : 14.0f);

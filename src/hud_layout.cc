@@ -87,14 +87,6 @@ float hudGetScreenDensity()
 #endif
 }
 
-// A tablet's screen, dp: room for a game screen's window with the tall
-// layouts - their content (680x440, `muiIsTallContent`), the window's
-// padding and the screen's margins (14 + 24 each side), the tab column
-// beside it (12 + 52). Phones in landscape have up to ~430 on the shorter
-// side, 7"-8" tablets from ~530, 10"-11" ones ~800.
-constexpr float kTabletShortSideDp = 520.0f;
-constexpr float kTabletLongSideDp = 820.0f;
-
 float hudGetScreenShortSideDp()
 {
     int width = 0;
@@ -103,23 +95,6 @@ float hudGetScreenShortSideDp()
         return 0.0f;
     }
     return static_cast<float>(std::min(width, height)) / hudGetScreenDensity();
-}
-
-bool hudIsTabletScreen(float interfaceScale)
-{
-    int width = 0;
-    int height = 0;
-    if (interfaceScale <= 0.0f || gSdlRenderer == nullptr || SDL_GetRendererOutputSize(gSdlRenderer, &width, &height) != 0 || width <= 0 || height <= 0) {
-        return false;
-    }
-
-    float dp = hudGetScreenDensity() * interfaceScale;
-    return std::min(width, height) / dp >= kTabletShortSideDp && std::max(width, height) / dp >= kTabletLongSideDp;
-}
-
-bool hudIsTabletScreen()
-{
-    return hudIsTabletScreen(hudGetInterfaceScale());
 }
 
 float hudGetInterfaceScale()

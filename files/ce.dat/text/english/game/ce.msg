@@ -284,7 +284,7 @@
 {373}{}{Tactical view}
 {374}{}{Combat button: see-through figures, tiles and where you can walk}
 {375}{}{Game screens}
-{376}{}{Auto: windows over the world on tablets}
+{376}{}{Auto: windows where there is room to spare}
 {377}{}{Close windows by tapping outside}
 {378}{}{A tap on the world past a window closes it}
 {379}{}{Auto}
@@ -295,7 +295,7 @@
 {384}{}{Wears no armor}
 {385}{}{Best}
 {386}{}{Screen layouts}
-{387}{}{Auto: tablet layouts in windows where they fit}
+{387}{}{Auto: by the screen's room and shape}
 {388}{}{Phone}
 {389}{}{Tablet}
 {390}{}{Start combat}

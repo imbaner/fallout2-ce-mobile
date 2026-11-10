@@ -381,19 +381,19 @@ struct TouchSettings {
 #endif
     // HUD and mobile UI size in percent: buttons, text and the game screens'
     // windows are sized in dp times it (a smaller size works as a screen of
-    // more dp, `hudIsTabletScreen`).
+    // more dp, `muiScreenPlan`).
     int hud_scale = 100;
     // Screen density (Android dp scale). 0 - detect (Android), 1.0 elsewhere.
     double hud_density = 0.0;
     // Combat's tactical view (its HUD button), kept until switched again.
     bool tactical_view = false;
     // Mobile UI's game screens as windows over the world instead of
-    // covering the screen (`muiUsesWindows`): 0 - on tablets (by the
-    // screen's size), 1 - never, 2 - always.
+    // covering the screen (`muiScreenPlan`): 0 - where the tablet's layouts
+    // fit one, 1 - never, 2 - always.
     int windows = 0;
-    // Game screens' layouts: 0 - the roomy ones in windows where they fit
-    // (`muiIsTallContent`), 1 - the phone's, 2 - the roomy ones always
-    // (even where they don't fit: the player's choice).
+    // Game screens' layouts: 0 - by the room and its shape
+    // (`muiScreenPlan`), 1 - the phone's, 2 - the tablet's (made to fit as
+    // far as they can).
     int layout = 0;
     // A tap on the world outside a window closes it (the game screens'
     // windows; small panels always close so).

@@ -161,14 +161,6 @@ float hudGetScreenDensity();
 // the renderer is up).
 float hudGetScreenShortSideDp();
 
-// A tablet's screen in the UI's dp (the screen's over the UI size: a
-// smaller UI works as a screen of more dp), 7" and bigger at 100%: room for
-// a game screen's window with the tall layouts, so they open as windows
-// over the world (`muiUsesWindows` Auto). With [interfaceScale] - for that
-// UI size instead of the current one.
-bool hudIsTabletScreen(float interfaceScale);
-bool hudIsTabletScreen();
-
 // UI size factor (`[touch] hud_scale`): everything of the HUD and the mobile
 // UI is laid out in dp times it, the windows of game screens too.
 float hudGetInterfaceScale();

@@ -403,6 +403,8 @@ set(FALLOUT_PLATFORM_SOURCES
     "src/mui_licenses.cc"
     "src/mui_options.cc"
     "src/mui_scenes.cc"
+    "src/mui_screen_plan.cc"
+    "src/mui_screen_plan.h"
     "src/mui_worldmap.cc"
     "src/mui_preferences.cc"
     "src/mui_loadsave.cc"
@@ -935,6 +937,7 @@ if(UNIX AND NOT ANDROID AND NOT IOS AND NOT CMAKE_SYSTEM_NAME MATCHES "Emscripte
     target_link_libraries(platform_compat_test ${ZLIB_LIBRARIES} ${SDL2_LIBRARIES})
     ce_add_test(dfile_test "src/dfile.cc" "src/platform_compat.cc")
     target_link_libraries(dfile_test fpattern_windows::fpattern_windows ${ZLIB_LIBRARIES} ${SDL2_LIBRARIES})
+    ce_add_test(mui_screen_plan_test "src/mui_screen_plan.cc")
     ce_add_test(sfall_global_vars_test "src/sfall_global_vars.cc")
     target_compile_options(sfall_global_vars_test PRIVATE -fsanitize=alignment -fno-sanitize-recover=alignment)
     target_link_options(sfall_global_vars_test PRIVATE -fsanitize=alignment)

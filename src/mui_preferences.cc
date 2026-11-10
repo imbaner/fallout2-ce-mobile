@@ -776,7 +776,7 @@ namespace {
         {
             // Every screen: phones can have windows too (a small UI size
             // gives the windows' roomy layouts room).
-            Row row { Section::Display, RowKind::Choice, kTextWindows, "Game screens", Origin::Port, kTextWindowsNote, "Auto: windows over the world on tablets" };
+            Row row { Section::Display, RowKind::Choice, kTextWindows, "Game screens", Origin::Port, kTextWindowsNote, "Auto: windows where there is room to spare" };
             row.options = { kTextWindowsAuto, kTextWindowsNever, kTextWindowsAlways };
             row.optionsFromCe = true;
             row.get = [](const Values& values) { return static_cast<float>(values.windows); };
@@ -790,14 +790,14 @@ namespace {
             row.set = [](Values& values, float value) { values.windowsTapOutside = value != 0.0f; };
             row.shown = [](const Values& values) {
                 // Auto: by the screen in the UI size being chosen.
-                return values.windows == kMuiWindowsAlways || (values.windows == kMuiWindowsAuto && hudIsTabletScreen(values.interfaceSize / 100.0f));
+                return muiScreenPlanFor(values.interfaceSize / 100.0f, values.windows, values.layout).windowed;
             };
             rows.push_back(row);
         }
         {
-            // Separate from the frame: any of them in any (both Auto: the
-            // phone's in full screen, the roomy ones in windows).
-            Row row { Section::Display, RowKind::Choice, kTextLayout, "Screen layouts", Origin::Port, kTextLayoutNote, "Auto: tablet layouts in windows where they fit" };
+            // Separate from the frame: any of them in any (both Auto:
+            // `muiScreenPlan`).
+            Row row { Section::Display, RowKind::Choice, kTextLayout, "Screen layouts", Origin::Port, kTextLayoutNote, "Auto: by the screen's room and shape" };
             row.options = { kTextWindowsAuto, kTextLayoutPhone, kTextLayoutTablet };
             row.optionsFromCe = true;
             row.get = [](const Values& values) { return static_cast<float>(values.layout); };
@@ -979,7 +979,7 @@ namespace {
         }
 
         // Tablet windows: the roomy sizes.
-        tall = muiIsTallContent(ui, content);
+        tall = muiIsTallContent(ui);
         float gap = ui.dp(tall ? 12.0f : 8.0f);
         float listWidth = tall ? std::floor(content.w * 0.26f) : std::max(ui.dp(130.0f), content.w * 0.22f);
         MuiRect list = { content.x, content.y, listWidth, content.h };
