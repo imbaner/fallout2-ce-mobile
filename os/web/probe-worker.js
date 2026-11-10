@@ -1,10 +1,12 @@
 import {prepareGameZip,importErrorInfo} from './zip-import.js';
-import {openResourceStore} from './resource-store.js';
+import {openResourceStore,FIRST_GAME,gameId} from './resource-store.js';
 import {prepareSaveZip,exportSaveZip,launcherFont} from './save-streams.js';
 let controller = null, prepared = null, phase = 'idle';
 let resources = null;
+// The game the manager works on (files.html?game=, or the live game's).
+let game = FIRST_GAME;
 function resourceOwner() {
-  if (!resources) return openResourceStore();
+  if (!resources) return openResourceStore({game});
   // The paused engine owns the immutable installation lease. Its two config
   // snapshots are the only resource payloads save exchange can read.
   return {active:async () => resources.active,close:async () => {},
@@ -23,7 +25,7 @@ async function disposePlan() {
   await old?.dispose();
 }
 async function activeSnapshot() {
-  const store = resources ? resourceOwner() : await openResourceStore();
+  const store = resources ? resourceOwner() : await openResourceStore({game});
   try { return await store.active(); } finally { await store.close(); }
 }
 self.onmessage = async ({data}) => {
@@ -38,13 +40,14 @@ self.onmessage = async ({data}) => {
     if (data.resources) {
       if (resources || data.type !== 'status' || !data.resources.active?.run) throw new Error('Invalid exchange initialization');
       resources = data.resources;
-    }
+      game = gameId(resources.game || FIRST_GAME);
+    } else if (data.game && data.type === 'status') game = gameId(data.game);
     if (resources && !['status','discard','inspect-saves','install-saves','export-saves','export-before-replace'].includes(data.type)) throw new Error('Only save exchange is allowed over a live game');
     let active, exchange;
     switch (data.type) {
       case 'inspect':
         await disposePlan();
-        prepared = await prepareGameZip(data.file,{signal:controller.signal,choice:data.choice ?? null});
+        prepared = await prepareGameZip(data.file,{signal:controller.signal,choice:data.choice ?? null,storeFactory:() => openResourceStore({game})});
         active = await activeSnapshot();
         break;
       case 'install': {
@@ -60,7 +63,7 @@ self.onmessage = async ({data}) => {
       case 'inspect-saves':
         await disposePlan();
         active = await activeSnapshot();
-        prepared = await prepareSaveZip(data.file,{signal:controller.signal,progress,rootHint:data.rootHint,storeFactory:resourceOwner});
+        prepared = await prepareSaveZip(data.file,{signal:controller.signal,progress,rootHint:data.rootHint,storeFactory:resourceOwner,game});
         break;
       case 'install-saves': {
         if (!prepared || prepared.summary.kind !== 'saves' || data.token !== prepared.summary.token) {
@@ -75,7 +78,7 @@ self.onmessage = async ({data}) => {
         if (!prepared || prepared.summary.kind !== 'saves' || data.token !== prepared.summary.token) throw new Error('Choose the ZIP again');
         active = prepared.active; exchange = await prepared.export({signal:controller.signal,progress}); break;
       case 'export-saves':
-        await disposePlan(); exchange = await exportSaveZip({signal:controller.signal,progress,storeFactory:resourceOwner});
+        await disposePlan(); exchange = await exportSaveZip({signal:controller.signal,progress,storeFactory:resourceOwner,game});
         active = await activeSnapshot(); break;
       case 'discard':
         await disposePlan(); active = await activeSnapshot(); break;
@@ -83,7 +86,7 @@ self.onmessage = async ({data}) => {
       default: throw new Error('Unknown storage action');
     }
     self.postMessage({type:'result',action:data.type,active,exchange,plan:prepared?.summary || null,
-      font:await launcherFont().catch(() => 0)});
+      font:await launcherFont({game}).catch(() => 0)});
   } catch (error) {
     await disposePlan().catch(() => {});
     const detail = importErrorInfo(error), response = {type:'error',...detail,cancelled:detail.code === 'cancelled'};

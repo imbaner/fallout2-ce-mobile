@@ -264,7 +264,8 @@ waits until every window is closed, as browsers do by default. Activation remove
 the older caches of the same scope only, so several copies of the app may share
 an origin. When an idle app comes back to the foreground, the launcher applies a
 build installed meanwhile (during a game) and looks for a newer one. The
-launcher's footer shows the version and the build id.
+files page's footer shows the version and the build id (the list of games has
+no footer; the game's Settings > About shows the version too).
 
 After the game's main returns, the web wrapper explicitly finishes the runtime
 with `emscripten_force_exit`, so pending asynchronous callbacks cannot defer

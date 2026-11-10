@@ -4,6 +4,40 @@
 // import-native.js, generated from its resources.)
 const strings = {
   en:{
+    games_add:'Add game',
+    games_delete:'Delete',
+    games_details:'Details',
+    games_back:'Back',
+    games_unnamed:'Game %1$s',
+    games_today:'Today, %1$s',
+    games_yesterday:'Yesterday, %1$s',
+    games_never:'Not started yet',
+    games_picture_later:'The picture appears after the first start',
+    games_last_save:'Last save: %1$s',
+    games_no_saves:'No saves yet',
+    games_saves_one:'%1$s save',
+    games_saves_other:'%1$s saves',
+    games_mods_none:'Mods: none',
+    games_mods_one:'Mods: %1$s',
+    games_mods_more:'Mods: %1$s and %2$s more',
+    games_add_text:'Choose the ZIP of a game: Fallout 2, a mod for it, or a game of its own on its engine, such as Sonora or Nevada. Its saves come with it.',
+    games_add_note:'You need your own copy of the game. Each game takes its own space in this browser.',
+    games_choose_zip:'Choose a ZIP',
+    games_delete_title:'Delete \u00AB%1$s\u00BB?',
+    games_delete_text:'The game\'s files (%1$s) and %2$s will be deleted from this browser. They can\'t be brought back.',
+    games_delete_note:'You can export the saves as one archive first: start the game, Settings, Game files.',
+    games_cancel:'Cancel',
+    games_rename:'Rename',
+    games_rename_title:'Name of the game',
+    games_save:'Save',
+    games_replace:'Replace files',
+    games_label_saves:'Saves',
+    games_label_size:'Size',
+    games_label_language:'Language',
+    games_label_added:'Added',
+    games_label_played:'Started',
+    games_mods_title:'Mods \u00B7 %1$s',
+    games_failed:'Something went wrong. Try again.',
     mib:' MiB',
     play:'Play',
     error_cancelled:'Preparation cancelled. Existing files and saves are unchanged.',
@@ -100,6 +134,42 @@ const strings = {
     visits_count:'Count my visits',
   },
   ru:{
+    games_add:'Добавить игру',
+    games_delete:'Удалить',
+    games_details:'Подробнее',
+    games_back:'Назад',
+    games_unnamed:'Игра %1$s',
+    games_today:'Сегодня, %1$s',
+    games_yesterday:'Вчера, %1$s',
+    games_never:'Ещё не запускали',
+    games_picture_later:'Картинка появится после первого запуска',
+    games_last_save:'Последний сейв: %1$s',
+    games_no_saves:'Сохранений пока нет',
+    games_saves_one:'%1$s сохранение',
+    games_saves_few:'%1$s сохранения',
+    games_saves_many:'%1$s сохранений',
+    games_saves_other:'%1$s сохранения',
+    games_mods_none:'Моды: нет',
+    games_mods_one:'Моды: %1$s',
+    games_mods_more:'Моды: %1$s и ещё %2$s',
+    games_add_text:'Укажите ZIP с игрой: Fallout 2, мод для неё или отдельная игра на её движке — Sonora, Nevada. Её сохранения перенесутся вместе с ней.',
+    games_add_note:'Нужна своя копия игры. Каждая игра занимает своё место в браузере.',
+    games_choose_zip:'Выбрать ZIP',
+    games_delete_title:'Удалить «%1$s»?',
+    games_delete_text:'Файлы игры (%1$s) и %2$s будут удалены из браузера. Вернуть их будет нельзя.',
+    games_delete_note:'Сохранения можно сначала выгрузить одним архивом: запустите игру, Настройки, Файлы игры.',
+    games_cancel:'Отмена',
+    games_rename:'Переименовать',
+    games_rename_title:'Название игры',
+    games_save:'Сохранить',
+    games_replace:'Заменить файлы',
+    games_label_saves:'Сохранений',
+    games_label_size:'Размер',
+    games_label_language:'Язык',
+    games_label_added:'Добавлена',
+    games_label_played:'Запускали',
+    games_mods_title:'Моды · %1$s',
+    games_failed:'Не получилось. Попробуйте ещё раз.',
     mib:' МиБ',
     play:'Начать игру',
     error_cancelled:'Подготовка отменена. Прежние файлы и сохранения остались.',
@@ -198,6 +268,12 @@ const strings = {
 };
 
 export const language = Object.keys(strings).find(code => globalThis.navigator?.language?.toLowerCase().startsWith(code)) ?? 'en';
+
+// The plural form of [count] for "<key>_one/few/many/other".
+export function webCount(key, count) {
+  const form = new Intl.PluralRules(language).select(count);
+  return webText(strings[language][key + '_' + form] || strings.en[key + '_' + form] ? key + '_' + form : key + '_other', count);
+}
 
 export function webText(key, ...values) {
   const text = strings[language][key] ?? strings.en[key];

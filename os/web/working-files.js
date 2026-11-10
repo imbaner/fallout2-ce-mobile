@@ -100,24 +100,26 @@ export function configsToMerge(templates,saved) {
     old:[...saved.keys()].find(path => path.toLowerCase() === oldName)};
 }
 
-export async function mountUserFiles(module) {
+export async function mountUserFiles(module,{prefix = ''} = {}) {
   if (!module.UserIO) throw new Error('The engine and user filesystem versions do not match; reload the application');
-  return mountLazyUserFiles(module);
+  return mountLazyUserFiles(module,{prefix});
 }
 
 export async function connectUserFiles(module, user, source = {}) {
   const FS = module.FS;
   const templates = await settingsFiles(FS,'/game');
   const hashes = Object.fromEntries(await Promise.all([...templates].map(async ([path,data]) => [path.toLowerCase(),await digest(data)])));
-  const provenance = user.root + '/port/settings-sources.json';
+  // The game's own part of the storage (its root for the first game).
+  const gameRoot = user.gameRoot || user.root;
+  const provenance = gameRoot + '/port/settings-sources.json';
   user.captureSettings = async () => {
-    await writeSettings(FS,user.root + '/settings',await settingsFiles(FS,'/game'),user);
+    await writeSettings(FS,gameRoot + '/settings',await settingsFiles(FS,'/game'),user);
     if (user.writeFile) await user.writeFile(provenance,new TextEncoder().encode(JSON.stringify(hashes)));
     else FS.writeFile(provenance,JSON.stringify(hashes));
-    if (source.installation) await user.writeFile(user.root + '/port/resource-installation.txt',new TextEncoder().encode(source.installation));
+    if (source.installation) await user.writeFile(gameRoot + '/port/resource-installation.txt',new TextEncoder().encode(source.installation));
   };
   user.restoreSettings = async () => {
-    const saved = await settingsFiles(FS,user.root + '/settings',user);
+    const saved = await settingsFiles(FS,gameRoot + '/settings',user);
     const combined = new Map(templates);
     const templateKeys = new Map([...templates.keys()].map(path => [path.toLowerCase(),path]));
     const hasProvenance = user.exists ? await user.exists(provenance) : await user.run(() => FS.analyzePath(provenance).exists);
@@ -142,7 +144,7 @@ export async function connectUserFiles(module, user, source = {}) {
     const path = inExistingCase(FS,'/game',(root ? root + '/' : '') + 'savegame');
     FS.mkdirTree(path.slice(0,path.lastIndexOf('/')));
     if (FS.analyzePath(path).exists) throw new Error('Game resources collide with user saves');
-    FS.symlink(user.root + '/savegame',path);
+    FS.symlink(gameRoot + '/savegame',path);
   }
   return user;
 }

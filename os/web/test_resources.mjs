@@ -2,6 +2,7 @@ import 'fake-indexeddb/auto';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {openResourceStore, DB_VERSION, BLOCK_SIZE, localFiles} from './resource-store.js';
+import {activeKey} from './resource-store.js';
 import {blockWriter} from './storage-common.js';
 import {fileLifetime, patchDirectories} from './working-files.js';
 import {importGameZip} from './zip-import.js';
@@ -180,4 +181,46 @@ test('resource paths and lifetime policy', async () => {
   assert.deepEqual(patchDirectories('[system]\nmaster_patches=custom\\data\ncritter_patches=data'),['data','custom/data']);
   assert.throws(() => patchDirectories('[system]\nmaster_patches=../../outside'));
   await store.close();
+});
+
+test('several games: each its own installation, DAT chunks shared, the format 2 with a second game', async () => {
+  const database = name();
+  const first = await openResourceStore({name:database});
+  const one = await install(first);
+  assert.deepEqual(await first.games(),{current:'1',games:{'1':{name:'',added:0,played:0}}});
+  await first.close();
+  // Still a database of one game: format 1.
+  assert.equal((await raw(database,db => readRequest(db.transaction('state').objectStore('state').get('format')))).format,1);
+
+  const second = await openResourceStore({name:database,game:'2'});
+  assert.equal(await second.active(),null);
+  const two = await install(second,[...base(),['mods/rpu.dat',Uint8Array.of(1,2,3)]]);
+  await second.saveGames({current:'2',games:{'1':{name:'',added:1,played:1},'2':{name:'RPU',added:2,played:2}}});
+  // Both stay through a collection; the shared master.dat (3 blocks) and
+  // critter.dat are stored once, the mod's block beside them.
+  await second.collect();
+  assert.equal(await count(database,'chunks'),5);
+  assert.deepEqual((await second.liveGenerations()).sort(),[one.run,two.run].sort());
+  await second.close();
+  assert.equal((await raw(database,db => readRequest(db.transaction('state').objectStore('state').get('format')))).format,2);
+  assert.equal(await raw(database,db => readRequest(db.transaction('state').objectStore('state').get(activeKey('2')))),two.run);
+
+  const firstSource = await localFiles({name:database});
+  assert.equal(firstSource.installation,one.run);
+  await firstSource.close();
+  const secondSource = await localFiles({name:database,game:'2'});
+  assert.equal(secondSource.installation,two.run);
+  assert.ok(secondSource.entries.some(file => file.path === 'mods/rpu.dat'));
+  await secondSource.close();
+
+  // Forgetting the second game drops its installation, not the first's.
+  const owner = await openResourceStore({name:database});
+  const list = await owner.forgetGame('2');
+  assert.deepEqual(Object.keys(list.games),['1']);
+  assert.equal(list.current,'1');
+  assert.deepEqual(await owner.liveGenerations(),[one.run]);
+  assert.equal(await count(database,'chunks'),4);
+  assert.equal((await owner.active()).run,one.run);
+  await owner.close();
+  await assert.rejects(openResourceStore({name:database,game:'x'}),/Invalid game/);
 });

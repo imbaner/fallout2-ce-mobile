@@ -6,7 +6,7 @@ import {openAsBlob,existsSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join,resolve} from 'node:path';
 import {execFileSync} from 'node:child_process';
-import {prepareSaveZip,exportSaveZip} from './save-streams.js';
+import {prepareSaveZip,exportSaveZip,forgetGameFiles,forgetGamePicture} from './save-streams.js';
 import {openUserStore} from './user-store.js';
 import {slotName,saveIdentity,recordText} from './save-format.js';
 import {ZipOutput,crc32} from './zip-output.js';
@@ -173,4 +173,42 @@ archiveTest('libarchive actually decodes a sparse Store ZIP64 across the 4 GiB o
     for await (const entry of readSaveArchive(new DiskBlob(),{moduleFactory,catalog:store.archiveCatalog(job)})) { for await (const chunk of entry.chunks()) total += chunk.length; count++; }
     assert.equal(count,2); assert.equal(total,size + 2000); await store.discard(job);
   } finally { await store.close(); await disk.close(); }
+});
+
+test('each game has its own saves: export and delete touch only that game',async t => {
+  const directory = await workspace(t), database = name(), store = await openUserStore({name:database}), job = await store.begin('archive');
+  await store.putFile(job,'savegame/SLOT01/SAVE.DAT',input(header(1)));
+  await store.putFile(job,'settings/fallout2.cfg',input(config));
+  await store.putFile(job,'games/2/savegame/SLOT03/SAVE.DAT',input(header(3)));
+  await store.putFile(job,'games/2/savegame/SLOT04/SAVE.DAT',input(header(4)));
+  await store.putFile(job,'games/2/port/card.txt',input(encode('version=Other\n')));
+  await store.putFile(job,'games/2/port/card.png',input(Uint8Array.of(1)));
+  await store.putFile(job,'port/card.png',input(Uint8Array.of(2)));
+  await store.commit(job); await store.close();
+  await forgetGamePicture({name:database,game:'2'});
+  await forgetGamePicture({name:database,game:'5'});
+  const pictures = await openUserStore({name:database});
+  assert.ok(!(await pictures.lookup((await pictures.resolve('games/2/port')).id,'card.png')));
+  assert.ok(await pictures.lookup((await pictures.resolve('games/2/port')).id,'card.txt'));
+  assert.ok(await pictures.lookup((await pictures.resolve('port')).id,'card.png'));
+  await pictures.close();
+  const exported = await exportSaveZip({userName:database,storeFactory:async () => owner(),temporary:() => temporary(directory),game:'2'});
+  assert.equal(exported.slots,2);
+  const first = await exportSaveZip({userName:database,storeFactory:async () => owner(),temporary:() => temporary(directory)});
+  assert.equal(first.slots,1);
+  await forgetGameFiles({name:database,game:'2'});
+  let reopened = await openUserStore({name:database});
+  assert.ok(!(await reopened.resolve('games/2')));
+  assert.ok(await reopened.lookup((await reopened.resolve('savegame/SLOT01')).id,'save.dat'));
+  await reopened.close();
+  // The first game's part is the root: emptied, the other games kept.
+  const again = await openUserStore({name:database}), add = await again.begin('archive');
+  await again.putFile(add,'games/3/savegame/SLOT01/SAVE.DAT',input(header(1))); await again.commit(add); await again.close();
+  await forgetGameFiles({name:database,game:'1'});
+  reopened = await openUserStore({name:database});
+  assert.ok(!(await reopened.resolve('savegame/SLOT01')));
+  assert.ok(!(await reopened.lookup((await reopened.resolve('settings')).id,'fallout2.cfg')));
+  assert.ok(await reopened.resolve('savegame'));
+  assert.ok(await reopened.lookup((await reopened.resolve('games/3/savegame/SLOT01')).id,'save.dat'));
+  await reopened.close();
 });

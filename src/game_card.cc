@@ -1,6 +1,7 @@
 #include "game_card.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include <vector>
@@ -19,6 +20,14 @@
 #include <jni.h>
 
 #include "platform/android/paths.h"
+#endif
+
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+
+#include "game.h"
+#include "platform/web/storage.h"
+#include "platform/web/window.h"
 #endif
 
 namespace fallout {
@@ -43,6 +52,10 @@ namespace {
         if (!folder.empty()) {
             return folder + "/" + name;
         }
+#endif
+#ifdef __EMSCRIPTEN__
+        // The game's port folder in the user's storage (its launcher reads it).
+        return webPortDataPath(name);
 #endif
         if (devAutotestIsEnabled()) {
             return std::string("ce-") + name;
@@ -93,6 +106,13 @@ namespace {
             return;
         }
         gPictureWritten = true;
+#ifdef __EMSCRIPTEN__
+        // Once: every write is a new version in the browser's storage.
+        saveStorage::Info info;
+        if (saveStorage::inspect(path, info) && info.exists) {
+            return;
+        }
+#endif
 
         std::vector<unsigned char> rgba;
         int width;
@@ -127,6 +147,15 @@ namespace {
             debugPrint("gameCardWrite: picture not written\n");
         }
     }
+
+#ifdef __EMSCRIPTEN__
+    // clang-format off
+    EM_JS(char*, webGameNameJs, (), {
+        const name = Module['webGameName'];
+        return typeof name === 'string' && name ? stringToNewUTF8(name) : 0;
+    });
+    // clang-format on
+#endif
 
 #ifdef __ANDROID__
     // MainActivity's [method] () -> String, empty when there's none.
@@ -176,6 +205,10 @@ void gameCardWrite(const std::u32string& place)
     if (!saveStorage::writeFile(cardPath("card.txt"), text)) {
         debugPrint("gameCardWrite: card not written\n");
     }
+#ifdef __EMSCRIPTEN__
+    // Kept in the browser's storage: the launcher reads it.
+    webCommitUserFiles();
+#endif
 }
 
 void gameCardStarted()
@@ -201,6 +234,12 @@ const std::string& gameCardName()
         askedAt = SDL_GetTicks();
 #ifdef __ANDROID__
         name = activityString("gameName");
+#elif defined(__EMSCRIPTEN__)
+        char* value = webGameNameJs();
+        if (value != nullptr) {
+            name = value;
+            free(value);
+        }
 #else
         // The menu's button in automated tests (`mainmenu`).
         if (devAutotestIsEnabled()) {
@@ -229,6 +268,10 @@ void gameCardOpenGames()
     }
     env->DeleteLocalRef(activityClass);
     env->DeleteLocalRef(activity);
+#elif defined(__EMSCRIPTEN__)
+    // The page's launcher, after the game ends as on Exit.
+    webOpenGameFiles("games");
+    _game_user_wants_to_quit = GAME_QUIT_REQUEST_EXIT;
 #else
     debugPrint("gameCardOpenGames: no list of games here\n");
 #endif

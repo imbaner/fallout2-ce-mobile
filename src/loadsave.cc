@@ -574,7 +574,7 @@ void _InitLoadSave()
 #ifdef __EMSCRIPTEN__
     // saveStorage inspects the final component without following links.
     // The writer's DATA/SAVEGAME alias is for engine paths, not catalog roots.
-    snprintf(saveRoot, sizeof(saveRoot), "%s/savegame", kWebUserRoot);
+    snprintf(saveRoot, sizeof(saveRoot), "%s/savegame", webGameUserRoot().c_str());
 #else
     snprintf(saveRoot, sizeof(saveRoot), "%s\\SAVEGAME", _patches);
 #endif
@@ -2882,7 +2882,7 @@ void lsgWebRestoreQuickRange(int previousCount, int previousSession)
     autoQuickSaveSlots = previousCount > 0;
     settings.ui.auto_quick_save = previousCount / slotsPerPage;
     char saveRoot[COMPAT_MAX_PATH];
-    snprintf(saveRoot, sizeof(saveRoot), "%s/savegame", kWebUserRoot);
+    snprintf(saveRoot, sizeof(saveRoot), "%s/savegame", webGameUserRoot().c_str());
     gSaveCatalog.configure(saveRoot, saveLoadTotalSlots, quickSaveFirstSlot, previousCount, &gameSaveRecords());
     gSaveCatalog.refresh();
     if (previousSession >= 0) gSaveCatalog.loaded(previousSession);

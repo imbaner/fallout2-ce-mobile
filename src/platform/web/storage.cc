@@ -1,12 +1,32 @@
 #include "storage.h"
 
+#include <stdlib.h>
+
 #include <emscripten.h>
 
 namespace fallout {
 
+// clang-format off
+EM_JS(char*, webGameUserRootJs, (), {
+    const root = Module['webGameUserRoot'];
+    return typeof root === 'string' && root ? stringToNewUTF8(root) : 0;
+});
+// clang-format on
+
+const std::string& webGameUserRoot()
+{
+    static std::string root;
+    if (root.empty()) {
+        char* value = webGameUserRootJs();
+        root = value != nullptr ? value : kWebUserRoot;
+        free(value);
+    }
+    return root;
+}
+
 std::string webPortDataPath(const char* name)
 {
-    return std::string(kWebUserRoot) + "/port/" + name;
+    return webGameUserRoot() + "/port/" + name;
 }
 
 // clang-format off

@@ -5,7 +5,25 @@ export {BLOCK_SIZE, MAX_READ};
 export const RESOURCE_DB = 'fallout2-device-check-v1';
 export const RESOURCE_LOCK = 'fallout2-device-check';
 export const DB_VERSION = 2;
-const FORMAT = 1;
+// Format 2: several games (`games` in state, `active:<id>`/`previous:<id>`
+// beside the first game's `active`/`previous`). A database stays format 1
+// until a second game is added: builds that know one game read it, and
+// can't open one whose collection would drop the other games.
+const FORMATS = [1,2];
+// A generation's own record is the same in both.
+const GENERATION_FORMAT = 1;
+export const FIRST_GAME = '1';
+// The first game keeps the keys of the builds of one game.
+export const activeKey = game => game === FIRST_GAME ? 'active' : 'active:' + game;
+export const previousKey = game => game === FIRST_GAME ? 'previous' : 'previous:' + game;
+const generationKey = key => key === 'active' || key === 'previous' || key.startsWith('active:') || key.startsWith('previous:');
+// The game's part of the user's storage: the first game's is its root (as
+// builds of one game kept it), another's games/<id>/.
+export const gamePrefix = game => game === FIRST_GAME ? '' : 'games/' + gameId(game) + '/';
+export function gameId(value) {
+  if (typeof value !== 'string' || !/^[1-9][0-9]{0,5}$/.test(value)) throw new Error('Invalid game');
+  return value;
+}
 const request = value => new Promise((resolve, reject) => {
   value.onsuccess = () => resolve(value.result);
   value.onerror = () => reject(value.error);
@@ -47,7 +65,7 @@ function filesOf(files) {
   return entries;
 }
 function checkFormat(value) {
-  if (value?.format !== FORMAT || value?.minReader !== FORMAT || value?.minWriter !== FORMAT) {
+  if (!FORMATS.includes(value?.format) || value?.minReader !== value?.format || value?.minWriter !== value?.format) {
     throw new Error('Unsupported resource format. Update the application; stored data has not been reset.');
   }
 }
@@ -74,7 +92,7 @@ async function openDatabase(name) {
     db.createObjectStore('generations', {keyPath:'run'});
     db.createObjectStore('chunks', {keyPath:'hash'});
     db.createObjectStore('refs', {keyPath:['run','path','index']}).createIndex('run','run');
-    pending.transaction.objectStore('state').put({format:FORMAT,minReader:FORMAT,minWriter:FORMAT},'format');
+    pending.transaction.objectStore('state').put({format:1,minReader:1,minWriter:1},'format');
   };
   return new Promise((resolve, reject) => {
     pending.onblocked = () => {
@@ -88,7 +106,10 @@ async function openDatabase(name) {
   });
 }
 
-export async function openResourceStore({name = RESOURCE_DB, locks = globalThis.navigator?.locks} = {}) {
+// [game]: whose installation `active`, `begin`...`activate` and `inherit`
+// work on (the list of games: `games`, `saveGames`, `forgetGame`).
+export async function openResourceStore({name = RESOURCE_DB, locks = globalThis.navigator?.locks, game = FIRST_GAME} = {}) {
+  gameId(game);
   const release = await lease(locks, name === RESOURCE_DB ? RESOURCE_LOCK : name);
   let db, closed = false, closing = null;
   const fileIndexes = new WeakMap();
@@ -110,8 +131,9 @@ export async function openResourceStore({name = RESOURCE_DB, locks = globalThis.
       if (!closing) { closed = true; db?.close(); closing = release(); }
       return closing;
     },
+    game,
     async active() {
-      const id = await get('state','active');
+      const id = await get('state',activeKey(game));
       if (!id) return null;
       const value = await get('generations',id);
       if (!value || value.state !== 'complete') throw new Error('Damaged active resource manifest');
@@ -124,7 +146,7 @@ export async function openResourceStore({name = RESOURCE_DB, locks = globalThis.
     async begin() {
       const run = crypto.randomUUID();
       const [tx,done] = transaction(['generations','state'],'readwrite');
-      tx.objectStore('generations').add({run,state:'writing',format:FORMAT,minReader:FORMAT,minWriter:FORMAT,created:Date.now()});
+      tx.objectStore('generations').add({run,state:'writing',format:GENERATION_FORMAT,minReader:GENERATION_FORMAT,minWriter:GENERATION_FORMAT,created:Date.now()});
       tx.objectStore('state').put(true,'needsCollection');
       await done; return run;
     },
@@ -192,7 +214,7 @@ export async function openResourceStore({name = RESOURCE_DB, locks = globalThis.
       const pending = tx.objectStore('generations').get(run);
       pending.onsuccess = guarded(() => {
         if (pending.result?.state !== 'writing') throw new Error('Resource generation is not writable');
-        const active = tx.objectStore('state').get('active');
+        const active = tx.objectStore('state').get(activeKey(game));
         active.onsuccess = guarded(() => {
           if (active.result !== source.run) throw new Error('Inherited resource generation changed');
           const refs = tx.objectStore('refs').index('run').openCursor(source.run);
@@ -217,7 +239,7 @@ export async function openResourceStore({name = RESOURCE_DB, locks = globalThis.
       const [tx,done] = transaction(['generations','refs','chunks','state'],'readwrite');
       const fail = () => tx.abort();
       const pending = tx.objectStore('generations').get(run);
-      const value = {run,state:'complete',format:FORMAT,minReader:FORMAT,minWriter:FORMAT,
+      const value = {run,state:'complete',format:GENERATION_FORMAT,minReader:GENERATION_FORMAT,minWriter:GENERATION_FORMAT,
         files,measurements,manifestHash,completed:completedAt};
       pending.onsuccess = () => {
         if (pending.result?.state !== 'writing') { fail(); return; }
@@ -235,11 +257,11 @@ export async function openResourceStore({name = RESOURCE_DB, locks = globalThis.
             const chunk = tx.objectStore('chunks').getKey(ref.hash);
             chunk.onsuccess = () => { if (chunk.result === undefined) fail(); };
           }
-          const previous = tx.objectStore('state').get('active');
+          const previous = tx.objectStore('state').get(activeKey(game));
           previous.onsuccess = () => {
-            if (previous.result) tx.objectStore('state').put(previous.result,'previous');
+            if (previous.result) tx.objectStore('state').put(previous.result,previousKey(game));
             tx.objectStore('generations').put(value);
-            tx.objectStore('state').put(run,'active');
+            tx.objectStore('state').put(run,activeKey(game));
             tx.objectStore('state').put(true,'needsCollection');
           };
         };
@@ -248,10 +270,11 @@ export async function openResourceStore({name = RESOURCE_DB, locks = globalThis.
     },
     async discard(run) {
       const [tx,done] = transaction(['state','generations','refs'],'readwrite');
-      const active = tx.objectStore('state').get('active'), previous = tx.objectStore('state').get('previous');
+      // Any game's active or previous one stays.
+      const kept = [];
+      const keys = tx.objectStore('state').openCursor();
       const check = () => {
-        if (active.readyState !== 'done' || previous.readyState !== 'done') return;
-        if ([active.result,previous.result].includes(run)) { tx.abort(); return; }
+        if (kept.includes(run)) { tx.abort(); return; }
         tx.objectStore('state').put(true,'needsCollection');
         tx.objectStore('generations').delete(run);
         const cursor = tx.objectStore('refs').index('run').openKeyCursor(run);
@@ -260,13 +283,18 @@ export async function openResourceStore({name = RESOURCE_DB, locks = globalThis.
           if (entry) { tx.objectStore('refs').delete(entry.primaryKey); entry.continue(); }
         };
       };
-      active.onsuccess = previous.onsuccess = check;
+      keys.onsuccess = () => {
+        const row = keys.result;
+        if (!row) { check(); return; }
+        if (typeof row.key === 'string' && generationKey(row.key) && row.value) kept.push(row.value);
+        row.continue();
+      };
       await done;
     },
     async collect() {
       // Only an exclusive lease may collect. Preserve active and one previous
       // completed generation; no reader can be using a discarded generation.
-      const keep = new Set([await get('state','active'),await get('state','previous')].filter(Boolean));
+      const keep = new Set(await store.liveGenerations());
       for (const item of await all('generations')) if (!keep.has(item.run)) await store.discard(item.run);
       const [tx,done] = transaction(['refs','chunks','state'],'readwrite'), used = new Set();
       const refs = tx.objectStore('refs').openCursor();
@@ -281,6 +309,50 @@ export async function openResourceStore({name = RESOURCE_DB, locks = globalThis.
         };
       };
       await done;
+    },
+    // Every game's active and previous generation.
+    async liveGenerations() {
+      const [tx,done] = transaction('state');
+      const [keys,values] = await Promise.all([request(tx.objectStore('state').getAllKeys()),
+        request(tx.objectStore('state').getAll()),done]);
+      return keys.map((key,index) => typeof key === 'string' && generationKey(key) ? values[index] : null).filter(Boolean);
+    },
+    // The list of games: {current, games:{id:{name,added,played}}}. A
+    // database of one game (format 1) has just the first, when installed.
+    async games() {
+      const value = await get('state','games');
+      if (value && typeof value === 'object' && value.games && typeof value.games === 'object') return value;
+      const installed = !!(await get('state','active'));
+      return {current:FIRST_GAME,games:installed ? {[FIRST_GAME]:{name:'',added:0,played:0}} : {}};
+    },
+    // Writes [value] (from `games`); the format becomes 2 with a second game.
+    async saveGames(value) {
+      if (!value || typeof value !== 'object' || !value.games || typeof value.games !== 'object') throw new Error('Invalid list of games');
+      for (const id of Object.keys(value.games)) gameId(id);
+      gameId(value.current);
+      const several = Object.keys(value.games).some(id => id !== FIRST_GAME);
+      const [tx,done] = transaction('state','readwrite');
+      tx.objectStore('state').put(JSON.parse(JSON.stringify(value)),'games');
+      if (several) tx.objectStore('state').put({format:2,minReader:2,minWriter:2},'format');
+      await done;
+    },
+    // A game deleted: its installation goes (collected), its entry too.
+    async forgetGame(id) {
+      gameId(id);
+      const list = await store.games();
+      delete list.games[id];
+      if (list.current === id) {
+        const next = Object.entries(list.games).sort(([,a],[,b]) => (b.played || b.added || 0) - (a.played || a.added || 0))[0];
+        list.current = next ? next[0] : FIRST_GAME;
+      }
+      const [tx,done] = transaction('state','readwrite');
+      tx.objectStore('state').delete(activeKey(id));
+      tx.objectStore('state').delete(previousKey(id));
+      tx.objectStore('state').put(true,'needsCollection');
+      await done;
+      await store.saveGames(list);
+      await store.collect();
+      return list;
     },
     async recover() {
       await store.active();
@@ -346,6 +418,7 @@ export async function localFiles(options) {
     const manifest = await store.active();
     if (!manifest) { await store.close(); return null; }
     const source = {kind:'local',entries:manifest.files,installation:manifest.run,importMode:manifest.measurements?.mode,mouseAsTouch:false,
+      game:store.game,prefix:gamePrefix(store.game),
       read:(file,offset,length) => store.read(manifest,file,offset,length),close:() => store.close(),
       async saveExchangeResources() {
         // The engine keeps the resource lease throughout the exchange. Only
@@ -355,7 +428,7 @@ export async function localFiles(options) {
           if (file.size > 1024 ** 2) throw new Error('Unexpectedly large game configuration');
           configs.push({path:file.path,bytes:await store.read(manifest,file,0,file.size)});
         }
-        return {active:manifest,configs};
+        return {active:manifest,configs,game:store.game};
       }};
     globalThis.addEventListener?.('pagehide',source.close,{once:true});
     return source;

@@ -10,6 +10,9 @@ import {installHint, installedApp} from './install-hint.js';
 import {countVisit, countEvent} from './visits.js';
 import {language, webText as t} from './strings.js';
 import {abortDetail, abortKind, createHangWatch, hideProblem, previousRunEvents, showProblem} from './problem-view.js';
+import {listGames, setCurrentGame, displayName, gameCard} from './games.js';
+import {createGamesView} from './games-view.js';
+import {USER_DATABASE} from './user-store.js';
 
 const $ = id => document.getElementById(id);
 const viewport = createGameViewport($('canvas'));
@@ -51,12 +54,15 @@ $('tagline').textContent = t('tagline');
 $('privacy').textContent = t('privacy');
 countVisit();
 let source = null;
+// The list of games (games-view.js) and the game started from it.
+let gamesView = null;
+let playedGame = null;
 let starting = false;
 let running = false;
 let updating = false;
 let downloading = false;
 let filesMode = null;
-const appCache = startAppCache({idle:() => !!source && !starting && !running,
+const appCache = startAppCache({idle:() => (!!source || !!gamesView) && !starting && !running,
   onApplying:value => { updating = value; rotatePrompt(); },
   onDownloading:value => { downloading = value; rotatePrompt(); }});
 
@@ -128,6 +134,8 @@ function error(message, detail) {
   $('diagnostics').hidden = true;
   document.body.classList.remove('playing');
   document.body.classList.add('error');
+  // The message is the launcher's panel's, not the list's.
+  document.body.classList.remove('games');
   $('message').textContent = detail?.name === 'StorageBusyError' ? t('already_open') : message;
   $('message').hidden = false;
   $('progress').hidden = true;
@@ -165,7 +173,15 @@ async function exited(status) {
   if (filesMode !== null) {
     const mode = filesMode; filesMode = null;
     await source?.close();
-    location.href = './files.html?mode=' + encodeURIComponent(mode);
+    // "Change game" (the game's menu): the list; else the game's files.
+    location.href = mode === 'games' ? './index.html'
+      : './files.html?mode=' + encodeURIComponent(mode) + (playedGame ? '&game=' + encodeURIComponent(playedGame.id) : '');
+    return;
+  }
+  if (gamesView) {
+    // Back to the list (its game's installation released), fresh.
+    await source?.close();
+    location.href = './index.html';
     return;
   }
   appCache.check();
@@ -180,8 +196,15 @@ async function prepare() {
   document.body.dataset.version = build.version;
   document.body.dataset.webBuild = build.buildId || build.files['fallout2-ce.wasm'].sha256.slice(0, 8);
   $('build-tag').textContent = build.version + ' · ' + document.body.dataset.webBuild;
-  source = await developmentFiles() || await localFiles();
-  if (!source) { location.replace('./files.html'); return; }
+  source = await developmentFiles();
+  if (!source) {
+    // The games installed: their list (the one played last chosen), Play
+    // there. None: the first game's import.
+    const listed = await listGames();
+    if (!listed.games.length) { location.replace('./files.html'); return; }
+    showGames(listed);
+    return;
+  }
   $('play').hidden = !source;
   $('dev-note').textContent = t('dev_note');
   $('dev-note').hidden = source.kind === 'local';
@@ -192,8 +215,23 @@ async function prepare() {
   appCache.check();
 }
 
+function showGames(listed) {
+  document.body.classList.add('games');
+  const host = document.createElement('div');
+  host.id = 'games-view'; host.style.cssText = 'display:contents';
+  // No footer: the notice, version and privacy are on the files page and
+  // in the game's Settings > About.
+  $('games').replaceChildren(host);
+  $('games').hidden = false;
+  gamesView = createGamesView({host,listed,
+    onPlay:() => play(),
+    onAdd:id => { location.href = './files.html?game=' + encodeURIComponent(id) + '&add=1'; },
+    onReplace:id => { location.href = './files.html?game=' + encodeURIComponent(id); },
+    onChanged:() => location.reload()});
+}
+
 async function play() {
-  if (starting || running || updating || !source) return;
+  if (starting || running || updating || (!source && !gamesView)) return;
   if (innerHeight > innerWidth && matchMedia('(pointer:coarse)').matches) return;
   starting = true;
   $('storage-warning').hidden = true;
@@ -212,10 +250,24 @@ async function play() {
     } catch { /* Fullscreen is optional, e.g. in an iOS Home Screen app. */ }
     const webPreviousRun = previousRunEvents(runningMark.get());
     runningMark.clear();
+    if (!source) {
+      // The list's game: played from now on, its installation and its part
+      // of the user's storage.
+      const listed = await listGames();
+      const game = listed.games.find(item => item.id === gamesView.selected);
+      if (!game) throw new Error('The game is gone from the list');
+      await setCurrentGame(game.id);
+      const card = await gameCard(game).catch(() => null);
+      playedGame = {id:game.id,name:displayName(game,card,t('games_unnamed','%1$s'))};
+      source = await localFiles({game:game.id});
+    }
     const module = engine = await globalThis.createFallout2({
       canvas:$('canvas'), noInitialRun:true, webMouseAsTouch:source.mouseAsTouch, webPreviousRun,
       // The engine has no version of its own (app_version.h).
       webAppVersion:document.body.dataset.version, webAppBuild:document.body.dataset.webBuild,
+      // The game's part of the user's storage and its name (game_card.h).
+      webGameUserRoot:USER_DATABASE + (source.prefix ? '/' + source.prefix.replace(/\/$/,'') : ''),
+      webGameName:playedGame?.name || '',
       SDL2, webTextInput:textInput, webViewport:viewport,webWindow:gameWindow,
       webOpenFiles:mode => { filesMode = mode; },
       locateFile:name => new URL('./' + name, import.meta.url).href,

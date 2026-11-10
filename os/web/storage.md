@@ -38,6 +38,38 @@ then marks referenced hashes and deletes only unreferenced chunks. A persistent
 dirty marker avoids scanning all references on every cold open; interruption
 leaves collection retryable. It never touches the user filesystem.
 
+## Several games
+
+Each game is an installation of its own: `resource-store.js` opened with
+`{game}` reads and writes that game's active/previous generation IDs. The first
+game keeps the keys of the builds of one game (`active`, `previous`); others use
+`active:<id>`, `previous:<id>`. Chunks are shared by all games, so a second copy
+of the same files costs almost nothing. Collection keeps every game's active
+and previous generations. The list itself (`games.js`) is `games` in `state`:
+`{current, games:{<id>:{name, added, played}}}`. A database of one game has no
+list and reads as game 1, so origins installed by older builds need no
+migration. The logical format becomes 2 (minReader/minWriter 2) only when a
+second game is added: older builds then refuse the database instead of
+misreading it.
+
+A game's part of the user's storage is the root for game 1 (as before) and
+`games/<id>/` for the others: `savegame`, `settings`, `port`, `exports` under it.
+The engine gets that root as `Module.webGameUserRoot`
+(`src/platform/web/storage.cc`) and its name for the menu as
+`Module.webGameName`. Deleting a game removes its generations and its part of
+the user's storage (the first game's root folders are emptied, other games'
+folders stay).
+
+The launcher always shows the list (`games-view.js`, laid out as Android's
+GamesActivity): Play is the user gesture that starts sound and full screen.
+It has no footer: the unofficial notice, the version and the privacy link are
+on the files page and in the game's Settings > About.
+`files.html?game=<id>&add=1` installs a new game, `files.html?game=<id>`
+replaces one's files; a new game is named after the archive's game folder (or
+the archive), renameable in the list. The game writes its card at the menu
+(`port/card.txt`, `port/card.png`, `src/game_card.cc`): the list's picture,
+version and last save.
+
 ## Safe ZIP replacement
 
 `zip-import.js` uses the pinned, vendored zip.js 2.24.0 inside a dedicated

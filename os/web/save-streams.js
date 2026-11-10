@@ -1,4 +1,4 @@
-import {openResourceStore} from './resource-store.js';
+import {openResourceStore,gamePrefix,FIRST_GAME} from './resource-store.js';
 import {openUserStore,USER_DATABASE} from './user-store.js';
 import {readSaveArchive} from './save-zip-reader.js';
 import {ZipOutput} from './zip-output.js';
@@ -21,9 +21,9 @@ async function textFile(store,path,{job,root = 'root',limit = 16 * 1024 ** 2} = 
 }
 // The installed game's config (`configName` of its ddraw.ini) and ddraw.ini:
 // the player's saved copies, else the game's own.
-async function gameConfigs(owner,active,store) {
+async function gameConfigs(owner,active,store,prefix = '') {
   const read = async path => {
-    const saved = await textFile(store,'settings/' + path,{limit:1024 ** 2}); if (saved) return saved;
+    const saved = await textFile(store,prefix + 'settings/' + path,{limit:1024 ** 2}); if (saved) return saved;
     const file = active?.files.find(f => f.path.toLowerCase() === path.toLowerCase());
     if (!file) return ''; if (file.size > 1024 ** 2) fail('limit','Unexpectedly large game configuration');
     return decodeConfig(await owner.read(active,file,0,file.size));
@@ -31,9 +31,11 @@ async function gameConfigs(owner,active,store) {
   const ddraw = await read('ddraw.ini');
   return [await read(configName(ddraw)),ddraw];
 }
-async function installed(store) {
-  const root = await store.resolve('savegame'), slots = new Map(), occupied = new Set();
-  for await (const folder of store.children(root.id)) {
+// [prefix]: the game's part (`gamePrefix`); a game that never ran has no
+// savegame yet (root null).
+async function installed(store,prefix = '') {
+  const root = await store.resolve(prefix + 'savegame') || null, slots = new Map(), occupied = new Set();
+  if (root) for await (const folder of store.children(root.id)) {
     if (/^\.ce-(write|cleanup)-\d+$/.test(folder.name)) fail('recovery_needed','Start the game once to recover an interrupted legacy save before importing or exporting saves');
     const number = slotNumber(folder.name); if (!number) continue; occupied.add(number);
     const node = await store.lookup(folder.id,'save.dat');
@@ -45,7 +47,7 @@ async function installed(store) {
       slots.set(number,{folder,node,id:prefix.length ? saveIdentity(prefix,node.size) : ''});
     }
   }
-  return {root,slots,occupied,records:parseRecords(await textFile(store,'port/saves.txt'))};
+  return {root,slots,occupied,records:parseRecords(await textFile(store,prefix + 'port/saves.txt'))};
 }
 async function removeTree(store,job,node) {
   if ((node.mode & 0o170000) === 0o040000) for await (const child of store.children(node.id)) await removeTree(store,job,child);
@@ -57,7 +59,8 @@ async function copyTree(store,scan,apply,node,parent,name) {
   if ((node.mode & 0o170000) === 0o040000) for await (const child of store.children(node.id,{job:scan})) await copyTree(store,scan,apply,child,node.id,child.name);
 }
 export async function prepareSaveZip(file,{signal,storeFactory = openResourceStore,userName = USER_DATABASE,
-  progress = () => {},rootHint,moduleFactory,archiveReader = readSaveArchive} = {}) {
+  progress = () => {},rootHint,moduleFactory,archiveReader = readSaveArchive,game = FIRST_GAME} = {}) {
+  const prefix = gamePrefix(game);
   let owner,store,scan,apply,disposed = false,used = false;
   const dispose = async () => {
     if (disposed) return; disposed = true;
@@ -94,16 +97,16 @@ export async function prepareSaveZip(file,{signal,storeFactory = openResourceSto
     const shallow = [...roots.values()].filter(r => r.depth === Math.min(...[...roots.values()].map(r => r.depth)));
     if (!shallow.length) fail('no_saves','No SLOT folders with SAVE.DAT');
     if (shallow.length !== 1) fail('ambiguous_root','Several save folders at the same depth');
-    const found = shallow[0], parent = found.root.replace(/[^/]+\/$/,''), current = await installed(store);
+    const found = shallow[0], parent = found.root.replace(/[^/]+\/$/,''), current = await installed(store,prefix);
     const info = await textFile(store,found.root + 'fallout2-saves.txt',{job:scan,root:scanRoot}) || await textFile(store,parent + 'fallout2-saves.txt',{job:scan,root:scanRoot});
-    const sourceRecords = parseRecords(info), [first,end] = quickRange(...await gameConfigs(owner,active,store));
+    const sourceRecords = parseRecords(info), [first,end] = quickRange(...await gameConfigs(owner,active,store,prefix));
     const sourceDdraw = await textFile(store,parent + 'ddraw.ini',{job:scan,root:scanRoot});
     const sourceQuick = quickRange(await textFile(store,parent + configName(sourceDdraw),{job:scan,root:scanRoot}),sourceDdraw);
     const ids = new Set([...current.slots.values()].map(s => s.id)), saves = [...found.slots.values()], unordered = [];
-    const currentComposition = (await textFile(store,'port/resource-installation.txt')).trim() === active.run
-      ? (await textFile(store,'port/game-composition.txt')).trim() : '';
+    const currentComposition = (await textFile(store,prefix + 'port/resource-installation.txt')).trim() === active.run
+      ? (await textFile(store,prefix + 'port/game-composition.txt')).trim() : '';
     const comparisons = new Map();
-    const [config] = await gameConfigs(owner,active,store); let charset;
+    const [config] = await gameConfigs(owner,active,store,prefix); let charset;
     try { charset = new TextDecoder(configValue(config,'system','language') === 'russian' ? 'windows-1251' : 'windows-1252'); } catch { charset = new TextDecoder(); }
     for (const item of saves) {
       const known = sourceRecords.get(item.slot);
@@ -152,16 +155,17 @@ export async function prepareSaveZip(file,{signal,storeFactory = openResourceSto
         if (plan.error) fail('slot_limit','Not enough matching free save slots');
         checkCancelled(writeSignal); apply = await store.begin('save-import');
         const records = replaceAll ? new Map() : new Map(current.records);
-        if (replaceAll) for await (const folder of store.children(current.root.id)) if (slotNumber(folder.name)) await removeTree(store,apply,folder);
+        const saveRoot = current.root || await store.resolve(prefix + 'savegame',{job:apply,create:true});
+        if (replaceAll && current.root) for await (const folder of store.children(current.root.id)) if (slotNumber(folder.name)) await removeTree(store,apply,folder);
         let done = 0;
         for (const {item,target} of plan.assignments) {
           checkCancelled(writeSignal);
           const folder = await store.node(item.node.parent,scan);
-          await copyTree(store,scan,apply,folder,current.root.id,slotName(target));
+          await copyTree(store,scan,apply,folder,saveRoot.id,slotName(target));
           records.set(target,{...item.record,quick:target >= first && target < end});
           notify(notice,{phase:'save-import',files:++done,totalFiles:plan.assignments.length,cancelAllowed:true});
         }
-        await store.putFile(apply,'port/saves.txt',input(encode(recordText(records,{exported:false}))),{signal:writeSignal});
+        await store.putFile(apply,prefix + 'port/saves.txt',input(encode(recordText(records,{exported:false}))),{signal:writeSignal});
         checkCancelled(writeSignal); notify(notice,{phase:'commit',cancelAllowed:false});
         await store.commit(apply); apply = null;
         // Cleanup cannot turn a confirmed commit into a reported failure.
@@ -172,19 +176,19 @@ export async function prepareSaveZip(file,{signal,storeFactory = openResourceSto
 }
 
 export async function exportSaveZip({signal,storeFactory = openResourceStore,userName = USER_DATABASE,
-  progress = () => {},temporary = temporaryExport} = {}) {
+  progress = () => {},temporary = temporaryExport,game = FIRST_GAME} = {}) {
   const owner = await storeFactory(); let store;
   try {
     store = await openUserStore({name:userName,signal});
-    return await writeExport(owner,store,{signal,progress,temporary});
+    return await writeExport(owner,store,{signal,progress,temporary,prefix:gamePrefix(game)});
   } finally { await store?.close(); await owner.close(); }
 }
-async function writeExport(owner,store,{signal,progress = () => {},temporary = temporaryExport} = {}) {
+async function writeExport(owner,store,{signal,progress = () => {},temporary = temporaryExport,prefix = ''} = {}) {
   let temp,complete = false;
   try {
     const active = await owner.active();
-    const current = await installed(store); if (!current.slots.size) fail('no_saves','No saves to export');
-    const [first,end] = quickRange(...await gameConfigs(owner,active,store));
+    const current = await installed(store,prefix); if (!current.slots.size) fail('no_saves','No saves to export');
+    const [first,end] = quickRange(...await gameConfigs(owner,active,store,prefix));
     const records = new Map(); let total = 0, overhead = 0;
     // Holding both leases pins the committed library throughout export.
     for (const [number,slot] of current.slots) {
@@ -217,8 +221,50 @@ async function writeExport(owner,store,{signal,progress = () => {},temporary = t
     return {blob:file,slots:current.slots.size,filename:'Fallout2-saves-' + new Date().toISOString().slice(0,10) + '.zip',bytes:file.size};
   } finally { if (!complete) await temp?.discard().catch(() => {}); }
 }
-export async function launcherFont({name = USER_DATABASE} = {}) {
+export async function launcherFont({name = USER_DATABASE,game = FIRST_GAME} = {}) {
   const {userSettingText} = await import('./user-report.js');
-  const config = configName(await userSettingText('settings/ddraw.ini',{name}));
-  return configValue(await userSettingText('settings/' + config,{name}),'touch','font') === '1' ? 1 : 0;
+  const prefix = gamePrefix(game);
+  const config = configName(await userSettingText(prefix + 'settings/ddraw.ini',{name}));
+  return configValue(await userSettingText(prefix + 'settings/' + config,{name}),'touch','font') === '1' ? 1 : 0;
+}
+
+// [game]'s files replaced: its card picture (game_card.cc writes it once)
+// made again at its next menu, as Android's Games.forgetPicture.
+export async function forgetGamePicture({name = USER_DATABASE,game = FIRST_GAME,signal} = {}) {
+  const store = await openUserStore({name,signal});
+  let job;
+  try {
+    const folder = await store.resolve(gamePrefix(game) + 'port').catch(() => null);
+    const picture = folder && await store.lookup(folder.id,'card.png');
+    if (!picture) return;
+    job = await store.begin('forget-picture');
+    await store.stage(job,{...picture,deleted:true});
+    await store.commit(job); job = null;
+  } finally {
+    if (job) await store.discard(job).catch(() => {});
+    await store.close();
+  }
+}
+
+// A deleted game's part of the user's storage: its saves, settings and the
+// port's records (the first game's in the root, its folders kept empty).
+export async function forgetGameFiles({name = USER_DATABASE,game,signal} = {}) {
+  const store = await openUserStore({name,signal});
+  let job;
+  try {
+    job = await store.begin('delete-game');
+    if (game === FIRST_GAME) {
+      for (const folder of ['savegame','settings','port','exports']) {
+        const node = await store.resolve(folder,{job});
+        if (node) for await (const child of store.children(node.id,{job})) await removeTree(store,job,child);
+      }
+    } else {
+      const node = await store.resolve(gamePrefix(game),{job});
+      if (node) await removeTree(store,job,node);
+    }
+    await store.commit(job); job = null;
+  } finally {
+    if (job) await store.discard(job).catch(() => {});
+    await store.close();
+  }
 }

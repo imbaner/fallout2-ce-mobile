@@ -2,9 +2,17 @@ import {lazyUserFilesystem} from './user-lazy-filesystem.js';
 import {USER_DATABASE} from './user-store.js';
 import {BLOCK_SIZE} from './storage-common.js';
 
+// [options.prefix]: the game's part of the storage (`gamePrefix`): its
+// savegame, settings, port and exports folders under `gameRoot`.
 export async function mountLazyUserFiles(module,options = {}) {
   const FS = module.FS, backend = await lazyUserFilesystem(module,options), root = USER_DATABASE;
   FS.mkdirTree(root); FS.mount(backend.type,{},root);
+  const gameRoot = options.prefix ? root + '/' + options.prefix.replace(/\/$/,'') : root;
+  if (options.prefix) {
+    // A new game's folders, kept by the next checkpoint (its first save or
+    // settings).
+    for (const folder of ['savegame','settings','port','exports']) await backend.run(() => FS.mkdirTree(gameRoot + '/' + folder));
+  }
   let active = false, blocked = false, error = null, commits = 0;
   const notify = (name,value) => { try { module[name]?.(value); } catch (e) { console.error('Storage notice failed',e); } };
   const close = () => { globalThis.removeEventListener?.('pagehide',close); return backend.close(); };
@@ -30,7 +38,7 @@ export async function mountLazyUserFiles(module,options = {}) {
     } finally { FS.close(stream); }
   }
   const user = {
-    root,close,run:backend.run,readFile:path => fileIO(path),writeFile:(path,data) => fileIO(path,data),
+    root,gameRoot,close,run:backend.run,readFile:path => fileIO(path),writeFile:(path,data) => fileIO(path,data),
     exists:path => backend.run(() => { try { FS.lookupPath(path); return true; } catch (e) { if (e.errno === 44) return false; throw e; } }),
     status:() => ({format:3,commits,blocked,error,suspended:backend.suspended,...backend.stats()}),
     suspend:() => operation(() => backend.suspend()),

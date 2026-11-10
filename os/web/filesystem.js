@@ -59,7 +59,7 @@ export async function mountGame(module, source) {
   const FS = module.FS;
   // Development sessions get their own temporary saves, never the real local
   // user's store. Every permanent/local launch already holds the writer lease.
-  const user = source.kind === 'local' ? await mountUserFiles(module) : null;
+  const user = source.kind === 'local' ? await mountUserFiles(module,{prefix:source.prefix || ''}) : null;
   module.webUserFiles = user;
   module.webStorageMode = user ? 'persistent' : 'temporary';
   const root = '/game';

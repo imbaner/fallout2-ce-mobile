@@ -3,7 +3,10 @@ import {installHint} from './install-hint.js';
 import {countEvent} from './visits.js';
 import {language, webText as t} from './strings.js';
 
-export function createFilesManager({root = document, mode = null, resources = null, buildId = null, onReturn = () => { location.href = './index.html'; }, download = null} = {}) {
+// [game]: the game of the list of games it works on; [adding]: a new one
+// (back leaves it with nothing installed); [onInstalled]: its files are in.
+export function createFilesManager({root = document, mode = null, resources = null, buildId = null, onReturn = () => { location.href = './index.html'; }, download = null,
+  game = '1', adding = false, onInstalled = async () => {}} = {}) {
   const $ = id => root.getElementById(id);
   const surface = root.host || document.body;
   document.documentElement.lang = language;
@@ -42,7 +45,7 @@ export function createFilesManager({root = document, mode = null, resources = nu
   // The corner arrow has Android's meaning: leave the manager for the game.
   // A previous step (e.g. replace confirmation -> review) is separate, like
   // Android's system Back, and is also available through Escape here.
-  function back(action) { previousStep = action; $('back').hidden = busy || !active; }
+  function back(action) { previousStep = action; $('back').hidden = busy || !(active || adding); }
   function show(title,message,details = '',note = '') {
     clearTimeout(doneTimer); doneTimer = null;
     $('download').hidden = true;
@@ -60,7 +63,7 @@ export function createFilesManager({root = document, mode = null, resources = nu
     }
   }
   function returnToGame() {
-    if (busy || !active) return;
+    if (busy || !(active || adding)) return;
     returning = true;
     show(labels.title,t('returning'));
     if (failedWorker) { play(); return; }
@@ -98,7 +101,7 @@ export function createFilesManager({root = document, mode = null, resources = nu
     buttons(null,['inspect','inspect-saves','install','install-saves','export-saves','export-before-replace'].includes(type)
       ? [labels.cancel,() => { cancelling = true; $('secondary').disabled = true; $('message').textContent = t('cancelling'); worker.postMessage({type:'cancel'}); }] : null);
     if (type === 'install-saves') $('message').textContent = n('saves_copying');
-    worker.postMessage({type,...extra,...(type === 'status' && resources ? {resources} : {})});
+    worker.postMessage({type,...extra,...(type === 'status' ? (resources ? {resources} : {game}) : {})});
   }
   function inspect(mode,chosen,rootHint) {
     file = chosen;
@@ -231,6 +234,15 @@ export function createFilesManager({root = document, mode = null, resources = nu
       }
       plan = data.plan;
       if (data.action === 'install' || data.action === 'install-saves') countEvent(data.action === 'install' ? 'files-installed' : 'saves-imported');
+      if (data.action === 'install') {
+        // Listed before anything else can happen (the list of games).
+        busy = true;
+        onInstalled(oldPlan).catch(error => console.warn('Game not listed',error)).finally(() => { busy = false; afterResult(data,oldPlan); });
+        return;
+      }
+      afterResult(data,oldPlan);
+    };
+    function afterResult(data,oldPlan) {
       if (returning) { returning = false; play(); return; }
       if (['export-saves','export-before-replace'].includes(data.action)) { exported(data.exchange,data.action === 'export-before-replace' ? confirmReplace : null); return; }
       if (plan) { review(); return; }
@@ -249,7 +261,7 @@ export function createFilesManager({root = document, mode = null, resources = nu
       } else if (data.action === 'status' && initialMode === 'saves_export') {
         show(labels.saves,n('saves_exporting')); send('export-saves');
       }
-    };
+    }
     busy = false; send('status');
   }
   $('archive').onchange = async () => {

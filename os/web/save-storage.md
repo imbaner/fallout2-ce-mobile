@@ -31,6 +31,10 @@ checkpoints do bounded cleanup. Active/previous contents and active jobs are
 pinned. Collector and writer operations on a handle are serialized. Closing a
 handle aborts in-flight publication transactions.
 
+Each game of the list has its own part of this tree: the root for the first
+game, `games/<id>/` for the others (`storage.md`, "Several games"). Save import
+and export take the game's prefix.
+
 ## Engine adapter
 
 `user-lazy-filesystem.js` keeps a 16 MiB block cache and a 2048-node metadata
