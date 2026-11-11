@@ -64,7 +64,8 @@ public class GamesActivity extends Activity {
     // background.
     private static final class Stats {
         int saves;
-        long size;
+        // Of all its files, -1: still counted (after every game's picture).
+        long size = -1;
         String language;
         List<String> mods = new ArrayList<>();
         Map<String, String> card = new HashMap<>();
@@ -358,10 +359,31 @@ public class GamesActivity extends Activity {
                     failedId = null;
                 }
             });
-            for (Games.Info info : games) {
-                Stats found = computeStats(info);
+            // The pictures first, the one chosen before the others: a
+            // game's size is a walk over all its files (seconds in
+            // Android/media), its picture shows without it.
+            List<Games.Info> ordered = new ArrayList<>(games);
+            String chosen = selectedId;
+            for (int index = 0; index < ordered.size(); index++) {
+                if (ordered.get(index).game.id.equals(chosen)) {
+                    ordered.add(0, ordered.remove(index));
+                    break;
+                }
+            }
+            List<Stats> found = new ArrayList<>();
+            for (Games.Info info : ordered) {
+                Stats one = computeStats(info);
+                found.add(one);
                 runOnUiThread(() -> {
-                    stats.put(info.game.id, found);
+                    stats.put(info.game.id, one);
+                    refresh();
+                });
+            }
+            for (int index = 0; index < ordered.size(); index++) {
+                Stats one = found.get(index);
+                long size = size(ordered.get(index).game.folder);
+                runOnUiThread(() -> {
+                    one.size = size;
                     refresh();
                 });
             }
@@ -372,7 +394,6 @@ public class GamesActivity extends Activity {
         Stats found = new Stats();
         File folder = info.game.folder;
         found.saves = GameSaves.installedSaves(folder).size();
-        found.size = size(folder);
         try {
             File config = GameFiles.configFile(folder);
             found.language = config.isFile() ? GameSaves.configValue(GameFiles.readText(config), "system", "language") : null;
@@ -396,7 +417,7 @@ public class GamesActivity extends Activity {
         File picture = Games.cardPicture(info.game);
         if (picture.isFile()) {
             found.picture = decode(picture, 1280);
-            found.thumbnail = decode(picture, 320);
+            found.thumbnail = thumbnail(found.picture, 320);
         }
         return found;
     }
@@ -412,6 +433,15 @@ public class GamesActivity extends Activity {
             options.inSampleSize *= 2;
         }
         return BitmapFactory.decodeFile(file.getPath(), options);
+    }
+
+    // [picture] no wider than [width] (once decoded, not twice).
+    private static Bitmap thumbnail(Bitmap picture, int width) {
+        if (picture == null || picture.getWidth() <= width) {
+            return picture;
+        }
+        int height = Math.max(1, Math.round((float) picture.getHeight() * width / picture.getWidth()));
+        return Bitmap.createScaledBitmap(picture, width, height, true);
     }
 
     private static long size(File file) {
@@ -508,7 +538,9 @@ public class GamesActivity extends Activity {
         if (found.saves > 0) {
             parts.add(getResources().getQuantityString(R.plurals.games_saves, found.saves, found.saves));
         }
-        parts.add(Formatter.formatShortFileSize(this, found.size));
+        if (found.size >= 0) {
+            parts.add(Formatter.formatShortFileSize(this, found.size));
+        }
         parts.add(ImportActivity.languageName(found.language));
         return String.join(" · ", parts);
     }
@@ -569,7 +601,7 @@ public class GamesActivity extends Activity {
         rows.removeAllViews();
         if (found != null) {
             addRow(rows, R.string.games_label_saves, Integer.toString(found.saves));
-            addRow(rows, R.string.games_label_size, Formatter.formatShortFileSize(this, found.size));
+            addRow(rows, R.string.games_label_size, found.size >= 0 ? Formatter.formatShortFileSize(this, found.size) : "…");
             addRow(rows, R.string.games_label_language, ImportActivity.languageName(found.language));
         }
         if (info.added > 0) {
@@ -711,7 +743,7 @@ public class GamesActivity extends Activity {
         }
         Stats found = stats.get(info.game.id);
         int saves = found != null ? found.saves : 0;
-        String size = found != null ? Formatter.formatShortFileSize(this, found.size) : "?";
+        String size = found != null && found.size >= 0 ? Formatter.formatShortFileSize(this, found.size) : "?";
         String text = getString(R.string.games_delete_text, size, getResources().getQuantityString(R.plurals.games_saves, saves, saves));
         List<Action> actions = new ArrayList<>();
         actions.add(new Action(getString(R.string.games_cancel), STYLE_NORMAL, null));
