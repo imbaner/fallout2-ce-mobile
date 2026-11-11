@@ -68,6 +68,8 @@ namespace {
 
     FloatingTextScreen gFloatingTextScreen;
     bool gFloatingTextPushed = false;
+    // Drawn at the last frame (the autotests).
+    int gFloatingTextShown = 0;
 
     void FloatingTextScreen::build(MuiContext& ui)
     {
@@ -86,6 +88,7 @@ namespace {
             screen.h - (metrics.insetTop + metrics.insetBottom) * scale - ui.dp(kMarginDp) * 2.0f,
         };
 
+        gFloatingTextShown = 0;
         int count = textObjectsGetCount();
         for (int index = 0; index < count; index++) {
             TextObjectView view;
@@ -110,6 +113,16 @@ namespace {
             }
             float height = lineHeight * lines.size();
 
+            // Only of who is on screen, as in the game (its texts stay at
+            // their tiles, off the window when they are): a zoomed out map
+            // hears the whole map (#36).
+            int speakerX;
+            int speakerY;
+            worldViewWorldToScreen(tileX + 16, tileY, &speakerX, &speakerY);
+            if (!screen.contains(speakerX * scale, speakerY * scale)) {
+                continue;
+            }
+
             // Over the head (its bottom), or at the tile (its top).
             int anchorX;
             int anchorY;
@@ -117,7 +130,7 @@ namespace {
             float x = anchorX * scale - width / 2.0f;
             float y = view.aboveTile ? anchorY * scale - height : anchorY * scale;
 
-            // On screen, whole.
+            // On screen, whole (a speaker at its edge).
             x = std::clamp(x, bounds.x, std::max(bounds.x, bounds.right() - width));
             y = std::clamp(y, bounds.y, std::max(bounds.y, bounds.bottom() - height));
 
@@ -135,6 +148,7 @@ namespace {
                 }
                 muiDrawTextAligned(lines[line], rect, size, color, MuiAlign::Center, MuiAlign::Center);
             }
+            gFloatingTextShown++;
         }
     }
 
@@ -148,6 +162,11 @@ void muiFloatingTextInit()
         muiPush(&gFloatingTextScreen);
         gFloatingTextPushed = true;
     }
+}
+
+int muiFloatingTextShownCount()
+{
+    return gFloatingTextScreen.isActive() ? gFloatingTextShown : 0;
 }
 
 } // namespace fallout

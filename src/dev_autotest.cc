@@ -48,6 +48,7 @@
 #include "mouse.h"
 #include "movie.h"
 #include "mui.h"
+#include "mui_floating_text.h"
 #include "mui_draw.h"
 #include "mui_icons.h"
 #include "object.h"
@@ -3939,7 +3940,9 @@ static const DevAutotestStep kDevAutotestBarterPartySteps[] = {
 };
 
 // The game's floating texts over the map at a fixed size (mui_floating_text.cc):
-// over the dude's head at zoom 1, 0.5 and 3, kept on screen near an edge.
+// over the dude's head at zoom 1, 0.5 and 3, kept on screen near an edge;
+// with the dude off screen, not shown (#36: Den's slaves heard from across
+// the map at its edge).
 static const DevAutotestStep kDevAutotestFloatTextSteps[] = {
     { DEV_AUTOTEST_ACTION_NONE, 0, 0, 0, 30, "f00_start" },
     { DEV_AUTOTEST_ACTION_FLOAT_TEXT, 1, 0, 0, 20, "f01_text", "\xcf\xf0\xe8\xe2\xe5\xf2, \xed\xe5\xe7\xed\xe0\xea\xee\xec\xe5\xf6! Long words wrap into lines over the speaker's head." },
@@ -3947,6 +3950,9 @@ static const DevAutotestStep kDevAutotestFloatTextSteps[] = {
     { DEV_AUTOTEST_ACTION_ZOOM_AT_DUDE, 3.0f, 0, 0, 20, "f03_zoom300" },
     { DEV_AUTOTEST_ACTION_ZOOM_AT_DUDE, 1.0f, 0, 0, 20, "f04_zoom100" },
     { DEV_AUTOTEST_ACTION_PAN, 0, -260, 0, 20, "f05_dude_near_top" },
+    { DEV_AUTOTEST_ACTION_FLOAT_TEXT, 2, 1, 0, 1, "f06_shown_near_edge" },
+    { DEV_AUTOTEST_ACTION_FLOAT_TEXT, 3, 0, 0, 20, "f07_far_speaker" },
+    { DEV_AUTOTEST_ACTION_FLOAT_TEXT, 2, 0, 0, 1, "f08_not_shown" },
 };
 
 // A scene faded out and in by a script (gfade_out, gfade_in) while the map's
@@ -7057,10 +7063,20 @@ void devAutotestTick()
                 const FrmId frmId(gDude);
                 bool fromSet = artFromSet(frmId);
                 bool pixels = ownPixels(frmId);
+                // An animation of the hero with no art name (a weapon's
+                // animation without a weapon: `_art_get_code`): none, as
+                // without the sets (#37: it crashed in the set's archive).
+                const FrmId unnamed(gDude, ANIM_FIRE_SINGLE, WeaponAnimation::None);
+                CacheEntry* unnamedHandle;
+                Art* unnamedArt = artLock(unnamed, &unnamedHandle);
+                if (unnamedArt != nullptr) {
+                    artUnlock(unnamedHandle);
+                }
+                bool noUnnamed = artIsHeroFrmId(unnamed) && unnamed.filePath() == nullptr && unnamedArt == nullptr;
                 ok = heroAppearanceHasChoice() && maleRaces == 3 && femaleStyles == 4 && !name.empty() && chosen
-                    && heroAppearanceRace() == 1 && artIsHeroFrmId(frmId) && fromSet && pixels;
-                devAutotestLog("  mode %d, male races %d, female styles %d, race 1 name \"%s\"; chosen %d, dude art %d (hero %d, from the set %d, own pixels %d): %s\n",
-                    heroAppearanceMode(), maleRaces, femaleStyles, name.c_str(), chosen ? 1 : 0, frmId.frameId(), artIsHeroFrmId(frmId) ? 1 : 0, fromSet ? 1 : 0, pixels ? 1 : 0, ok ? "PASS" : "FAIL");
+                    && heroAppearanceRace() == 1 && artIsHeroFrmId(frmId) && fromSet && pixels && noUnnamed;
+                devAutotestLog("  mode %d, male races %d, female styles %d, race 1 name \"%s\"; chosen %d, dude art %d (hero %d, from the set %d, own pixels %d), no art without a name %d: %s\n",
+                    heroAppearanceMode(), maleRaces, femaleStyles, name.c_str(), chosen ? 1 : 0, frmId.frameId(), artIsHeroFrmId(frmId) ? 1 : 0, fromSet ? 1 : 0, pixels ? 1 : 0, noUnnamed ? 1 : 0, ok ? "PASS" : "FAIL");
                 break;
             }
             case 2: {
@@ -8983,19 +8999,55 @@ void devAutotestTick()
             break;
         }
         case DEV_AUTOTEST_ACTION_FLOAT_TEXT: {
-            // Centered on dude, so the text is on screen. [a] 1 - the color
+            // [a] 2: the texts drawn over the map are [b].
+            if (step->a == 2) {
+                int shown = muiFloatingTextShownCount();
+                bool ok = textObjectsGetCount() != 0 && shown == static_cast<int>(step->b);
+                devAutotestLog("  floating texts %d, drawn %d (expected %d): %s\n", textObjectsGetCount(), shown, static_cast<int>(step->b), ok ? "PASS" : "FAIL");
+                if (!ok) {
+                    exit(EXIT_FAILURE);
+                }
+                break;
+            }
+            // Centered on dude, so the text is on screen; [a] 3: over a
+            // thing of the map off screen (a far speaker). [a] 1 - the color
             // of scripts' `float_msg` and [widget]'s text.
             tileSetCenter(gDude->tile, TILE_SET_CENTER_REFRESH_WINDOW);
+            Object* speaker = gDude;
+            if (step->a == 3) {
+                // Only its text.
+                textObjectsReset();
+                speaker = nullptr;
+                for (Object* object = objectFindFirstAtElevation(gDude->elevation); object != nullptr && speaker == nullptr; object = objectFindNextAtElevation()) {
+                    if (object->tile < 0 || object->pid == -1) {
+                        continue;
+                    }
+                    int worldX;
+                    int worldY;
+                    tileToScreenXY(object->tile, &worldX, &worldY);
+                    int screenX;
+                    int screenY;
+                    worldViewWorldToScreen(worldX + 16, worldY, &screenX, &screenY);
+                    if (screenX < -200 || screenX >= screenGetWidth() + 200 || screenY < -200 || screenY >= screenGetHeight() + 200) {
+                        speaker = object;
+                        devAutotestLog("  speaker pid %d at tile %d, on screen (%d, %d)\n", object->pid, object->tile, screenX, screenY);
+                    }
+                }
+                if (speaker == nullptr) {
+                    devAutotestLog("  no thing off screen: FAIL\n");
+                    exit(EXIT_FAILURE);
+                }
+            }
             char text[256] = "Floating text test";
             if (step->widget != nullptr) {
                 snprintf(text, sizeof(text), "%s", step->widget);
             }
             Rect rect;
-            int rc = textObjectAdd(gDude, text, 101, step->a == 1 ? COLOR_LIGHT_YELLOW : COLOR_GREEN, COLOR_BLACK, &rect);
+            int rc = textObjectAdd(speaker, text, 101, step->a == 1 ? COLOR_LIGHT_YELLOW : COLOR_GREEN, COLOR_BLACK, &rect);
             if (rc == 0) {
                 tileWindowRefreshRect(&rect, gElevation);
             }
-            devAutotestLog("  floating text over dude: rc %d, rect (%d, %d) - (%d, %d)\n", rc, rect.left, rect.top, rect.right, rect.bottom);
+            devAutotestLog("  floating text: rc %d, rect (%d, %d) - (%d, %d)\n", rc, rect.left, rect.top, rect.right, rect.bottom);
             break;
         }
         case DEV_AUTOTEST_ACTION_KILL_CRITTER:

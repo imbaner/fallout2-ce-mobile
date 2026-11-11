@@ -339,6 +339,12 @@ void heroAppearanceGetStyleText(int gender, int race, int style, std::string* na
 
 File* heroAppearanceOpenFile(const char* path)
 {
+    // No path: an animation the hero's weapon has no art name for
+    // (`FrmId::filePath`), not in any set either.
+    if (path == nullptr) {
+        return nullptr;
+    }
+
     File* stream = setOpenFile(gHeroStyleSet, path, "rb");
     if (stream == nullptr) {
         stream = setOpenFile(gHeroRaceSet, path, "rb");
