@@ -110,14 +110,14 @@ static bool _combat_add_noncoms();
 static int _compare_faster(const void* critter1Ptr, const void* critter2Ptr);
 static void _combat_sequence_init(Object* attacker, Object* defender);
 static void _combat_sequence();
-static void combatAttemptEnd();
+static bool combatAttemptEnd();
 static int _combat_input();
 static void _combat_set_move(Object* object);
 static int combatTurnHooked(Object* obj, bool reloadedDuringCombat);
 static void queueGorisCombatBeginEndAnimation(Object* critter, CritterFrameId baseFrameId);
 static void waitForGorisAnimation(Object* critter);
 static int _combat_turn(Object* obj, bool reloadedDuringCombat);
-static bool _combat_should_end();
+static bool _combat_should_end(bool afterSequence = false);
 static bool _check_ranged_miss(Attack* attack);
 static int _shoot_along_path(Attack* attack, int endTile, int rounds, AnimationType anim);
 static Roll _compute_spray(Attack* attack, int accuracy, int* roundsHitMainTargetPtr, int* roundsFiredPtr, AnimationType anim);
@@ -3206,7 +3206,9 @@ static void _combat_sequence()
 }
 
 // 0x422694
-static void combatAttemptEnd()
+//
+// CE: Returns whether the combat ends.
+static bool combatAttemptEnd()
 {
     if (_combat_elev == gDude->elevation) {
         MessageListItem messageListItem;
@@ -3223,7 +3225,7 @@ static void combatAttemptEnd()
                         if (messageListGetItem(&gCombatMessageList, &messageListItem)) {
                             displayMonitorAddMessage(messageListItem.text);
                         }
-                        return;
+                        return false;
                     }
                 }
             }
@@ -3240,7 +3242,7 @@ static void combatAttemptEnd()
                         if (messageListGetItem(&gCombatMessageList, &messageListItem)) {
                             displayMonitorAddMessage(messageListItem.text);
                         }
-                        return;
+                        return false;
                     }
                 }
             }
@@ -3249,6 +3251,53 @@ static void combatAttemptEnd()
 
     gCombatState |= COMBAT_STATE_EXIT_REQUESTED;
     _caiTeamCombatExit();
+    return true;
+}
+
+CombatEndOutlook combatEndOutlook()
+{
+    if (!isInCombat() || _combat_should_end(true)) {
+        return CombatEndOutlook::EndsThisRound;
+    }
+
+    // Another level: End Combat asks nobody (`combatAttemptEnd`).
+    if (_combat_elev != gDude->elevation) {
+        return CombatEndOutlook::Possible;
+    }
+
+    // The combatants End Combat asks, by what `_combatai_want_to_stop`
+    // finds. Its danger source of a critter not in the party is the one
+    // that hit it, while that is alive; others (no living attacker, party
+    // members by their orders) can't be told without running the AI.
+    int dudeTeam = gDude->data.critter.combat.team;
+    for (int index = 0; index < _list_com; index++) {
+        Object* critter = _combat_list[index];
+        if (critter == gDude) {
+            continue;
+        }
+
+        int critterTeam = critter->data.critter.combat.team;
+        Object* critterWhoHitMe = critter->data.critter.combat.whoHitMe;
+        if (critterTeam == dudeTeam && (critterWhoHitMe == nullptr || critterWhoHitMe->data.critter.combat.team != critterTeam)) {
+            continue;
+        }
+
+        if ((critter->data.critter.combat.maneuver & (CRITTER_MANEUVER_DISENGAGING | CRITTER_MANUEVER_FLEEING)) != CRITTER_MANEUVER_NONE
+            || (critter->data.critter.combat.results & (DAM_KNOCKED_OUT | DAM_DEAD)) != DAM_NONE
+            || objectIsPartyMember(critter)) {
+            continue;
+        }
+
+        if (critterWhoHitMe != nullptr
+            && critterWhoHitMe != critter
+            && (critterWhoHitMe->data.critter.combat.results & DAM_DEAD) == DAM_NONE
+            && isWithinPerception(critter, critterWhoHitMe)) {
+            return CombatEndOutlook::Refused;
+        }
+    }
+
+    // Bystanders who may join are asked by their scripts.
+    return CombatEndOutlook::Possible;
 }
 
 // 0x4227DC
@@ -3316,7 +3365,12 @@ static int _combat_input()
         }
 
         if (keyCode == KEY_RETURN || (hasCommand && command.type == GameCommandType::EndCombat)) {
-            combatAttemptEnd();
+            // The touch HUD's single button when the combat ends this round
+            // anyway (`combatEndOutlook`): refused (a bystander joins), it
+            // ends the turn.
+            if (!combatAttemptEnd() && hasCommand && command.value == kGameCommandEndCombatOrTurn) {
+                break;
+            }
         } else {
             _scripts_check_state_in_combat();
             gameHandleKey(keyCode, true);
@@ -3560,9 +3614,27 @@ static void waitForGorisAnimation(Object* critter)
 }
 
 // 0x422C60
-static bool _combat_should_end()
+// CE: [afterSequence] - as it will be at the round's end, after
+// `_combat_sequence` takes the dead, knocked out and disengaged out of the
+// combatants (`combatEndOutlook` asks during a turn).
+static bool _combat_should_end(bool afterSequence)
 {
-    if (_list_com <= 1) {
+    // Whether `_combat_sequence` takes [critter] out of the combatants.
+    auto leaves = [afterSequence](Object* critter) {
+        return afterSequence
+            && critter != gDude
+            && ((critter->data.critter.combat.results & (DAM_DEAD | DAM_KNOCKED_OUT)) != DAM_NONE
+                || critter->data.critter.combat.maneuver == CRITTER_MANEUVER_DISENGAGING);
+    };
+
+    int combatants = 0;
+    for (int index = 0; index < _list_com; index++) {
+        if (!leaves(_combat_list[index])) {
+            combatants++;
+        }
+    }
+
+    if (combatants <= 1) {
         return true;
     }
 
@@ -3581,6 +3653,10 @@ static bool _combat_should_end()
 
     for (index = 0; index < _list_com; index++) {
         Object* critter = _combat_list[index];
+        if (leaves(critter)) {
+            continue;
+        }
+
         Object* critterWhoHitMe = critter->data.critter.combat.whoHitMe;
         if (critterWhoHitMe == nullptr) {
             continue;

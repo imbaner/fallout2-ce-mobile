@@ -178,6 +178,8 @@ namespace {
     constexpr int kTextDoorTargetsNote = 517;
     constexpr int kTextPartyTargets = 518;
     constexpr int kTextPartyTargetsNote = 519;
+    constexpr int kTextCombatEndButtons = 521;
+    constexpr int kTextCombatEndButtonsNote = 522;
 
     // The port's number of quick saves (one page, the phone's config); CE's
     // own default is none.
@@ -211,6 +213,7 @@ namespace {
         bool mainMenuContinue;
         bool worldmapFollow;
         bool tacticalView;
+        bool combatEndButtonsBySituation;
         bool doorTargetsBreakableOnly;
         bool noPartyMemberTargets;
         bool saveCompatibility;
@@ -245,6 +248,7 @@ namespace {
         values.mainMenuContinue = settings.enhancements.main_menu_continue;
         values.worldmapFollow = settings.enhancements.worldmap_follow_party;
         values.tacticalView = settings.enhancements.tactical_view;
+        values.combatEndButtonsBySituation = settings.enhancements.combat_end_buttons_by_situation;
         values.doorTargetsBreakableOnly = settings.enhancements.door_targets_breakable_only;
         values.noPartyMemberTargets = settings.enhancements.no_party_member_targets;
         values.saveCompatibility = settings.enhancements.save_compatibility;
@@ -280,6 +284,7 @@ namespace {
         values.mainMenuContinue = EnhancementSettings().main_menu_continue;
         values.worldmapFollow = EnhancementSettings().worldmap_follow_party;
         values.tacticalView = EnhancementSettings().tactical_view;
+        values.combatEndButtonsBySituation = EnhancementSettings().combat_end_buttons_by_situation;
         values.doorTargetsBreakableOnly = EnhancementSettings().door_targets_breakable_only;
         values.noPartyMemberTargets = EnhancementSettings().no_party_member_targets;
         values.saveCompatibility = EnhancementSettings().save_compatibility;
@@ -376,6 +381,7 @@ namespace {
             settings.enhancements.main_menu_continue = values.mainMenuContinue;
             settings.enhancements.worldmap_follow_party = values.worldmapFollow;
             settings.enhancements.tactical_view = values.tacticalView;
+            settings.enhancements.combat_end_buttons_by_situation = values.combatEndButtonsBySituation;
             settings.enhancements.door_targets_breakable_only = values.doorTargetsBreakableOnly;
             settings.enhancements.no_party_member_targets = values.noPartyMemberTargets;
             settings.enhancements.save_compatibility = values.saveCompatibility;
@@ -687,6 +693,12 @@ namespace {
             Row row { Section::Combat, RowKind::Toggle, kTextPartyTargets, "Party members aren't targets", Origin::Port, kTextPartyTargetsNote, "Off: a tap can pick a party member as a target, as on the PC" };
             row.get = [](const Values& values) { return values.noPartyMemberTargets ? 1.0f : 0.0f; };
             row.set = [](Values& values, float value) { values.noPartyMemberTargets = value != 0.0f; };
+            rows.push_back(row);
+        }
+        {
+            Row row { Section::Combat, RowKind::Toggle, kTextCombatEndButtons, "End turn and End combat by situation", Origin::Port, kTextCombatEndButtonsNote, "End combat only where it may work; off: both always" };
+            row.get = [](const Values& values) { return values.combatEndButtonsBySituation ? 1.0f : 0.0f; };
+            row.set = [](Values& values, float value) { values.combatEndButtonsBySituation = value != 0.0f; };
             rows.push_back(row);
         }
         choice(Section::Combat, kTextTargetHighlight, "Target highlight", { kMessageOff, kMessageOn, kMessageTargetingOnly }, &PreferenceValues::targetHighlight);

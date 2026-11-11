@@ -399,6 +399,7 @@ void initSettingsRegistry(bool isMapper)
     SETTING(main_menu_continue);
     SETTING(worldmap_follow_party);
     SETTING(tactical_view);
+    SETTING(combat_end_buttons_by_situation);
     SETTING(door_targets_breakable_only);
     SETTING(no_party_member_targets);
     SETTING(save_compatibility);

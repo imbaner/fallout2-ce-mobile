@@ -153,6 +153,15 @@ enum DevAutotestAction {
     // sfall's hero_select_win window (`muiHeroSelectRun`), `a`: 0 - races,
     // 1 - styles; the script goes on inside it.
     DEV_AUTOTEST_ACTION_HERO_SELECT,
+    // The touch HUD's End Turn and End Combat by what they would do
+    // (`combatEndOutlook`), `a`: 0 - the map's other critters removed (they
+    // would join or be asked); 1 - the enemy fighting on the dude in sight;
+    // 2 - only End Turn shows, the enemy flees; 3 - both show, it out of
+    // sight; 4 - both show, it killed; 5 - only End Combat shows, the setting
+    // off; 6 - both show, the setting on; 7 - only End Combat, tapped; 8 -
+    // the combat is over; 9 - out of sight both show (no kill); 10 - End
+    // Combat pressed; 11 - the enemy taken out of sight.
+    DEV_AUTOTEST_ACTION_COMBAT_END_BUTTONS,
     // a = 0: logs the stairs and ladders of the dude's elevation and uses
     // the one at tile b (else the nearest) as the player would; a = 1: logs
     // where the dude is; a = 2: puts the dude next to that one and taps it
@@ -1038,11 +1047,12 @@ static const DevAutotestStep kDevAutotestTacticalSteps[] = {
     { DEV_AUTOTEST_ACTION_CHECK_WIDGET, 0, 0, 0, 1, "v12b_no_menu", "radial.3" },
     { DEV_AUTOTEST_ACTION_HUD_TAP, HUD_ELEMENT(TacticalView), 0, 0, 20, "v13_off" },
     { DEV_AUTOTEST_ACTION_CHECK_TACTICAL, 0, 0, 0, 1, "v14_hidden" },
-    // On again, then the turn ends - and the combat with it (the critter is
-    // far): hidden, but kept on for the next combat.
+    // On again, then the combat ends (the critter is far, nobody fights:
+    // End Combat alone, `combat_end_buttons_by_situation`): hidden, but
+    // kept on for the next combat.
     { DEV_AUTOTEST_ACTION_HUD_TAP, HUD_ELEMENT(TacticalView), 0, 0, 20, "v15_on_again" },
     { DEV_AUTOTEST_ACTION_CHECK_TACTICAL, 1, 0, 0, 1, "v16_shown" },
-    { DEV_AUTOTEST_ACTION_HUD_TAP, HUD_ELEMENT(EndTurn), 0, 0, 120, "v17_end_turn" },
+    { DEV_AUTOTEST_ACTION_HUD_TAP, HUD_ELEMENT(EndCombat), 0, 0, 120, "v17_end_combat" },
     { DEV_AUTOTEST_ACTION_LOG_COMBAT, 0, 0, 0, 1, "v18_combat_over" },
     { DEV_AUTOTEST_ACTION_CHECK_TACTICAL, 0, 1, 0, 1, "v19_hidden_kept" },
     { DEV_AUTOTEST_ACTION_START_COMBAT, 0, 0, 0, 60, "v20_next_combat" },
@@ -1496,9 +1506,10 @@ static const DevAutotestStep kDevAutotestTacticalPickupSteps[] = {
     { DEV_AUTOTEST_ACTION_TOUCH_TAP_NEAR_ITEM, 0, 0, 1, 20, "u05_selected" },
     { DEV_AUTOTEST_ACTION_TOUCH_TAP_NEAR_ITEM, 0, 0, 1, 200, "u06_picked" },
     { DEV_AUTOTEST_ACTION_LOG_PLACED_ITEM, 1, 0, 0, 1, "u07_check" },
-    // The turn ends - and the combat with it (the critter is far): the next
-    // one, the view shown again.
-    { DEV_AUTOTEST_ACTION_HUD_TAP, HUD_ELEMENT(EndTurn), 0, 0, 120, "u08_end_turn" },
+    // The combat ends (the critter is far, nobody fights: End Combat alone,
+    // `combat_end_buttons_by_situation`): the next one, the view shown
+    // again.
+    { DEV_AUTOTEST_ACTION_HUD_TAP, HUD_ELEMENT(EndCombat), 0, 0, 120, "u08_end_combat" },
     { DEV_AUTOTEST_ACTION_START_COMBAT, 0, 0, 0, 60, "u08b_next_combat" },
     { DEV_AUTOTEST_ACTION_CHECK_TACTICAL, 1, 1, 0, 1, "u08c_shown" },
     { DEV_AUTOTEST_ACTION_HUD_TAP, HUD_ELEMENT(Highlight), 0, 0, 20, "u09_highlight" },
@@ -3980,6 +3991,55 @@ static const DevAutotestStep kDevAutotestRetargetLeaveSteps[] = {
     { DEV_AUTOTEST_ACTION_RETARGET_LEAVE, 2, 0, 1800, 10, "l03_combat_over" },
 };
 
+// The touch HUD's End Turn and End Combat by situation
+// (`[enhancements] combat_end_buttons_by_situation`, combatEndOutlook): an
+// enemy fighting on the dude in sight - only End Turn; fleeing - both; out of
+// its sight it still has the dude for its target, so the combat wouldn't end
+// this round (End Turn goes on) - both; dead, the combat ending this round
+// anyway - only End Combat, ending it at once; the setting off - both always.
+static const DevAutotestStep kDevAutotestCombatEndButtonsSteps[] = {
+    { DEV_AUTOTEST_ACTION_NONE, 0, 0, 0, 30, "ce00_start" },
+    { DEV_AUTOTEST_ACTION_COMBAT_END_BUTTONS, 0, 0, 0, 1, "ce01_alone" },
+    { DEV_AUTOTEST_ACTION_SPAWN_ENEMY, 245, 5, ROTATION_SW, 10, "ce02_enemy" },
+    { DEV_AUTOTEST_ACTION_START_COMBAT_ATTACKED, 0, 0, 0, 120, "ce03_attacked" },
+    { DEV_AUTOTEST_ACTION_COMBAT_END_BUTTONS, 1, 0, 0, 10, "ce04_in_sight" },
+    { DEV_AUTOTEST_ACTION_COMBAT_END_BUTTONS, 2, 0, 0, 10, "ce05_end_turn_only" },
+    { DEV_AUTOTEST_ACTION_COMBAT_END_BUTTONS, 3, 0, 0, 10, "ce06_both_fleeing" },
+    { DEV_AUTOTEST_ACTION_COMBAT_END_BUTTONS, 4, 0, 0, 10, "ce07_both_out_of_sight" },
+    { DEV_AUTOTEST_ACTION_COMBAT_END_BUTTONS, 5, 0, 0, 10, "ce08_end_combat_only" },
+    { DEV_AUTOTEST_ACTION_COMBAT_END_BUTTONS, 6, 0, 0, 10, "ce09_setting_off" },
+    { DEV_AUTOTEST_ACTION_COMBAT_END_BUTTONS, 7, 0, 0, 90, "ce10_end_combat_tapped" },
+    { DEV_AUTOTEST_ACTION_COMBAT_END_BUTTONS, 8, 0, 0, 10, "ce11_ended_at_once" },
+};
+
+// End Combat ends a combat End Turn wouldn't: the enemy out of the dude's
+// sight keeps him for its target (the combat goes on after the round), yet
+// it wants to stop.
+static const DevAutotestStep kDevAutotestCombatEndHiddenSteps[] = {
+    { DEV_AUTOTEST_ACTION_NONE, 0, 0, 0, 30, "ch00_start" },
+    { DEV_AUTOTEST_ACTION_COMBAT_END_BUTTONS, 0, 0, 0, 1, "ch01_alone" },
+    { DEV_AUTOTEST_ACTION_SPAWN_ENEMY, 245, 5, ROTATION_SW, 10, "ch02_enemy" },
+    { DEV_AUTOTEST_ACTION_START_COMBAT_ATTACKED, 0, 0, 0, 120, "ch03_attacked" },
+    { DEV_AUTOTEST_ACTION_COMBAT_END_BUTTONS, 1, 0, 0, 10, "ch04_in_sight" },
+    { DEV_AUTOTEST_ACTION_COMBAT_END_BUTTONS, 11, 0, 0, 10, "ch05_moved_away" },
+    { DEV_AUTOTEST_ACTION_COMBAT_END_BUTTONS, 9, 0, 0, 10, "ch06_out_of_sight" },
+    { DEV_AUTOTEST_ACTION_COMBAT_END_BUTTONS, 10, 0, 0, 90, "ch07_end_combat" },
+    { DEV_AUTOTEST_ACTION_COMBAT_END_BUTTONS, 8, 0, 0, 10, "ch08_ended" },
+};
+
+// ... while End Turn goes on: the dude's next turn comes, the enemy out of
+// sight still fighting.
+static const DevAutotestStep kDevAutotestCombatEndTurnHiddenSteps[] = {
+    { DEV_AUTOTEST_ACTION_NONE, 0, 0, 0, 30, "ct00_start" },
+    { DEV_AUTOTEST_ACTION_COMBAT_END_BUTTONS, 0, 0, 0, 1, "ct01_alone" },
+    { DEV_AUTOTEST_ACTION_SPAWN_ENEMY, 245, 5, ROTATION_SW, 10, "ct02_enemy" },
+    { DEV_AUTOTEST_ACTION_START_COMBAT_ATTACKED, 0, 0, 0, 120, "ct03_attacked" },
+    { DEV_AUTOTEST_ACTION_COMBAT_END_BUTTONS, 1, 0, 0, 10, "ct04_in_sight" },
+    { DEV_AUTOTEST_ACTION_COMBAT_END_BUTTONS, 11, 0, 0, 10, "ct05_moved_away" },
+    { DEV_AUTOTEST_ACTION_END_TURN_WAIT, 1800, 0, 0, 10, "ct06_next_turn" },
+    { DEV_AUTOTEST_ACTION_COMBAT_END_BUTTONS, 9, 0, 0, 10, "ct07_still_both" },
+};
+
 // sfall's Hero Appearance (hero_appearance.cc): on the RPU copy (its
 // Appearance folder, EnableHeroAppearanceMod=1 in ddraw.ini) the black dude
 // (race 1) is chosen and wears his own art from hmR01S00.dat, leather armor
@@ -5046,6 +5106,9 @@ static const DevAutotestScenario kDevAutotestScenarios[] = {
     devAutotestScenario("heroselect", kDevAutotestHeroSelectSteps),
     devAutotestScenario("creationappearance", kDevAutotestCreationAppearanceSteps),
     devAutotestScenario("heroappearance", kDevAutotestHeroAppearanceSteps),
+    devAutotestScenario("combatendbuttons", kDevAutotestCombatEndButtonsSteps),
+    devAutotestScenario("combatendhidden", kDevAutotestCombatEndHiddenSteps),
+    devAutotestScenario("combatendturnhidden", kDevAutotestCombatEndTurnHiddenSteps),
     devAutotestScenario("retargetleave", kDevAutotestRetargetLeaveSteps),
     devAutotestScenario("fleeheal", kDevAutotestFleeHealSteps),
     devAutotestScenario("pcparty", kDevAutotestPcPartySteps),
@@ -7110,6 +7173,119 @@ void devAutotestTick()
                 devAutotestLog("  loaded: race %d, dude art %d (hero %d, from the set %d), stale pixels on the map %d: %s\n", heroAppearanceRace(), dudeFrmId.frameId(), heroArt ? 1 : 0, fromSet ? 1 : 0, stale, ok ? "PASS" : "FAIL");
                 break;
             }
+            }
+            break;
+        }
+        case DEV_AUTOTEST_ACTION_COMBAT_END_BUTTONS: {
+            static int enemyId = -1;
+            static int round = -1;
+            Object* enemy = enemyId != -1 ? objectFindById(enemyId) : nullptr;
+            MuiRect rect;
+            bool endTurnShown = touchHudGetElementRect(HudElementId::EndTurn, &rect) && rect.w > 0.0f;
+            bool endCombatShown = touchHudGetElementRect(HudElementId::EndCombat, &rect) && rect.w > 0.0f;
+            CombatEndOutlook outlook = combatEndOutlook();
+            const char* outlookName = outlook == CombatEndOutlook::Refused ? "refused" : (outlook == CombatEndOutlook::Possible ? "possible" : "ends this round");
+            // Far away: out of the enemy's perception.
+            auto moveOutOfSight = [&]() {
+                int tile = -1;
+                for (int distance = 60; distance >= 30 && tile == -1; distance -= 5) {
+                    for (int rotation = 0; rotation < ROTATION_COUNT && tile == -1; rotation++) {
+                        int candidate = tileGetTileInDirection(gDude->tile, static_cast<Rotation>(rotation), distance);
+                        if (tileIsValid(candidate) && _obj_blocking_at(nullptr, candidate, gDude->elevation) == nullptr) {
+                            tile = candidate;
+                        }
+                    }
+                }
+                if (enemy != nullptr && tile != -1) {
+                    objectSetLocation(enemy, tile, enemy->elevation, nullptr);
+                }
+                devAutotestLog("  enemy moved to tile %d, %d hexes away, perceives the dude %d\n", tile, enemy != nullptr ? objectGetDistanceBetween(gDude, enemy) : -1,
+                    enemy != nullptr && isWithinPerception(enemy, gDude) ? 1 : 0);
+            };
+            auto shows = [&](const char* when, CombatEndOutlook expected, bool endTurn, bool endCombat) {
+                bool ok = outlook == expected && endTurnShown == endTurn && endCombatShown == endCombat;
+                devAutotestLog("  %s: %s, End Turn %d, End Combat %d: %s\n", when, outlookName, endTurnShown ? 1 : 0, endCombatShown ? 1 : 0, ok ? "PASS" : "FAIL");
+                return ok;
+            };
+            bool ok = true;
+            switch (static_cast<int>(step->a)) {
+            case 0: {
+                std::vector<Object*> others;
+                for (Object* object = objectFindFirstAtElevation(gDude->elevation); object != nullptr; object = objectFindNextAtElevation()) {
+                    if (object != gDude && FrmId(object).objectType() == OBJ_TYPE_CRITTER && !objectIsPartyMember(object)) {
+                        others.push_back(object);
+                    }
+                }
+                for (Object* object : others) {
+                    objectDestroy(object, nullptr);
+                }
+                devAutotestLog("  %d critters removed\n", static_cast<int>(others.size()));
+                break;
+            }
+            case 1:
+                // As fighting leaves it: the dude its target.
+                enemy = devAutotestFindNearestEnemyInSight();
+                ok = enemy != nullptr && isInCombat();
+                if (ok) {
+                    enemyId = enemy->id;
+                    critterSetWhoHitMe(enemy, gDude);
+                }
+                devAutotestLog("  in combat %d, enemy %s: %s\n", isInCombat() ? 1 : 0, ok ? "fights the dude" : "none", ok ? "PASS" : "FAIL");
+                break;
+            case 2:
+                ok = shows("in sight", CombatEndOutlook::Refused, true, false);
+                if (enemy != nullptr) {
+                    enemy->data.critter.combat.maneuver |= CRITTER_MANUEVER_FLEEING;
+                }
+                break;
+            case 3:
+                ok = shows("fleeing", CombatEndOutlook::Possible, true, true);
+                if (enemy != nullptr) {
+                    enemy->data.critter.combat.maneuver &= ~CRITTER_MANUEVER_FLEEING;
+                }
+                moveOutOfSight();
+                break;
+            case 4:
+            case 9:
+                // End Turn would go on: the enemy keeps its target.
+                ok = shows("out of sight", CombatEndOutlook::Possible, true, true) && enemy != nullptr && enemy->data.critter.combat.whoHitMe == gDude;
+                devAutotestLog("  its target the dude %d\n", enemy != nullptr && enemy->data.critter.combat.whoHitMe == gDude ? 1 : 0);
+                if (step->a == 4 && enemy != nullptr) {
+                    critterKill(enemy, ANIM_FALL_BACK_SF, true);
+                }
+                break;
+            case 5:
+                ok = shows("killed", CombatEndOutlook::EndsThisRound, false, true);
+                settings.enhancements.combat_end_buttons_by_situation = false;
+                break;
+            case 6:
+                ok = shows("setting off", CombatEndOutlook::EndsThisRound, true, true);
+                settings.enhancements.combat_end_buttons_by_situation = true;
+                break;
+            case 7: {
+                ok = shows("setting on", CombatEndOutlook::EndsThisRound, false, true);
+                round = _combatNumTurns;
+                int x;
+                int y;
+                if (touchHudGetElementScreenCenter(HudElementId::EndCombat, &x, &y)) {
+                    devAutotestStartTouch(static_cast<float>(x), static_cast<float>(y), static_cast<float>(x), static_cast<float>(y), 1, 0);
+                }
+                break;
+            }
+            case 8:
+                ok = !isInCombat();
+                devAutotestLog("  in combat %d (round %d, End Combat in %d): %s\n", isInCombat() ? 1 : 0, _combatNumTurns, round, ok ? "PASS" : "FAIL");
+                break;
+            case 10:
+                round = _combatNumTurns;
+                gameCommandPost(GameCommandType::EndCombat);
+                break;
+            case 11:
+                moveOutOfSight();
+                break;
+            }
+            if (!ok) {
+                exit(EXIT_FAILURE);
             }
             break;
         }

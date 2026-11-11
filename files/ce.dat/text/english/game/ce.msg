@@ -377,6 +377,8 @@
 # The main menu's button to the app's list of games (game_card.h), after
 # the game's name.
 {520}{}{Change game}
+{521}{}{End turn and End combat by situation}
+{522}{}{End combat only where it may work; off: both always}
 
 # The message when a party member or another critter cannot pick up an item
 # (the player's message is 905 in proto.msg).

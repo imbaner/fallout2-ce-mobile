@@ -32,12 +32,15 @@ enum class GameCommandType {
     StartCombat,
     QuickSave,
     QuickLoad,
-    // Taken by the combat loop (Space, Enter).
+    // Taken by the combat loop (Space, Enter). EndCombat's `value`
+    // kGameCommandEndCombatOrTurn: refused, it ends the turn.
     EndTurn,
     EndCombat,
     // Touch HUD's own action, `value` - its event (touch_hud.cc).
     Hud,
 };
+
+constexpr int kGameCommandEndCombatOrTurn = 1;
 
 struct GameCommand {
     GameCommandType type = GameCommandType::None;

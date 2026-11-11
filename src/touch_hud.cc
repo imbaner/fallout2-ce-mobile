@@ -218,6 +218,10 @@ namespace {
     bool gTickerAdded = false;
 
     bool gCombatButtonsVisible = false;
+    // What ending combat would do, as of the player's turn (kept while the
+    // others act, the buttons dimmed): which of End Turn and End Combat
+    // show (`[enhancements] combat_end_buttons_by_situation`).
+    CombatEndOutlook gCombatEndOutlook = CombatEndOutlook::Refused;
     bool gCombatButtonsEnabled = false;
 
     int gActionPoints = 0;
@@ -613,6 +617,12 @@ namespace {
         if (id == HudElementId::PartyOrders) {
             _gsound_med_butt_press(-1, 0);
             openPartyOrders(rect);
+            return;
+        }
+
+        // End Combat alone: refused (a bystander joins), it ends the turn.
+        if (id == HudElementId::EndCombat && settings.enhancements.combat_end_buttons_by_situation && gCombatEndOutlook == CombatEndOutlook::EndsThisRound) {
+            sendCommand({ GameCommandType::EndCombat, kGameCommandEndCombatOrTurn });
             return;
         }
 
@@ -1515,12 +1525,23 @@ namespace {
         // closes up.
         bool partyOrders = partyOrdersAvailable();
         bool tacticalView = settings.enhancements.tactical_view;
+        // End Turn without End Combat where that would be refused, End
+        // Combat alone where the combat ends this round anyway; both where
+        // they differ or the game can't tell ahead.
+        if (gCombatButtonsEnabled) {
+            gCombatEndOutlook = combatEndOutlook();
+        }
+        bool bySituation = settings.enhancements.combat_end_buttons_by_situation;
+        bool endTurn = !bySituation || gCombatEndOutlook != CombatEndOutlook::EndsThisRound;
+        bool endCombat = !bySituation || gCombatEndOutlook != CombatEndOutlook::Refused;
         HudLayout layout = hudLayoutLandscape();
         for (HudGroupSpec& group : layout.groups) {
             for (auto& line : group.lines) {
                 line.erase(std::remove_if(line.begin(), line.end(), [&](const HudElementSpec& element) {
                     return (element.id == HudElementId::PartyOrders && !partyOrders)
-                        || (element.id == HudElementId::TacticalView && !tacticalView);
+                        || (element.id == HudElementId::TacticalView && !tacticalView)
+                        || (element.id == HudElementId::EndTurn && !endTurn)
+                        || (element.id == HudElementId::EndCombat && !endCombat);
                 }),
                     line.end());
             }
@@ -1728,6 +1749,9 @@ void touchHudSetCombatButtons(bool visible, bool enabled)
 {
     gCombatButtonsVisible = visible;
     gCombatButtonsEnabled = visible && enabled;
+    if (!visible) {
+        gCombatEndOutlook = CombatEndOutlook::Refused;
+    }
 }
 
 void touchHudAddMessage(const char* message)

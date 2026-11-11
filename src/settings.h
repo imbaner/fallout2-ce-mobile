@@ -326,6 +326,11 @@ struct EnhancementSettings {
     // Touch controls: the combat's tactical view button (tactical_view.h);
     // whether the view is on is [touch] tactical_view.
     bool tactical_view = true;
+    // Touch controls: the combat's End Turn and End Combat buttons by what
+    // they would do (`combatEndOutlook`): End Combat only where it may work,
+    // alone where the combat ends this round anyway (then ending the turn
+    // if refused); off - both always, as the game's bar has them.
+    bool combat_end_buttons_by_situation = true;
     // Touch controls, what a tap picks as a target in combat. Doors only when
     // the weapon may change them; off - also when their script reacts in any
     // other way, guards for one (door_targets.h).

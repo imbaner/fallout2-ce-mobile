@@ -101,6 +101,24 @@ void combatSetFo1HitChance(bool enabled);
 void combatResetFo1HitChance();
 Attack* combat_get_data();
 
+// CE: What ending combat would do from the player's turn now, for the touch
+// HUD's buttons. Nothing in the game changes: End Combat itself
+// (`combatAttemptEnd`) asks the critters' AI and runs bystanders' scripts,
+// which can't be asked ahead, so only what is certain is told.
+enum class CombatEndOutlook {
+    // A hostile combatant who sees the player fights on: End Combat would
+    // be refused.
+    Refused,
+    // End Combat may work (the critters left decide when it's pressed);
+    // End Turn keeps the combat going.
+    Possible,
+    // Nobody has a living foe to fight: the combat ends at the end of this
+    // round anyway, End Combat only ends it now.
+    EndsThisRound,
+};
+
+CombatEndOutlook combatEndOutlook();
+
 static inline bool isInCombat()
 {
     return (gCombatState & COMBAT_STATE_IN_COMBAT) != 0;

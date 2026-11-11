@@ -427,6 +427,8 @@
 # The main menu's button to the app's list of games (game_card.h), after
 # the game's name.
 {520}{}{Сменить игру}
+{521}{}{Конец хода и конец боя по ситуации}
+{522}{}{Конец боя — только когда может сработать; выкл.: обе всегда}
 
 # The message when a party member or another critter cannot pick up an item
 # (the player's message is 905 in proto.msg).
