@@ -2711,6 +2711,11 @@ void _interpretClose()
     intLibExit();
 }
 
+bool interpreterIsExecuting()
+{
+    return gInterpreterCurrentProgram != nullptr;
+}
+
 // 0x46CCA4
 void programInterpret(Program* program, int numInstructions)
 {

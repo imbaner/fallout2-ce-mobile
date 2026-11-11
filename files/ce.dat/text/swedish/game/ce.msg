@@ -424,6 +424,8 @@
 {520}{}{Byt spel}
 {521}{}{Avsluta tur och avsluta strid efter läget}
 {522}{}{Avsluta strid bara när det kan lyckas; av: alltid båda}
+{523}{}{Öppna dörrar när det inte finns någon annan väg}
+{524}{}{Utanför strid, som ett tryck på dörren; av: bara raden ovanför}
 
 # The message when a party member or another critter cannot pick up an item
 # (the player's message is 905 in proto.msg).

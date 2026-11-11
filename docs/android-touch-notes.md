@@ -1528,6 +1528,23 @@ CE's.
   and the frames' refreshes are drawn once at the end of `_object_animate`
   (`tileBeginDeferredRefresh`: touching rects merged, past 48 a new one
   joins the nearest).
+- `doors_when_needed` (on; settings, Game, under CE's "Open unlocked doors on
+  the way", 2026-11-11, #30). CE's `[qol] auto_open_doors` (off by default)
+  lets the player's paths go through closed unlocked doors without scripts
+  only (CE 325577db: a door with a script is for the player to open), and
+  most doors of the towns have one, so a tap behind a closed door did
+  nothing. Now out of combat a walk the player asked for (not a script's:
+  `AnimationDescription.byPlayer`, no script running when it was registered)
+  that finds no way at all is looked for again through closed doors that
+  aren't locked or jammed (`gPathThroughDoors`, animation.cc `_anim_move`;
+  the sad keeps `ANIM_SAD_THROUGH_DOORS` for finding its way again on the
+  way). Any way around is taken first, so the walk never cuts through a house
+  (none of 7 towns' maps has a door with one within 80 hexes anyway). The
+  door is opened by the game's own code for critters walking into doors
+  (`objectUseDoor`: its `use_p_proc` runs as on a tap, may keep it shut -
+  then the player stops there, #731), and the player goes on while it
+  opens, as in combat. Off: exactly CE. Autotests `doorsneeded`,
+  `doorsneededoff`, `doorslocked`, `doorscombat` (the Den).
 
 ## Cursor-era issues (resolved)
 

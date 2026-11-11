@@ -180,6 +180,8 @@ namespace {
     constexpr int kTextPartyTargetsNote = 519;
     constexpr int kTextCombatEndButtons = 521;
     constexpr int kTextCombatEndButtonsNote = 522;
+    constexpr int kTextDoorsWhenNeeded = 523;
+    constexpr int kTextDoorsWhenNeededNote = 524;
 
     // The port's number of quick saves (one page, the phone's config); CE's
     // own default is none.
@@ -214,6 +216,7 @@ namespace {
         bool worldmapFollow;
         bool tacticalView;
         bool combatEndButtonsBySituation;
+        bool doorsWhenNeeded;
         bool doorTargetsBreakableOnly;
         bool noPartyMemberTargets;
         bool saveCompatibility;
@@ -249,6 +252,7 @@ namespace {
         values.worldmapFollow = settings.enhancements.worldmap_follow_party;
         values.tacticalView = settings.enhancements.tactical_view;
         values.combatEndButtonsBySituation = settings.enhancements.combat_end_buttons_by_situation;
+        values.doorsWhenNeeded = settings.enhancements.doors_when_needed;
         values.doorTargetsBreakableOnly = settings.enhancements.door_targets_breakable_only;
         values.noPartyMemberTargets = settings.enhancements.no_party_member_targets;
         values.saveCompatibility = settings.enhancements.save_compatibility;
@@ -285,6 +289,7 @@ namespace {
         values.worldmapFollow = EnhancementSettings().worldmap_follow_party;
         values.tacticalView = EnhancementSettings().tactical_view;
         values.combatEndButtonsBySituation = EnhancementSettings().combat_end_buttons_by_situation;
+        values.doorsWhenNeeded = EnhancementSettings().doors_when_needed;
         values.doorTargetsBreakableOnly = EnhancementSettings().door_targets_breakable_only;
         values.noPartyMemberTargets = EnhancementSettings().no_party_member_targets;
         values.saveCompatibility = EnhancementSettings().save_compatibility;
@@ -382,6 +387,7 @@ namespace {
             settings.enhancements.worldmap_follow_party = values.worldmapFollow;
             settings.enhancements.tactical_view = values.tacticalView;
             settings.enhancements.combat_end_buttons_by_situation = values.combatEndButtonsBySituation;
+            settings.enhancements.doors_when_needed = values.doorsWhenNeeded;
             settings.enhancements.door_targets_breakable_only = values.doorTargetsBreakableOnly;
             settings.enhancements.no_party_member_targets = values.noPartyMemberTargets;
             settings.enhancements.save_compatibility = values.saveCompatibility;
@@ -644,6 +650,12 @@ namespace {
         }
         header(Section::Game, kTextConvenience, "Convenience");
         toggle(Section::Game, kTextAutoOpenDoors, "Open unlocked doors on the way", Origin::Ce, &Values::autoOpenDoors);
+        {
+            Row row { Section::Game, RowKind::Toggle, kTextDoorsWhenNeeded, "Open doors when there's no way around", Origin::Port, kTextDoorsWhenNeededNote, "Out of combat, as a tap on the door; off: only the row above" };
+            row.get = [](const Values& values) { return values.doorsWhenNeeded ? 1.0f : 0.0f; };
+            row.set = [](Values& values, float value) { values.doorsWhenNeeded = value != 0.0f; };
+            rows.push_back(row);
+        }
         toggle(Section::Game, kTextWalkWhenSneaking, "Walk instead of leaving sneak", Origin::Ce, &Values::walkWhenSneaking);
         toggle(Section::Game, kTextFastAmmoLoad, "Fast ammo loading", Origin::Ce, &Values::fastAmmoLoad);
         {

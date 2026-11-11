@@ -22,6 +22,7 @@
 #include "geometry.h"
 #include "input.h"
 #include "interface.h"
+#include "interpreter.h"
 #include "item.h"
 #include "kb.h"
 #include "map.h"
@@ -178,6 +179,10 @@ typedef enum AnimationSadFlags {
 
     // Specifies that the animation should never end.
     ANIM_SAD_FOREVER = 0x80,
+
+    // CE: The player's walk whose path goes through closed doors there was
+    // no way around (`dudeOpensDoorsWhenNeeded`): it opens them on the way.
+    ANIM_SAD_THROUGH_DOORS = 0x100,
 } AnimationSadFlags;
 
 typedef struct AnimationDescription {
@@ -252,6 +257,10 @@ typedef struct AnimationDescription {
         int lightIntensity;
     };
     CacheEntry* artCacheKey;
+
+    // CE: A walk the player asked for (not a script's): for
+    // `dudeOpensDoorsWhenNeeded`.
+    bool byPlayer;
 } AnimationDescription;
 
 typedef struct AnimationSequence {
@@ -332,9 +341,10 @@ static int _anim_set_end(int a1);
 static bool canUseDoor(Object* critter, Object* door);
 static int _idist(int a1, int a2, int a3, int a4);
 static int _tile_idistance(int tile1, int tile2);
-static int animateMoveObjectToObject(Object* from, Object* to, int actionPoints, AnimationType anim, int animationSequenceIndex);
-static int animateMoveObjectToTile(Object* obj, int tile, MapElevation elev, int actionPoints, AnimationType anim, int animationSequenceIndex);
-static int _anim_move(Object* obj, int tile, MapElevation elev, int a3, AnimationType anim, int a5, int animationSequenceIndex);
+static int animateMoveObjectToObject(Object* from, Object* to, int actionPoints, AnimationType anim, int animationSequenceIndex, bool byPlayer);
+static int animateMoveObjectToTile(Object* obj, int tile, MapElevation elev, int actionPoints, AnimationType anim, int animationSequenceIndex, bool byPlayer);
+static int _anim_move(Object* obj, int tile, MapElevation elev, int a3, AnimationType anim, int a5, int animationSequenceIndex, bool byPlayer = false);
+static bool dudeOpensDoorsWhenNeeded(Object* obj);
 static int animateMoveObjectToTileStraight(Object* obj, int tile, MapElevation elevation, AnimationType anim, int animationSequenceIndex, int flags);
 static int _anim_move_on_stairs(Object* obj, int tile, MapElevation elevation, AnimationType anim, int animationSequenceIndex);
 static int _check_for_falling(Object* obj, AnimationType anim, int a3);
@@ -353,6 +363,10 @@ static void reportOverloaded(Object* critter);
 
 // 0x510718 curr_sad
 static int gAnimationCurrentSad = 0;
+
+// CE: The path being found is a player's walk that may open closed doors
+// that aren't locked or jammed (`dudeOpensDoorsWhenNeeded`).
+static bool gPathThroughDoors = false;
 
 // 0x51071C curr_anim_set
 static int gAnimationSequenceCurrentIndex = -1;
@@ -690,6 +704,7 @@ int animationRegisterMoveToObject(Object* owner, Object* destination, int action
 
     AnimationDescription* animationDescription = &(gAnimationSequences[gAnimationSequenceCurrentIndex].animations[gAnimationDescriptionCurrentIndex]);
     animationDescription->kind = ANIM_KIND_MOVE_TO_OBJECT;
+    animationDescription->byPlayer = owner == gDude && !interpreterIsExecuting();
     animationDescription->anim = ANIM_WALK;
     animationDescription->owner = owner;
     animationDescription->destination = destination;
@@ -731,6 +746,7 @@ int animationRegisterRunToObject(Object* owner, Object* destination, int actionP
 
     AnimationDescription* animationDescription = &(gAnimationSequences[gAnimationSequenceCurrentIndex].animations[gAnimationDescriptionCurrentIndex]);
     animationDescription->kind = ANIM_KIND_MOVE_TO_OBJECT;
+    animationDescription->byPlayer = owner == gDude && !interpreterIsExecuting();
     animationDescription->owner = owner;
     animationDescription->destination = destination;
 
@@ -771,6 +787,7 @@ int animationRegisterMoveToTile(Object* owner, int tile, MapElevation elevation,
 
     AnimationDescription* animationDescription = &(gAnimationSequences[gAnimationSequenceCurrentIndex].animations[gAnimationDescriptionCurrentIndex]);
     animationDescription->kind = ANIM_KIND_MOVE_TO_TILE;
+    animationDescription->byPlayer = owner == gDude && !interpreterIsExecuting();
     animationDescription->anim = ANIM_WALK;
     animationDescription->owner = owner;
     animationDescription->tile = tile;
@@ -813,6 +830,7 @@ int animationRegisterRunToTile(Object* owner, int tile, MapElevation elevation, 
 
     AnimationDescription* animationDescription = &(gAnimationSequences[gAnimationSequenceCurrentIndex].animations[gAnimationDescriptionCurrentIndex]);
     animationDescription->kind = ANIM_KIND_MOVE_TO_TILE;
+    animationDescription->byPlayer = owner == gDude && !interpreterIsExecuting();
     animationDescription->owner = owner;
     animationDescription->tile = tile;
     animationDescription->elevation = elevation;
@@ -1453,10 +1471,10 @@ static int animationRunSequence(int animationSequenceIndex)
         Rect rect;
         switch (animationDescription->kind) {
         case ANIM_KIND_MOVE_TO_OBJECT:
-            rc = animateMoveObjectToObject(animationDescription->owner, animationDescription->destination, animationDescription->actionPoints, animationDescription->anim, animationSequenceIndex);
+            rc = animateMoveObjectToObject(animationDescription->owner, animationDescription->destination, animationDescription->actionPoints, animationDescription->anim, animationSequenceIndex, animationDescription->byPlayer);
             break;
         case ANIM_KIND_MOVE_TO_TILE:
-            rc = animateMoveObjectToTile(animationDescription->owner, animationDescription->tile, animationDescription->elevation, animationDescription->actionPoints, animationDescription->anim, animationSequenceIndex);
+            rc = animateMoveObjectToTile(animationDescription->owner, animationDescription->tile, animationDescription->elevation, animationDescription->actionPoints, animationDescription->anim, animationSequenceIndex, animationDescription->byPlayer);
             break;
         case ANIM_KIND_MOVE_TO_TILE_STRAIGHT:
             rc = animateMoveObjectToTileStraight(animationDescription->owner, animationDescription->tile, animationDescription->elevation, animationDescription->anim, animationSequenceIndex, 0);
@@ -1755,7 +1773,9 @@ static int _anim_set_end(int animationSequenceIndex)
 static bool canUseDoor(Object* critter, Object* door)
 {
     if (critter == gDude) {
-        if (!_obj_portal_is_walk_thru(door)) {
+        // CE: Or any door the player's walk may open (`gPathThroughDoors`),
+        // by the rest as for others, not a jammed one.
+        if (!_obj_portal_is_walk_thru(door) && !gPathThroughDoors) {
             return false;
         }
     }
@@ -1786,11 +1806,23 @@ static bool canUseDoor(Object* critter, Object* door)
         return false;
     }
 
+    if (critter == gDude && gPathThroughDoors && !_obj_portal_is_walk_thru(door)
+        && (door->data.scenery.door.openFlags & DOOR_FLAG_JAMMED) != 0) {
+        return false;
+    }
+
     if (critterGetKillType(critter) == KILL_TYPE_GECKO) {
         return false;
     }
 
     return true;
+}
+
+// CE: The player walking out of combat opens closed doors on the way when
+// there is no way around them ([enhancements] doors_when_needed).
+static bool dudeOpensDoorsWhenNeeded(Object* obj)
+{
+    return obj == gDude && !isInCombat() && settings.enhancements.doors_when_needed;
 }
 
 // 0x415EE8
@@ -2254,12 +2286,12 @@ int _make_straight_path_func(Object* obj, int from, int to, StraightPathNode* st
 }
 
 // 0x4167F8
-static int animateMoveObjectToObject(Object* from, Object* to, int actionPoints, AnimationType anim, int animationSequenceIndex)
+static int animateMoveObjectToObject(Object* from, Object* to, int actionPoints, AnimationType anim, int animationSequenceIndex, bool byPlayer)
 {
     bool hidden = (to->flags & OBJECT_HIDDEN);
     to->flags |= OBJECT_HIDDEN;
 
-    int moveSadIndex = _anim_move(from, to->tile, to->elevation, -1, anim, 0, animationSequenceIndex);
+    int moveSadIndex = _anim_move(from, to->tile, to->elevation, -1, anim, 0, animationSequenceIndex, byPlayer);
 
     if (!hidden) {
         to->flags &= ~OBJECT_HIDDEN;
@@ -2473,9 +2505,9 @@ int _make_stair_path(Object* object, int from, MapElevation fromElevation, int t
 }
 
 // 0x416CFC
-static int animateMoveObjectToTile(Object* obj, int tile, MapElevation elev, int actionPoints, AnimationType anim, int animationSequenceIndex)
+static int animateMoveObjectToTile(Object* obj, int tile, MapElevation elev, int actionPoints, AnimationType anim, int animationSequenceIndex, bool byPlayer)
 {
-    int index = _anim_move(obj, tile, elev, -1, anim, 0, animationSequenceIndex);
+    int index = _anim_move(obj, tile, elev, -1, anim, 0, animationSequenceIndex, byPlayer);
     if (index == -1) {
         return -1;
     }
@@ -2506,7 +2538,7 @@ static int animateMoveObjectToTile(Object* obj, int tile, MapElevation elev, int
 }
 
 // 0x416DFC
-static int _anim_move(Object* obj, int tile, MapElevation elev, int a3, AnimationType anim, int a5, int animationSequenceIndex)
+static int _anim_move(Object* obj, int tile, MapElevation elev, int a3, AnimationType anim, int a5, int animationSequenceIndex, bool byPlayer)
 {
     if (gAnimationCurrentSad == ANIMATION_SAD_LIST_CAPACITY) {
         return -1;
@@ -2530,6 +2562,18 @@ static int _anim_move(Object* obj, int tile, MapElevation elev, int a3, Animatio
     sad->anim = anim;
 
     sad->length = _make_path(obj, obj->tile, tile, sad->rotations, a5);
+
+    // CE: No way there for the player but through closed doors: the path
+    // through them (any way around is taken first).
+    if (sad->length == 0 && byPlayer && dudeOpensDoorsWhenNeeded(obj)) {
+        gPathThroughDoors = true;
+        sad->length = _make_path(obj, obj->tile, tile, sad->rotations, a5);
+        gPathThroughDoors = false;
+        if (sad->length != 0) {
+            sad->flags |= ANIM_SAD_THROUGH_DOORS;
+        }
+    }
+
     if (sad->length == 0) {
         sad->step = ANIM_COMPLETE;
         return -1;
@@ -2706,8 +2750,16 @@ static void _object_move(int index)
         int nextTile = tileGetTileInDirection(object->tile, rotation, 1);
         Object* obstacle = _obj_blocking_at(object, nextTile, object->elevation);
         if (obstacle != nullptr) {
-            if (!canUseDoor(object, obstacle)) {
+            // CE: The player's walk through doors keeps to doors when it
+            // finds the way again.
+            gPathThroughDoors = (sad->flags & ANIM_SAD_THROUGH_DOORS) != 0 && dudeOpensDoorsWhenNeeded(object);
+            bool usable = canUseDoor(object, obstacle);
+            if (!usable) {
                 sad->length = _make_path(object, object->tile, sad->targetTile, sad->rotations, 1);
+            }
+            gPathThroughDoors = false;
+
+            if (!usable) {
                 if (sad->length != 0) {
                     objectSetLocation(object, object->tile, object->elevation, &tempRect);
                     rectUnion(&dirtyRect, &tempRect, &dirtyRect);
@@ -2725,8 +2777,14 @@ static void _object_move(int index)
                 nextTile = -1;
             } else {
                 objectUseDoor(object, obstacle, false);
+
+                // CE: The player goes on while the door opens, as in combat;
+                // stops if its script kept it shut (nothing animates).
+                bool goesOn = object == gDude
+                    && settings.enhancements.doors_when_needed
+                    && animationIsBusy(obstacle);
                 if (sad->step == ANIM_COMPLETE
-                    || (!isInCombat() && (obstacle->data.scenery.door.openFlags & DOOR_FLAG_OPEN) == 0)) {
+                    || (!isInCombat() && !goesOn && (obstacle->data.scenery.door.openFlags & DOOR_FLAG_OPEN) == 0)) {
                     sad->step = ANIM_COMPLETE;
                     nextTile = -1;
                 }

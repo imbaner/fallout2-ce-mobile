@@ -163,6 +163,7 @@ enum DevAutotestAction {
     // the combat is over; 9 - out of sight both show (no kill); 10 - End
     // Combat pressed; 11 - the enemy taken out of sight.
     DEV_AUTOTEST_ACTION_COMBAT_END_BUTTONS,
+    DEV_AUTOTEST_ACTION_DOORS_WHEN_NEEDED,
     // a = 0: logs the stairs and ladders of the dude's elevation and uses
     // the one at tile b (else the nearest) as the player would; a = 1: logs
     // where the dude is; a = 2: puts the dude next to that one and taps it
@@ -4003,6 +4004,48 @@ static const DevAutotestStep kDevAutotestRetargetLeaveSteps[] = {
 // its sight it still has the dude for its target, so the combat wouldn't end
 // this round (End Turn goes on) - both; dead, the combat ending this round
 // anyway - only End Combat, ending it at once; the setting off - both always.
+// [enhancements] doors_when_needed in the Den (--dev-map=denbus1.map): the
+// player's walk to the other side of a closed door with a script goes
+// through it when there is no way around (it opens), not when the setting is
+// off (as CE: doors with scripts by hand), not through a locked door, not in
+// combat. (A way around is taken first by construction: the path through
+// doors is looked for only when there is none. No door of the Den, Klamath,
+// Arroyo, Modoc, NCR, Vault City or New Reno has one within 80 hexes.)
+// DOORS_WHEN_NEEDED: [a] 1 - a door with a script, the way to its other side
+// only through it, [b] 1 - a locked one; the dude on one side; 2 - the walk
+// to its other side; 3 - the dude there [b] (1 yes, 0 still on his side),
+// the door shut if [c] 1; 5 - the setting [b].
+static const DevAutotestStep kDevAutotestDoorsNeededSteps[] = {
+    { DEV_AUTOTEST_ACTION_WAIT_MAP_LOADED, 1500, 0, 0, 60, "dn00_map" },
+    { DEV_AUTOTEST_ACTION_DOORS_WHEN_NEEDED, 1, 0, 0, 10, "dn01_door" },
+    { DEV_AUTOTEST_ACTION_DOORS_WHEN_NEEDED, 2, 0, 0, 240, "dn02_walk" },
+    { DEV_AUTOTEST_ACTION_DOORS_WHEN_NEEDED, 3, 1, 0, 1, "dn03_through" },
+};
+
+static const DevAutotestStep kDevAutotestDoorsNeededOffSteps[] = {
+    { DEV_AUTOTEST_ACTION_WAIT_MAP_LOADED, 1500, 0, 0, 60, "do00_map" },
+    { DEV_AUTOTEST_ACTION_DOORS_WHEN_NEEDED, 5, 0, 0, 1, "do01_off" },
+    { DEV_AUTOTEST_ACTION_DOORS_WHEN_NEEDED, 1, 0, 0, 10, "do02_door" },
+    { DEV_AUTOTEST_ACTION_DOORS_WHEN_NEEDED, 2, 0, 0, 120, "do03_walk" },
+    { DEV_AUTOTEST_ACTION_DOORS_WHEN_NEEDED, 3, 0, 1, 1, "do04_stays" },
+};
+
+static const DevAutotestStep kDevAutotestDoorsLockedSteps[] = {
+    { DEV_AUTOTEST_ACTION_WAIT_MAP_LOADED, 1500, 0, 0, 60, "dl00_map" },
+    { DEV_AUTOTEST_ACTION_DOORS_WHEN_NEEDED, 1, 1, 0, 10, "dl01_door" },
+    { DEV_AUTOTEST_ACTION_DOORS_WHEN_NEEDED, 2, 0, 0, 120, "dl02_walk" },
+    { DEV_AUTOTEST_ACTION_DOORS_WHEN_NEEDED, 3, 0, 1, 1, "dl03_stays" },
+};
+
+static const DevAutotestStep kDevAutotestDoorsCombatSteps[] = {
+    { DEV_AUTOTEST_ACTION_WAIT_MAP_LOADED, 1500, 0, 0, 60, "dc00_map" },
+    { DEV_AUTOTEST_ACTION_DOORS_WHEN_NEEDED, 1, 0, 0, 10, "dc01_door" },
+    { DEV_AUTOTEST_ACTION_SPAWN_ENEMY, 245, 14, ROTATION_SW, 1, "dc02_enemy" },
+    { DEV_AUTOTEST_ACTION_START_COMBAT, 0, 0, 0, 60, "dc03_combat" },
+    { DEV_AUTOTEST_ACTION_DOORS_WHEN_NEEDED, 2, 0, 0, 120, "dc04_walk" },
+    { DEV_AUTOTEST_ACTION_DOORS_WHEN_NEEDED, 3, 0, 1, 1, "dc05_stays" },
+};
+
 static const DevAutotestStep kDevAutotestCombatEndButtonsSteps[] = {
     { DEV_AUTOTEST_ACTION_NONE, 0, 0, 0, 30, "ce00_start" },
     { DEV_AUTOTEST_ACTION_COMBAT_END_BUTTONS, 0, 0, 0, 1, "ce01_alone" },
@@ -5113,6 +5156,10 @@ static const DevAutotestScenario kDevAutotestScenarios[] = {
     devAutotestScenario("creationappearance", kDevAutotestCreationAppearanceSteps),
     devAutotestScenario("heroappearance", kDevAutotestHeroAppearanceSteps),
     devAutotestScenario("combatendbuttons", kDevAutotestCombatEndButtonsSteps),
+    devAutotestScenario("doorsneeded", kDevAutotestDoorsNeededSteps),
+    devAutotestScenario("doorsneededoff", kDevAutotestDoorsNeededOffSteps),
+    devAutotestScenario("doorslocked", kDevAutotestDoorsLockedSteps),
+    devAutotestScenario("doorscombat", kDevAutotestDoorsCombatSteps),
     devAutotestScenario("combatendhidden", kDevAutotestCombatEndHiddenSteps),
     devAutotestScenario("combatendturnhidden", kDevAutotestCombatEndTurnHiddenSteps),
     devAutotestScenario("retargetleave", kDevAutotestRetargetLeaveSteps),
@@ -5874,6 +5921,76 @@ void devAutotestTick()
                     devAutotestLog("  dude on tile %d near the door\n", gDude->tile);
                     break;
                 }
+            }
+            break;
+        }
+        case DEV_AUTOTEST_ACTION_DOORS_WHEN_NEEDED: {
+            static Object* door = nullptr;
+            static int from = -1;
+            static int to = -1;
+            bool ok = true;
+            switch (static_cast<int>(step->a)) {
+            case 1: {
+                bool lockedOne = step->b != 0;
+                door = nullptr;
+                int length = 0;
+                for (Object* object = objectFindFirstAtElevation(gDude->elevation); object != nullptr && door == nullptr; object = objectFindNextAtElevation()) {
+                    Proto* proto;
+                    if (FrmId(object).objectType() != OBJ_TYPE_SCENERY || protoGetProto(object, &proto) == -1 || proto->scenery.type != SCENERY_TYPE_DOOR) {
+                        continue;
+                    }
+                    unsigned int flags = object->data.scenery.door.openFlags;
+                    bool locked = objectIsLocked(object);
+                    if ((flags & DOOR_FLAG_OPEN) != 0 || (flags & DOOR_FLAG_JAMMED) != 0 || object->sid == -1 || locked != lockedOne) {
+                        continue;
+                    }
+                    for (int rotation = 0; rotation < 3 && door == nullptr; rotation++) {
+                        int a = tileGetTileInDirection(object->tile, static_cast<Rotation>(rotation), 1);
+                        int b = tileGetTileInDirection(object->tile, static_cast<Rotation>(rotation + 3), 1);
+                        if (_obj_blocking_at(nullptr, a, object->elevation) != nullptr || _obj_blocking_at(nullptr, b, object->elevation) != nullptr) {
+                            continue;
+                        }
+                        Rect rect;
+                        objectSetLocation(gDude, a, object->elevation, &rect);
+                        length = _make_path(gDude, a, b, nullptr, 0);
+                        if (length == 0) {
+                            door = object;
+                            from = a;
+                            to = b;
+                        }
+                    }
+                }
+                ok = door != nullptr;
+                if (ok) {
+                    Rect rect;
+                    objectSetLocation(gDude, from, door->elevation, &rect);
+                    tileSetCenter(gDude->tile, TILE_SET_CENTER_REFRESH_WINDOW);
+                    devAutotestLog("  door pid %d on tile %d (script %d, locked %d), from %d to %d, the way around %d hexes\n",
+                        door->pid, door->tile, door->sid != -1 ? 1 : 0, objectIsLocked(door) ? 1 : 0, from, to, length);
+                } else {
+                    devAutotestLog("  no door (locked %d): FAIL\n", lockedOne ? 1 : 0);
+                }
+                break;
+            }
+            case 2: {
+                int rc = playerMoveTo(to, false);
+                devAutotestLog("  walk from %d to %d: %d (in combat %d)\n", gDude->tile, to, rc, isInCombat() ? 1 : 0);
+                break;
+            }
+            case 3: {
+                bool there = gDude->tile == to;
+                bool shut = door != nullptr && (door->data.scenery.door.openFlags & DOOR_FLAG_OPEN) == 0;
+                ok = there == (step->b != 0) && (step->c == 0 || shut);
+                devAutotestLog("  dude on %d (other side %d, his side %d), door shut %d: %s\n", gDude->tile, to, from, shut ? 1 : 0, ok ? "PASS" : "FAIL");
+                break;
+            }
+            case 5:
+                settings.enhancements.doors_when_needed = step->b != 0;
+                devAutotestLog("  doors when needed %d\n", settings.enhancements.doors_when_needed ? 1 : 0);
+                break;
+            }
+            if (!ok) {
+                exit(EXIT_FAILURE);
             }
             break;
         }

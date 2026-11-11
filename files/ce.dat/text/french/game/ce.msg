@@ -424,6 +424,8 @@
 {520}{}{Changer de jeu}
 {521}{}{Fin du tour et fin du combat selon la situation}
 {522}{}{Fin du combat seulement quand il peut réussir ; désactivé : les deux toujours}
+{523}{}{Ouvrir les portes s'il n'y a pas d'autre chemin}
+{524}{}{Hors combat, comme un appui sur la porte ; désactivé : seulement la ligne au-dessus}
 
 # The message when a party member or another critter cannot pick up an item
 # (the player's message is 905 in proto.msg).

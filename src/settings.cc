@@ -400,6 +400,7 @@ void initSettingsRegistry(bool isMapper)
     SETTING(worldmap_follow_party);
     SETTING(tactical_view);
     SETTING(combat_end_buttons_by_situation);
+    SETTING(doors_when_needed);
     SETTING(door_targets_breakable_only);
     SETTING(no_party_member_targets);
     SETTING(save_compatibility);

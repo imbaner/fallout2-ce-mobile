@@ -427,6 +427,8 @@
 {520}{}{Change game}
 {521}{}{End turn and End combat by situation}
 {522}{}{End combat only where it may work; off: both always}
+{523}{}{Open doors when there's no way around}
+{524}{}{Out of combat, as a tap on the door; off: only the row above}
 
 # The message when a party member or another critter cannot pick up an item
 # (the player's message is 905 in proto.msg).

@@ -331,6 +331,11 @@ struct EnhancementSettings {
     // alone where the combat ends this round anyway (then ending the turn
     // if refused); off - both always, as the game's bar has them.
     bool combat_end_buttons_by_situation = true;
+    // Out of combat the player's walk goes through closed doors that aren't
+    // locked or jammed when there is no way around them, opening them as a
+    // tap on them would (their scripts run, may keep them shut). Off - only
+    // what [qol] auto_open_doors opens (doors without scripts), as CE.
+    bool doors_when_needed = true;
     // Touch controls, what a tap picks as a target in combat. Doors only when
     // the weapon may change them; off - also when their script reacts in any
     // other way, guards for one (door_targets.h).
