@@ -284,7 +284,7 @@
 {373}{}{Vue tactique}
 {374}{}{Bouton de combat : silhouettes transparentes, cases et zone de déplacement}
 {375}{}{Écrans du jeu}
-{376}{}{Auto : fenêtres sur le monde sur tablette}
+{376}{}{Auto : fenêtres là où la place ne manque pas}
 {377}{}{Fermer les fenêtres en touchant à côté}
 {378}{}{Toucher le monde hors d'une fenêtre la ferme}
 {379}{}{Auto}
@@ -295,7 +295,7 @@
 {384}{}{Ne porte pas d'armure}
 {385}{}{Meilleure}
 {386}{}{Disposition des écrans}
-{387}{}{Auto : disposition tablette dans les fenêtres où elle tient}
+{387}{}{Auto : selon la taille et la forme de l'écran}
 {388}{}{Téléphone}
 {389}{}{Tablette}
 {390}{}{Lancer le combat}
@@ -421,6 +421,9 @@
 {517}{}{Désactivé : aussi les portes qui réagissent à un coup, par exemple en appelant les gardes}
 {518}{}{Les membres du groupe ne sont pas des cibles}
 {519}{}{Désactivé : toucher peut choisir un membre du groupe comme cible, comme sur PC}
+{520}{}{Changer de jeu}
+{521}{}{Fin du tour et fin du combat selon la situation}
+{522}{}{Fin du combat seulement quand il peut réussir ; désactivé : les deux toujours}
 
 # The message when a party member or another critter cannot pick up an item
 # (the player's message is 905 in proto.msg).

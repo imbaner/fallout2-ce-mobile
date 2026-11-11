@@ -284,7 +284,7 @@
 {373}{}{Taktický pohled}
 {374}{}{Tlaèítko boje: prùhledné postavy, políèka a dosah pohybu}
 {375}{}{Obrazovky hry}
-{376}{}{Auto: na tabletech okna nad svìtem}
+{376}{}{Auto: okna tam, kde je dost místa}
 {377}{}{Zavírat okna klepnutím vedle}
 {378}{}{Klepnutí na svìt mimo okno ho zavøe}
 {379}{}{Auto}
@@ -295,7 +295,7 @@
 {384}{}{Nenosí zbroj}
 {385}{}{Nejlepší}
 {386}{}{Rozložení obrazovek}
-{387}{}{Auto: tabletové rozložení v oknech, kam se vejde}
+{387}{}{Auto: podle velikosti a tvaru obrazovky}
 {388}{}{Telefon}
 {389}{}{Tablet}
 {390}{}{Zaèít boj}
@@ -421,6 +421,9 @@
 {517}{}{Vyp: i dveøe, které reagují na zásah, tøeba pøivoláním stráží}
 {518}{}{Èlenové družiny nejsou cíle}
 {519}{}{Vyp: klepnutí mùže vybrat èlena družiny jako cíl, jako na PC}
+{520}{}{Zmìnit hru}
+{521}{}{Konec tahu a konec boje podle situace}
+{522}{}{Konec boje jen tehdy, když mùže uspìt; vyp.: vždy obì}
 
 # The message when a party member or another critter cannot pick up an item
 # (the player's message is 905 in proto.msg).

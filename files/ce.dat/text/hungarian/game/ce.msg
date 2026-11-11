@@ -284,7 +284,7 @@
 {373}{}{Taktikai nézet}
 {374}{}{Harci gomb: átlátszó alakok, mezõk és mozgási terület}
 {375}{}{Játékképernyõk}
-{376}{}{Auto: táblagépen ablakok a világ felett}
+{376}{}{Auto: ablakok, ahol bõven van hely}
 {377}{}{Ablakok bezárása mellékoppintással}
 {378}{}{Az ablakon kívüli koppintás bezárja az ablakot}
 {379}{}{Auto}
@@ -295,7 +295,7 @@
 {384}{}{Nem visel páncélt}
 {385}{}{Legjobb}
 {386}{}{Képernyõk elrendezése}
-{387}{}{Auto: táblagépes elrendezés ablakokban, ahol elfér}
+{387}{}{Auto: a képernyõ mérete és alakja szerint}
 {388}{}{Telefon}
 {389}{}{Táblagép}
 {390}{}{Harc indítása}
@@ -421,6 +421,9 @@
 {517}{}{Ki: a találatra reagáló ajtók is, például amik õröket hívnak}
 {518}{}{A csapattagok nem célpontok}
 {519}{}{Ki: a koppintás csapattagot is választhat célpontnak, mint PC-n}
+{520}{}{Játék váltása}
+{521}{}{Kör vége és harc vége a helyzettõl függõen}
+{522}{}{Harc vége csak, ha sikerülhet; ki: mindig mindkettõ}
 
 # The message when a party member or another critter cannot pick up an item
 # (the player's message is 905 in proto.msg).

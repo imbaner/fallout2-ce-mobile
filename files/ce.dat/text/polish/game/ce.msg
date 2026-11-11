@@ -284,7 +284,7 @@
 {373}{}{Widok taktyczny}
 {374}{}{Przycisk w walce: przezroczyste postacie, pola i zasiêg ruchu}
 {375}{}{Ekrany gry}
-{376}{}{Auto: na tabletach okna nad œwiatem gry}
+{376}{}{Auto: okna tam, gdzie jest doœæ miejsca}
 {377}{}{Zamykaj okna dotkniêciem obok}
 {378}{}{Dotkniêcie œwiata poza oknem zamyka je}
 {379}{}{Auto}
@@ -295,7 +295,7 @@
 {384}{}{Nie nosi pancerza}
 {385}{}{Najlepsza}
 {386}{}{Uk³ad ekranów}
-{387}{}{Auto: uk³ad tabletowy w oknach, gdzie siê mieœci}
+{387}{}{Auto: wed³ug rozmiaru i kszta³tu ekranu}
 {388}{}{Telefon}
 {389}{}{Tablet}
 {390}{}{Rozpocznij walkê}
@@ -421,6 +421,9 @@
 {517}{}{Wy³.: tak¿e drzwi reaguj¹ce na uderzenie, np. wzywaj¹ce stra¿ników}
 {518}{}{Cz³onkowie dru¿yny nie s¹ celami}
 {519}{}{Wy³.: dotkniêcie mo¿e wybraæ cz³onka dru¿yny jako cel, jak na PC}
+{520}{}{Zmieñ grê}
+{521}{}{Koniec tury i koniec walki zale¿nie od sytuacji}
+{522}{}{Koniec walki tylko gdy mo¿e siê udaæ; wy³.: zawsze oba}
 
 # The message when a party member or another critter cannot pick up an item
 # (the player's message is 905 in proto.msg).

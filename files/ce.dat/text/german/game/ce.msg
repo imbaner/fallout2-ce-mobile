@@ -284,7 +284,7 @@
 {373}{}{Taktische Ansicht}
 {374}{}{Kampftaste: durchsichtige Figuren, Felder und Bewegungsbereich}
 {375}{}{Spielbildschirme}
-{376}{}{Auto: Fenster über der Welt auf Tablets}
+{376}{}{Auto: Fenster, wo genug Platz ist}
 {377}{}{Fenster durch Tippen daneben schließen}
 {378}{}{Ein Tippen auf die Welt neben einem Fenster schließt es}
 {379}{}{Auto}
@@ -295,7 +295,7 @@
 {384}{}{Trägt keine Rüstung}
 {385}{}{Beste}
 {386}{}{Bildschirm-Layouts}
-{387}{}{Auto: Tablet-Layouts in Fenstern, wo sie passen}
+{387}{}{Auto: nach Größe und Form des Bildschirms}
 {388}{}{Telefon}
 {389}{}{Tablet}
 {390}{}{Kampf beginnen}
@@ -421,6 +421,9 @@
 {517}{}{Aus: auch Türen, die auf einen Treffer reagieren, etwa Wachen rufen}
 {518}{}{Gruppenmitglieder sind keine Ziele}
 {519}{}{Aus: Ein Tippen kann ein Gruppenmitglied als Ziel wählen, wie am PC}
+{520}{}{Spiel wechseln}
+{521}{}{Zug beenden und Kampf beenden je nach Lage}
+{522}{}{Kampf beenden nur, wenn es klappen kann; aus: immer beide}
 
 # The message when a party member or another critter cannot pick up an item
 # (the player's message is 905 in proto.msg).

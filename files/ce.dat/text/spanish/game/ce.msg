@@ -284,7 +284,7 @@
 {373}{}{Vista táctica}
 {374}{}{Botón de combate: figuras transparentes, casillas y zona de movimiento}
 {375}{}{Pantallas del juego}
-{376}{}{Auto: ventanas sobre el mundo en tabletas}
+{376}{}{Auto: ventanas donde sobra espacio}
 {377}{}{Cerrar ventanas tocando fuera}
 {378}{}{Un toque en el mundo fuera de una ventana la cierra}
 {379}{}{Auto}
@@ -295,7 +295,7 @@
 {384}{}{No lleva armadura}
 {385}{}{Mejor}
 {386}{}{Diseño de pantallas}
-{387}{}{Auto: diseño de tableta en ventanas donde quepa}
+{387}{}{Auto: según el tamaño y la forma de la pantalla}
 {388}{}{Teléfono}
 {389}{}{Tableta}
 {390}{}{Iniciar combate}
@@ -421,6 +421,9 @@
 {517}{}{Apagado: también puertas que reaccionan a un golpe, por ejemplo llamando a los guardias}
 {518}{}{Los miembros del grupo no son objetivos}
 {519}{}{Apagado: un toque puede elegir a un miembro del grupo como objetivo, como en PC}
+{520}{}{Cambiar juego}
+{521}{}{Fin de turno y fin de combate según la situación}
+{522}{}{Fin de combate solo cuando puede funcionar; desactivado: siempre ambos}
 
 # The message when a party member or another critter cannot pick up an item
 # (the player's message is 905 in proto.msg).

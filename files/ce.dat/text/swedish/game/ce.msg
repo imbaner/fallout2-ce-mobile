@@ -284,7 +284,7 @@
 {373}{}{Taktisk vy}
 {374}{}{Stridsknapp: genomskinliga figurer, rutor och var du kan gå}
 {375}{}{Spelskärmar}
-{376}{}{Auto: fönster över världen på surfplattor}
+{376}{}{Auto: fönster där det finns gott om plats}
 {377}{}{Stäng fönster genom att trycka utanför}
 {378}{}{Ett tryck på världen utanför ett fönster stänger det}
 {379}{}{Auto}
@@ -295,7 +295,7 @@
 {384}{}{Bär ingen rustning}
 {385}{}{Bästa}
 {386}{}{Skärmlayouter}
-{387}{}{Auto: surfplattelayouter i fönster där de får plats}
+{387}{}{Auto: efter skärmens storlek och form}
 {388}{}{Telefon}
 {389}{}{Surfplatta}
 {390}{}{Starta strid}
@@ -421,6 +421,9 @@
 {517}{}{Av: även dörrar som reagerar på en träff, till exempel kallar på vakter}
 {518}{}{Gruppmedlemmar är inte mål}
 {519}{}{Av: ett tryck kan välja en gruppmedlem som mål, som på PC}
+{520}{}{Byt spel}
+{521}{}{Avsluta tur och avsluta strid efter läget}
+{522}{}{Avsluta strid bara när det kan lyckas; av: alltid båda}
 
 # The message when a party member or another critter cannot pick up an item
 # (the player's message is 905 in proto.msg).
