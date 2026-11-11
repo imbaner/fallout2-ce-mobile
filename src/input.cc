@@ -3,6 +3,10 @@
 
 #include <string.h>
 
+#ifdef __ANDROID__
+#include <unistd.h>
+#endif
+
 #include <SDL.h>
 #include <lodepng.h>
 
@@ -1324,7 +1328,19 @@ void _GNW95_process_message()
             errorReportExit();
             actionLog("the game closed by the system");
             actionLogFlush();
+#ifdef __ANDROID__
+            // At once, as the system ends an app: `exit` here, on the game's
+            // thread, runs the exit handlers and static destructors while the
+            // app's other threads (its UI, drawing, sound) go on using what
+            // they free, and the process can crash on its way out. Android
+            // doesn't count a crashing process as running, so the list of
+            // games started the next game into the dying one, which went down
+            // with it (switching games, rarely). Nothing is left to write:
+            // saves and settings are written when made, the logs just above.
+            _exit(EXIT_SUCCESS);
+#else
             exit(EXIT_SUCCESS);
+#endif
             break;
         }
     }

@@ -4,6 +4,7 @@ import android.app.ActivityManager;
 import android.content.Context;
 import android.content.Intent;
 
+import java.io.File;
 import java.util.List;
 
 // The game runs in the app's main process (MainActivity); its list of games
@@ -40,21 +41,19 @@ final class GameProcess {
     // Asks the game to close and waits for its process to end (7 s at most;
     // not on the main thread). True: no game runs now.
     static boolean close(Context context) {
-        if (!isRunning(context)) {
+        int pid = pid(context);
+        if (pid <= 0) {
             return true;
         }
         context.sendBroadcast(new Intent(closeAction(context)).setPackage(context.getPackageName()), permission(context));
-        if (waitForExit(context, 40)) {
+        if (waitForExit(context, pid, 40)) {
             return true;
         }
         // Nobody to answer: the process stayed after sending the player here
         // (no game ran in it), or the game hangs. Its marks of the run stay
         // (a hang is told at the next start).
-        int pid = pid(context);
-        if (pid > 0) {
-            android.os.Process.killProcess(pid);
-        }
-        return waitForExit(context, 30);
+        android.os.Process.killProcess(pid);
+        return waitForExit(context, pid, 30);
     }
 
     private static int pid(Context context) {
@@ -78,8 +77,17 @@ final class GameProcess {
 
     // [attempts] tenths of a second at most.
     private static boolean waitForExit(Context context, int attempts) {
+        int pid = pid(context);
+        return pid <= 0 || waitForExit(context, pid, attempts);
+    }
+
+    // Until the process of [pid] is gone itself: the system leaves a process
+    // that crashes or hangs out of its running ones while it still dies, and
+    // a game started then would go into it and down with it.
+    private static boolean waitForExit(Context context, int pid, int attempts) {
+        File process = new File("/proc/" + pid);
         for (int attempt = 0; attempt < attempts; attempt++) {
-            if (!isRunning(context)) {
+            if (!process.exists() && !isRunning(context)) {
                 return true;
             }
             try {

@@ -1711,6 +1711,21 @@ folder (`Games.java`):
   data/MAPS holds mods' loose maps next to them, and the save lists it by mask.
 - The list is in the system's language (Android resources), as the import
   screen; a game's menu in the game's.
+- Pictures before sizes: a game's size is a walk over all its files (seconds
+  in Android/media), so the list decodes every game's card picture first (the
+  chosen game's first) and counts the sizes after; a size not counted yet is
+  left out of the card (Details: "…").
+- Another game started (2026-11-11, a player's rare crash switching RPU and
+  Nevada): the list closes the game (`GameProcess.close`: the broadcast, the
+  activity's `onDestroy`, SDL's quit event). The game ended with `exit` on its
+  own thread, running exit handlers and static destructors while the app's
+  other threads went on, which can crash the process on its way out; Android
+  leaves a crashing (or hanging) process out of `getRunningAppProcesses`, so
+  the list took the game for closed and started the next one into the dying
+  process, which went down with it. Now SDL's quit ends the process at once
+  (`_exit`, input.cc; the logs and marks are written before, saves and
+  settings when made), and the list waits for the process itself
+  (`/proc/<pid>` gone, the pid taken before asking it to close).
 
 ## Game layouts the import understands (Android and web)
 
