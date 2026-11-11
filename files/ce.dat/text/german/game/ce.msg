@@ -424,8 +424,8 @@
 {520}{}{Spiel wechseln}
 {521}{}{Zug beenden und Kampf beenden je nach Lage}
 {522}{}{Kampf beenden nur, wenn es klappen kann; aus: immer beide}
-{523}{}{Türen öffnen, wenn es keinen anderen Weg gibt}
-{524}{}{Außerhalb des Kampfes, wie ein Tippen auf die Tür; aus: nur die Zeile darüber}
+{523}{}{Türen unterwegs öffnen}
+{524}{}{Außerhalb des Kampfes, wie ein Tippen auf die Tür}
 
 # The message when a party member or another critter cannot pick up an item
 # (the player's message is 905 in proto.msg).

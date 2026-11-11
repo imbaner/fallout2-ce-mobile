@@ -67,7 +67,6 @@ namespace {
     constexpr int kTextLanguageFilter = 254;
     constexpr int kTextTextDelay = 255;
     constexpr int kTextConvenience = 256;
-    constexpr int kTextAutoOpenDoors = 257;
     constexpr int kTextWalkWhenSneaking = 258;
     constexpr int kTextFastAmmoLoad = 259;
     constexpr int kTextPartyMembers = 260;
@@ -649,11 +648,17 @@ namespace {
             rows.push_back(row);
         }
         header(Section::Game, kTextConvenience, "Convenience");
-        toggle(Section::Game, kTextAutoOpenDoors, "Open unlocked doors on the way", Origin::Ce, &Values::autoOpenDoors);
         {
-            Row row { Section::Game, RowKind::Toggle, kTextDoorsWhenNeeded, "Open doors when there's no way around", Origin::Port, kTextDoorsWhenNeededNote, "Out of combat, as a tap on the door; off: only the row above" };
-            row.get = [](const Values& values) { return values.doorsWhenNeeded ? 1.0f : 0.0f; };
-            row.set = [](Values& values, float value) { values.doorsWhenNeeded = value != 0.0f; };
+            // One row for doors on the way: CE's [qol] auto_open_doors (doors
+            // without scripts, any way) and the port's [enhancements]
+            // doors_when_needed (any door, when there's no way around), on
+            // and off together. On if either is (a config of CE's).
+            Row row { Section::Game, RowKind::Toggle, kTextDoorsWhenNeeded, "Open doors on the way", Origin::Port, kTextDoorsWhenNeededNote, "Out of combat, as a tap on the door would" };
+            row.get = [](const Values& values) { return values.doorsWhenNeeded || values.autoOpenDoors ? 1.0f : 0.0f; };
+            row.set = [](Values& values, float value) {
+                values.doorsWhenNeeded = value != 0.0f;
+                values.autoOpenDoors = value != 0.0f;
+            };
             rows.push_back(row);
         }
         toggle(Section::Game, kTextWalkWhenSneaking, "Walk instead of leaving sneak", Origin::Ce, &Values::walkWhenSneaking);

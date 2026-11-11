@@ -424,8 +424,8 @@
 {520}{}{Játék váltása}
 {521}{}{Kör vége és harc vége a helyzettõl függõen}
 {522}{}{Harc vége csak, ha sikerülhet; ki: mindig mindkettõ}
-{523}{}{Ajtók kinyitása, ha nincs más út}
-{524}{}{Harcon kívül, mint egy koppintás az ajtóra; ki: csak a fenti sor}
+{523}{}{Ajtók kinyitása útközben}
+{524}{}{Harcon kívül, mint egy koppintásnál az ajtóra}
 
 # The message when a party member or another critter cannot pick up an item
 # (the player's message is 905 in proto.msg).

@@ -424,8 +424,8 @@
 {520}{}{Zmieñ grê}
 {521}{}{Koniec tury i koniec walki zale¿nie od sytuacji}
 {522}{}{Koniec walki tylko gdy mo¿e siê udaæ; wy³.: zawsze oba}
-{523}{}{Otwieraj drzwi, gdy nie ma innej drogi}
-{524}{}{Poza walk¹, jak dotkniêcie drzwi; wy³.: tylko wiersz powy¿ej}
+{523}{}{Otwieraj drzwi po drodze}
+{524}{}{Poza walk¹, jak przy dotkniêciu drzwi}
 
 # The message when a party member or another critter cannot pick up an item
 # (the player's message is 905 in proto.msg).

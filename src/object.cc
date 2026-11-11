@@ -2304,7 +2304,10 @@ bool _obj_portal_is_walk_thru(Object* obj)
         return false;
     }
 
-    if (settings.qol.auto_open_doors) {
+    // CE: Also with the port's doors_when_needed (one row in the settings for
+    // both): doors without scripts on any way, the rest when needed
+    // (animation.cc `gPathThroughDoors`).
+    if (settings.qol.auto_open_doors || settings.enhancements.doors_when_needed) {
         if (!isInCombat()) {
             if (proto->scenery.type == SCENERY_TYPE_DOOR) // Door
             {

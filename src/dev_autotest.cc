@@ -4037,6 +4037,26 @@ static const DevAutotestStep kDevAutotestDoorsLockedSteps[] = {
     { DEV_AUTOTEST_ACTION_DOORS_WHEN_NEEDED, 3, 0, 1, 1, "dl03_stays" },
 };
 
+// The settings' one row for doors on the way sets CE's [qol]
+// auto_open_doors and [enhancements] doors_when_needed together (by default
+// the port's on, CE's off: the row on).
+static const DevAutotestStep kDevAutotestDoorsRowSteps[] = {
+    { DEV_AUTOTEST_ACTION_NONE, 0, 0, 0, 30, "dw00_start" },
+    { DEV_AUTOTEST_ACTION_BACK, 0, 0, 0, 40, "dw01_menu" },
+    { DEV_AUTOTEST_ACTION_MUI_TAP, 0, 0, 0, 30, "dw02_settings", "menu.settings" },
+    { DEV_AUTOTEST_ACTION_MUI_DRAG_BY, 0, -0.45f, 0, 40, "dw03_scrolled", "prefs.rows.253" },
+    { DEV_AUTOTEST_ACTION_MUI_DRAG_BY, 0, -0.3f, 0, 40, "dw04_scrolled", "prefs.rows.356" },
+    { DEV_AUTOTEST_ACTION_MUI_DRAG_BY, 0, -0.3f, 0, 40, "dw04b_scrolled", "prefs.rows.327" },
+    { DEV_AUTOTEST_ACTION_CHECK_WIDGET, 1, 0, 0, 1, "dw05_row", "prefs.rows.523" },
+    { DEV_AUTOTEST_ACTION_CHECK_WIDGET, 0, 0, 0, 1, "dw06_no_ce_row", "prefs.rows.257" },
+    { DEV_AUTOTEST_ACTION_MUI_TAP, 0, 0, 0, 20, "dw07_off", "prefs.rows.523" },
+    { DEV_AUTOTEST_ACTION_MUI_TAP, 0, 0, 0, 30, "dw08_applied", "prefs.apply" },
+    { DEV_AUTOTEST_ACTION_DOORS_WHEN_NEEDED, 6, 0, 0, 1, "dw09_both_off" },
+    { DEV_AUTOTEST_ACTION_MUI_TAP, 0, 0, 0, 20, "dw10_on", "prefs.rows.523" },
+    { DEV_AUTOTEST_ACTION_MUI_TAP, 0, 0, 0, 30, "dw11_applied", "prefs.apply" },
+    { DEV_AUTOTEST_ACTION_DOORS_WHEN_NEEDED, 6, 1, 0, 1, "dw12_both_on" },
+};
+
 static const DevAutotestStep kDevAutotestDoorsCombatSteps[] = {
     { DEV_AUTOTEST_ACTION_WAIT_MAP_LOADED, 1500, 0, 0, 60, "dc00_map" },
     { DEV_AUTOTEST_ACTION_DOORS_WHEN_NEEDED, 1, 0, 0, 10, "dc01_door" },
@@ -5160,6 +5180,7 @@ static const DevAutotestScenario kDevAutotestScenarios[] = {
     devAutotestScenario("doorsneededoff", kDevAutotestDoorsNeededOffSteps),
     devAutotestScenario("doorslocked", kDevAutotestDoorsLockedSteps),
     devAutotestScenario("doorscombat", kDevAutotestDoorsCombatSteps),
+    devAutotestScenario("doorsrow", kDevAutotestDoorsRowSteps),
     devAutotestScenario("combatendhidden", kDevAutotestCombatEndHiddenSteps),
     devAutotestScenario("combatendturnhidden", kDevAutotestCombatEndTurnHiddenSteps),
     devAutotestScenario("retargetleave", kDevAutotestRetargetLeaveSteps),
@@ -5987,6 +6008,10 @@ void devAutotestTick()
             case 5:
                 settings.enhancements.doors_when_needed = step->b != 0;
                 devAutotestLog("  doors when needed %d\n", settings.enhancements.doors_when_needed ? 1 : 0);
+                break;
+            case 6:
+                ok = settings.enhancements.doors_when_needed == (step->b != 0) && settings.qol.auto_open_doors == (step->b != 0);
+                devAutotestLog("  doors when needed %d, CE's auto open doors %d: %s\n", settings.enhancements.doors_when_needed ? 1 : 0, settings.qol.auto_open_doors ? 1 : 0, ok ? "PASS" : "FAIL");
                 break;
             }
             if (!ok) {

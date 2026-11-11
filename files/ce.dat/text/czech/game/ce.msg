@@ -424,8 +424,8 @@
 {520}{}{Zmìnit hru}
 {521}{}{Konec tahu a konec boje podle situace}
 {522}{}{Konec boje jen tehdy, když mùže uspìt; vyp.: vždy obì}
-{523}{}{Otevírat dveøe, když není jiná cesta}
-{524}{}{Mimo boj, jako klepnutí na dveøe; vyp.: jen øádek výše}
+{523}{}{Otevírat dveøe po cestì}
+{524}{}{Mimo boj, jako pøi klepnutí na dveøe}
 
 # The message when a party member or another critter cannot pick up an item
 # (the player's message is 905 in proto.msg).

@@ -1528,8 +1528,12 @@ CE's.
   and the frames' refreshes are drawn once at the end of `_object_animate`
   (`tileBeginDeferredRefresh`: touching rects merged, past 48 a new one
   joins the nearest).
-- `doors_when_needed` (on; settings, Game, under CE's "Open unlocked doors on
-  the way", 2026-11-11, #30). CE's `[qol] auto_open_doors` (off by default)
+- `doors_when_needed` (on; settings, Game > Convenience, 2026-11-11, #30).
+  One row "Open doors on the way" sets it and CE's `auto_open_doors` together
+  (shown on if either is): two rows confused - what does CE's off with the
+  port's on do? On, doors without scripts open on any way (CE's rule, now
+  also with the port's key alone: `_obj_portal_is_walk_thru`), the rest only
+  when needed. CE's `[qol] auto_open_doors` (off by default)
   lets the player's paths go through closed unlocked doors without scripts
   only (CE 325577db: a door with a script is for the player to open), and
   most doors of the towns have one, so a tap behind a closed door did
@@ -1543,8 +1547,9 @@ CE's.
   door is opened by the game's own code for critters walking into doors
   (`objectUseDoor`: its `use_p_proc` runs as on a tap, may keep it shut -
   then the player stops there, #731), and the player goes on while it
-  opens, as in combat. Off: exactly CE. Autotests `doorsneeded`,
-  `doorsneededoff`, `doorslocked`, `doorscombat` (the Den).
+  opens, as in combat. Off: doors by hand, as the original. Autotests
+  `doorsneeded`, `doorsneededoff`, `doorslocked`, `doorscombat` (the Den),
+  `doorsrow` (the row sets both keys).
 
 ## Cursor-era issues (resolved)
 
