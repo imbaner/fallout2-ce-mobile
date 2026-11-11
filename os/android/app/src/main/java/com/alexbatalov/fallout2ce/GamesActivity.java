@@ -6,6 +6,7 @@ import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
+import android.graphics.Outline;
 import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
@@ -18,6 +19,7 @@ import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewOutlineProvider;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.Button;
@@ -251,6 +253,11 @@ public class GamesActivity extends Activity {
         });
     }
 
+    // The card (import_panel): its padding, border and corners, dp.
+    private static final int CARD_PADDING_DP = 8;
+    private static final int CARD_BORDER_DP = 1;
+    private static final int CARD_RADIUS_DP = 10;
+
     // The card's picture and lines: on phones the lines over the picture
     // (it fills the card, as large as can be); on tablets the picture 4:3
     // at the top, the lines under it (a tall card would cut the picture).
@@ -289,6 +296,27 @@ public class GamesActivity extends Activity {
         if (name.getParent() == cover) {
             return;
         }
+        // The picture to the card's border, cut to its rounded top corners:
+        // one line around them, not the card's and the picture's frame side
+        // by side. The buttons stay in the card under it, as the save
+        // screen's.
+        int inset = dp(CARD_PADDING_DP - CARD_BORDER_DP);
+        LinearLayout.LayoutParams coverParams = (LinearLayout.LayoutParams) cover.getLayoutParams();
+        coverParams.setMargins(-inset, -inset, -inset, 0);
+        cover.setLayoutParams(coverParams);
+        ((ViewGroup) cover.getParent()).setClipToPadding(false);
+        cover.setBackgroundColor(Color.BLACK);
+        cover.setForeground(null);
+        cover.setPadding(0, 0, 0, 0);
+        float radius = dp(CARD_RADIUS_DP - CARD_BORDER_DP);
+        cover.setOutlineProvider(new ViewOutlineProvider() {
+            @Override
+            public void getOutline(View view, Outline outline) {
+                // Square bottom corners: the rounded rectangle past them.
+                outline.setRoundRect(0, 0, view.getWidth(), view.getHeight() + Math.round(radius), radius);
+            }
+        });
+        ((LinearLayout.LayoutParams) findViewById(R.id.games_actions).getLayoutParams()).topMargin = dp(CARD_PADDING_DP);
         ((ViewGroup) name.getParent()).removeView(name);
         ((ViewGroup) info.getParent()).removeView(info);
         FrameLayout.LayoutParams nameParams = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP);

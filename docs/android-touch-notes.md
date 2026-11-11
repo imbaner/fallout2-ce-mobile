@@ -175,6 +175,21 @@ goes through mouse emulation in touchscreen (absolute) mode.
   selected enemy is the one with the hit chance above it (in the tactical
   view also the only outline cycling, `objectSetTargetOutline`, set by map
   hints). Autotest `behindcritter`.
+- End Turn and End Combat by situation (2026-11-11, `[enhancements]
+  combat_end_buttons_by_situation`, the Combat settings' row; off - both
+  always, as the game's bar): `combatEndOutlook` (combat.cc) tells what is
+  certain without changing anything - End Combat itself
+  (`combatAttemptEnd`) asks the critters' AI and runs bystanders' combat
+  scripts. Refused (a hostile combatant not in the party sees the one who
+  hit it, alive: `_combatai_want_to_stop`'s danger source) - End Turn alone;
+  the combat ending this round anyway (`_combat_should_end` as after
+  `_combat_sequence` takes the dead, knocked out and disengaged out) - End
+  Combat alone, ending it at once, the turn if a bystander joins
+  (`kGameCommandEndCombatOrTurn`); else both (enemies out of sight or
+  fleeing: End Combat ends the combat, End Turn goes on - an enemy that
+  lost sight of the dude keeps him for its target; or what can't be told
+  ahead). Kept from the player's turn while the others act. Autotests
+  `combatendbuttons`, `combatendhidden`, `combatendturnhidden`.
 - Combat's tactical view (2026-10-09/10, `tactical_view.cc`, a port
   setting `[enhancements] tactical_view` for the button): a HUD button over
   End turn / End combat, kept on across combats and starts (`[touch]
@@ -1652,6 +1667,12 @@ folder (`Games.java`):
   process is stopped - the app's process stays after sending the player to
   the list or the import, with no game in it). Delete moves the folders away
   at once and deletes them in the background.
+- Phones: the picture fills the card to its border (`layoutCard`; the web's
+  `.games-cover`), cut to the card's rounded top corners - one line around
+  them, not the card's and the picture's frame side by side - its name and
+  lines over it, the buttons in the card under it (as the save screen's:
+  actions of the chosen one). Tablets keep the picture in its frame with the
+  lines under it.
 - The picture (`CoverImageView`) is held at its right edge as in the main
   menu: as wide as its frame or wider, it fills it; much narrower (a mod's
   tall picture), it's as tall as the frame and its left part fades into the

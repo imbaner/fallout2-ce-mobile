@@ -210,8 +210,10 @@ body.games #links { display:none; }
 .games-row-when { font-size:12px; color:var(--dim); }
 .games-add { height:44px; font-size:15px; white-space:nowrap; display:flex; align-items:center; justify-content:center; gap:10px; }
 .games-add .plus { color:var(--accent); font-size:22px; line-height:1; }
-.games-card { flex:1; display:flex; flex-direction:column; gap:6px; padding:8px; min-width:0; }
-.games-cover { position:relative; flex:1; min-height:0; overflow:hidden; border:1px solid var(--border); border-radius:5px; background:#000; }
+.games-card { flex:1; display:flex; flex-direction:column; gap:8px; padding:8px; min-width:0; }
+/* The picture to the card's border, cut to its rounded top corners: one
+   line around them, the buttons in the card under it. */
+.games-cover { position:relative; flex:1; min-height:0; overflow:hidden; margin:-7px -7px 0; border-radius:6px 6px 0 0; background:#000; }
 .games-picture { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; object-position:right center; }
 /* As tall as the card, its left edge fading into the black (the menu's way). */
 .games-cover.narrow .games-picture { left:auto; right:0; width:auto; height:100%; object-fit:contain;
