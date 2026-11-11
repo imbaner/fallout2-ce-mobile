@@ -303,6 +303,54 @@
 {392}{}{Use}
 {393}{}{Unit prices when trading}
 {394}{}{Top right of an item: the price of one in this deal}
+{395}{}{Text}
+{396}{}{Saves}
+{397}{}{Speed}
+{398}{}{On screen}
+{399}{}{Messages}
+{400}{}{Interface}
+{401}{}{Font}
+{402}{}{Classic: the game's dialog font redrawn}
+{403}{}{Classic}
+{404}{}{Modern}
+{405}{}{Update available}
+{406}{}{Update ready}
+{407}{}{Update}
+{408}{}{Install}
+{409}{}{Downloading update…}
+{410}{}{Preparing installation…}
+{411}{}{Check}
+{412}{}{Checking…}
+{413}{}{The latest version is installed}
+{414}{}{Check for a newer version}
+{415}{}{Could not check for updates. Try again.}
+{416}{}{GitHub is temporarily unavailable. Try again later.}
+{417}{}{Download interrupted. Try again.}
+{418}{}{The update file is damaged or signed with a different key.}
+{419}{}{Could not install the update. You can try again.}
+{420}{}{Allow updates to be installed from this app.}
+{421}{}{Open settings}
+{422}{}{Size:}
+{423}{}{The game will close to install. Saves and settings stay.}
+{424}{}{Check for updates}
+{425}{}{At startup, at most once an hour}
+{426}{}{Delete downloaded update}
+{427}{}{Retry}
+{428}{}{Download and install updates from the main menu.}
+{429}{}{Cancel}
+{430}{}{Update}
+{433}{}{Could not save this setting.}
+{434}{}{No release notes.}
+{435}{}{View}
+{436}{}{MB}
+{437}{}{Source code}
+{438}{}{Open}
+{439}{}{No update is available for this device}
+{440}{}{Developer news on Telegram}
+{441}{}{Videos and guides on YouTube}
+{442}{}{Report a problem}
+{443}{}{Thank the port's author}
+{444}{}{The app, its updates and all of its features are free. A thank-you goes to the port's author personally: it is not a payment for Fallout 2 or for the app, and it has nothing to do with Microsoft, Bethesda Softworks, ZeniMax, Interplay or any other owner of Fallout. It gives no access to builds or features, no priority for fixes and no commitment to development.}
 
 # Character creation's appearance tab (sfall's Hero Appearance mod); race
 # and style as sfall's translations ([AppearanceMod] RaceText, StyleText),
