@@ -155,7 +155,11 @@ public class MainActivity extends SDLActivity {
 
     // Where to go instead of the game, null: the game.
     private Intent otherScreen(File gameFolder) {
-        boolean failed = Games.startingMark(this).isFile();
+        // This game's start that didn't reach its menu. The mark of another
+        // game's (it failed, then this one was added or chosen) isn't this
+        // one's failure: it was blamed on the game started next.
+        File mark = Games.startingMark(this);
+        boolean failed = mark.isFile() && game.id.equals(readText(mark).trim());
         boolean installed = GameImport.isInstalled(gameFolder);
         if (failed || !installed) {
             try {
