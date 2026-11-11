@@ -68,7 +68,8 @@ const appCache = startAppCache({idle:() => (!!source || !!gamesView) && !startin
 
 function rotatePrompt() {
   const portrait = innerHeight > innerWidth && matchMedia('(pointer:coarse)').matches;
-  $('rotate').hidden = !(running && portrait);
+  // The game and its list of games are landscape only (as on Android).
+  $('rotate').hidden = !((running || gamesView) && portrait);
   if (source && !starting && !running && !document.body.classList.contains('error')) {
     // A download doesn't hold Play: a game started meanwhile runs this build,
     // the new one comes after it.
@@ -228,6 +229,7 @@ function showGames(listed) {
     onAdd:id => { location.href = './files.html?game=' + encodeURIComponent(id) + '&add=1'; },
     onReplace:id => { location.href = './files.html?game=' + encodeURIComponent(id); },
     onChanged:() => location.reload()});
+  rotatePrompt();
 }
 
 async function play() {
